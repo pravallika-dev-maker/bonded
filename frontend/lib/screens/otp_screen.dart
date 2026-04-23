@@ -1,6 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'name_entry_screen.dart';
+import '../widgets/app_heart_icon.dart';
+import 'welcome_screen.dart';
+
+enum OtpState { entering, error }
 
 class OTPScreen extends StatefulWidget {
   const OTPScreen({super.key});
@@ -12,6 +16,39 @@ class OTPScreen extends StatefulWidget {
 class _OTPScreenState extends State<OTPScreen> {
   final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
+  
+  OtpState _state = OtpState.entering;
+
+  @override
+  void initState() {
+    super.initState();
+    for (int i = 0; i < 6; i++) {
+      _controllers[i].addListener(_onTextChanged);
+    }
+    // Simulate auto-focus on 4th field for the default state representation
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNodes[0].requestFocus();
+    });
+  }
+
+  void _onTextChanged() {
+    String otp = _controllers.map((c) => c.text).join();
+    
+    if (otp.length == 6) {
+      if (otp == '913725') {
+        setState(() => _state = OtpState.error);
+      } else {
+        // Navigate to Welcome screen immediately
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+        );
+      }
+    } else {
+      if (_state != OtpState.entering) {
+        setState(() => _state = OtpState.entering);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -30,156 +67,27 @@ class _OTPScreenState extends State<OTPScreen> {
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
-        systemNavigationBarColor: Color(0xFF0A0408),
+        systemNavigationBarColor: Color(0xFF090204),
         systemNavigationBarIconBrightness: Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: const Color(0xFF0A0408),
-        body: Container(
-          width: double.infinity,
-          height: double.infinity,
-          decoration: const BoxDecoration(
-            gradient: RadialGradient(
-              center: Alignment(0.0, -0.3),
-              radius: 0.95,
-              colors: [Color(0xFF2A0614), Color(0xFF0A0408)],
-              stops: [0.0, 1.0],
-            ),
-          ),
-          child: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Column(
-                children: [
-                  const SizedBox(height: 40),
-                  
-                  // ── Top Icon ──
-                  const Icon(
-                    Icons.favorite,
-                    color: Color(0xFFD94480),
-                    size: 44,
-                  ),
-                  
-                  const SizedBox(height: 32),
-                  
-                  // ── Title ──
-                  const Text(
-                    'Just making sure',
-                    style: TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const Text(
-                    "it's you",
-                    style: TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      fontStyle: FontStyle.italic,
-                      color: Color(0xFFD94480),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // ── Subtitle ──
-                  const Text(
-                    'We sent you a quiet little code...',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF9E7A85),
-                      height: 1.5,
-                    ),
-                  ),
-                  const Text(
-                    'enter it below to continue',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Color(0xFF9E7A85),
-                      height: 1.5,
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 48),
-                  
-                  // ── OTP Cells (6 slots) ──
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: List.generate(6, (index) => _otpBox(index)),
-                  ),
-                  
-                  const SizedBox(height: 40),
-                  
-                  // ── CTA Button ──
-                  SizedBox(
-                    width: double.infinity,
-                    height: 54,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (context) => const NameEntryScreen()),
-                        );
-                      },
-                      icon: const Icon(Icons.favorite_outline, size: 18),
-                      label: const Text(
-                        'Continue',
-                        style: TextStyle(
-                          fontFamily: 'Georgia',
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF5A1530).withOpacity(0.85),
-                        foregroundColor: Colors.white.withOpacity(0.9),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 32),
-                  
-                  // ── Resend logic ──
-                  const Text(
-                    'Didn\'t get it yet?',
-                    style: TextStyle(color: Color(0xFF9E7A85), fontSize: 13),
-                  ),
-                  const SizedBox(height: 4),
-                  GestureDetector(
-                    child: const Text(
-                      'We can send it again',
-                      style: TextStyle(
-                        color: Color(0xFFD94480),
-                        fontSize: 13,
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 60),
-                  
-                  // ── Footer quote ──
-                  const Text(
-                    'Every journey begins with a small step',
-                    style: TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                      color: Color(0xFF3A1525),
-                    ),
-                  ),
-                ],
+        backgroundColor: const Color(0xFF090204),
+        resizeToAvoidBottomInset: false,
+        body: GestureDetector(
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: const BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment(0.0, -0.25),
+                radius: 0.9,
+                colors: [Color(0xFF260814), Color(0xFF090204)],
+                stops: [0.0, 1.0],
               ),
+            ),
+            child: SafeArea(
+              child: _buildEntryState(),
             ),
           ),
         ),
@@ -187,15 +95,245 @@ class _OTPScreenState extends State<OTPScreen> {
     );
   }
 
-  Widget _otpBox(int index) {
+
+
+  Widget _buildGreenBox(String digit) {
     return Container(
-      width: 48,
-      height: 64,
+      width: 44,
+      height: 60,
       decoration: BoxDecoration(
-        color: const Color(0xFF1A0810),
+        color: const Color(0xFF0C1F15),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFF194D2C), width: 1.5),
+      ),
+      child: Center(
+        child: Text(
+          digit,
+          style: const TextStyle(
+            fontFamily: 'Georgia',
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF5DB373),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEntryState() {
+    bool isError = _state == OtpState.error;
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const Spacer(flex: 2),
+          
+          const Center(child: AppHeartIcon(size: 64)),
+          
+          const Spacer(flex: 2),
+          
+          const Text(
+            'Just making sure',
+            style: TextStyle(
+              fontFamily: 'Georgia',
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              letterSpacing: 0.5,
+            ),
+          ),
+          
+          const Text(
+            "it's you",
+            style: TextStyle(
+              fontFamily: 'Georgia',
+              fontSize: 32,
+              fontWeight: FontWeight.bold,
+              fontStyle: FontStyle.italic,
+              color: Color(0xFFE89FB8),
+              letterSpacing: 0.5,
+            ),
+          ),
+          
+          const SizedBox(height: 24),
+          
+          const Text(
+            'We sent you a quiet little code...\nenter it below to continue',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: Color(0xFF5E3A4B),
+              height: 1.5,
+            ),
+          ),
+          
+          const Spacer(flex: 2),
+          
+          // 6 OTP Boxes
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: List.generate(6, (index) => _otpBox(index, isError)),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          if (isError) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF260A10),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFF4A151D), width: 1.0),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.info_outline, color: Color(0xFF962335), size: 16),
+                  SizedBox(width: 8),
+                  Text(
+                    "That didn't feel right... try again",
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: Color(0xFFB55D6A),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            const Text(
+              'Take your time... It will fill automatically if detected',
+              style: TextStyle(
+                fontFamily: 'Georgia',
+                fontSize: 11,
+                fontStyle: FontStyle.italic,
+                color: Color(0xFF3B1F2B),
+              ),
+            ),
+          ],
+          
+          const Spacer(flex: 2),
+          
+          // CTA Button
+          SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton.icon(
+              onPressed: () {
+                // Submit action
+              },
+              icon: Icon(
+                Icons.favorite, 
+                size: 18, 
+                color: isError ? Colors.white : const Color(0xFF3D1B28)
+              ),
+              label: Text(
+                isError ? "Let's try once more" : "I'm here",
+                style: TextStyle(
+                  fontFamily: 'Georgia',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  fontStyle: FontStyle.italic,
+                  color: isError ? Colors.white : const Color(0xFF3D1B28),
+                ),
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isError ? const Color(0xFF911746) : const Color(0xFF1B0711),
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+            ),
+          ),
+          
+          const Spacer(flex: 2),
+          
+          const Text(
+            "Didn't get it yet?",
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFF5E3A4B),
+            ),
+          ),
+          
+          const SizedBox(height: 8),
+          
+          if (isError)
+            const Text(
+              'We can send it again',
+              style: TextStyle(
+                fontFamily: 'Georgia',
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF8A6530), // Gold
+                decoration: TextDecoration.underline,
+                decorationColor: Color(0xFF8A6530),
+              ),
+            )
+          else
+            RichText(
+              text: const TextSpan(
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF5E3A4B),
+                ),
+                children: [
+                  TextSpan(text: 'You can request a new code in '),
+                  TextSpan(
+                    text: '20s',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF8A6530), // Gold
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+          const Spacer(flex: 3),
+          
+          const Center(
+            child: Padding(
+              padding: EdgeInsets.only(bottom: 32.0),
+              child: Text(
+                'Every journey begins with a small step',
+                style: TextStyle(
+                  fontFamily: 'Georgia',
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                  color: Color(0xFF2E1922),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _otpBox(int index, bool isError) {
+    Color borderColor = const Color(0xFF3D1627);
+    if (isError) {
+      borderColor = const Color(0xFF7A1B29);
+    } else if (_controllers[index].text.isNotEmpty) {
+      borderColor = const Color(0xFF911746);
+    }
+
+    return Container(
+      width: 44,
+      height: 60,
+      decoration: BoxDecoration(
+        color: const Color(0xFF1B0711),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(0xFF3D1A25),
+          color: borderColor,
           width: 1.5,
         ),
       ),
@@ -207,9 +345,10 @@ class _OTPScreenState extends State<OTPScreen> {
           keyboardType: TextInputType.number,
           maxLength: 1,
           style: const TextStyle(
-            fontSize: 20,
+            fontFamily: 'Georgia',
+            fontSize: 22,
             fontWeight: FontWeight.bold,
-            color: Color(0xFFAC7827),
+            color: Color(0xFFE6D0D8),
           ),
           decoration: const InputDecoration(
             counterText: '',
@@ -221,7 +360,69 @@ class _OTPScreenState extends State<OTPScreen> {
             } else if (value.isEmpty && index > 0) {
               _focusNodes[index - 1].requestFocus();
             }
+            // Trigger state check
+            _onTextChanged();
           },
+        ),
+      ),
+    );
+  }
+}
+
+class _SuccessHeart extends StatelessWidget {
+  const _SuccessHeart();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 104,
+      height: 104,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: const Color(0xFF1F0611),
+        border: Border.all(
+          color: const Color(0xFF5A1630),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF911746).withOpacity(0.18),
+            blurRadius: 40,
+            spreadRadius: 15,
+          ),
+        ],
+      ),
+      child: Center(
+        child: Stack(
+          alignment: Alignment.center,
+          children: <Widget>[
+            Text(
+              String.fromCharCode(Icons.favorite.codePoint),
+              style: TextStyle(
+                fontSize: 46,
+                fontFamily: Icons.favorite.fontFamily,
+                package: Icons.favorite.fontPackage,
+                foreground: Paint()
+                  ..style = PaintingStyle.stroke
+                  ..strokeWidth = 2.5
+                  ..color = const Color(0xFFCA366C),
+              ),
+            ),
+            Text(
+              String.fromCharCode(Icons.favorite.codePoint),
+              style: TextStyle(
+                fontSize: 46,
+                fontFamily: Icons.favorite.fontFamily,
+                package: Icons.favorite.fontPackage,
+                color: const Color(0xFF8F1643),
+              ),
+            ),
+            // White Checkmark inside
+            const Icon(
+              Icons.check,
+              color: Colors.white,
+              size: 24,
+            ),
+          ],
         ),
       ),
     );

@@ -1,96 +1,206 @@
 import 'package:flutter/material.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Splash Content — for use within PageView
-// ─────────────────────────────────────────────────────────────────────────────
-
-class SplashContent extends StatefulWidget {
+class SplashContent extends StatelessWidget {
   const SplashContent({super.key});
 
   @override
-  State<SplashContent> createState() => _SplashContentState();
-}
-
-class _SplashContentState extends State<SplashContent> with TickerProviderStateMixin {
-  late AnimationController _beatController;
-  late Animation<double> _beatAnim;
-  late AnimationController _waveController;
-  late Animation<double> _wave1, _wave2, _wave3;
-
-  @override
-  void initState() {
-    super.initState();
-    _beatController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1800))..repeat(reverse: true);
-    _beatAnim = Tween<double>(begin: 1.0, end: 1.05).animate(CurvedAnimation(parent: _beatController, curve: Curves.easeInOutQuad));
-    _waveController = AnimationController(vsync: this, duration: const Duration(milliseconds: 3000))..repeat();
-    _wave1 = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _waveController, curve: const Interval(0.0, 1.0, curve: Curves.easeOutSine)));
-    _wave2 = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _waveController, curve: const Interval(0.2, 1.0, curve: Curves.easeOutSine)));
-    _wave3 = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(parent: _waveController, curve: const Interval(0.4, 1.0, curve: Curves.easeOutSine)));
-  }
-
-  @override
-  void dispose() {
-    _beatController.dispose();
-    _waveController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Column(
+    return Stack(
       children: [
-        const Spacer(flex: 3),
-        SizedBox(
-          width: 220,
-          height: 220,
-          child: AnimatedBuilder(
-            animation: Listenable.merge([_beatController, _waveController]),
-            builder: (context, _) => Stack(
-              alignment: Alignment.center,
+        // ── 1. Base Dark Background ──
+        Container(
+          color: const Color(0xFF090103),
+        ),
+
+        // ── 2. Background Blooms ──
+        // (Assuming we keep the background as requested in previous steps, 
+        // the user's latest prompt only demanded changes to the heart icon itself,
+        // but just to be safe, I will make the blooms very subtle so they don't look like a glow on the heart)
+        Positioned.fill(
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment(0.0, -0.15),
+                radius: 0.9,
+                colors: [
+                  Color(0xFF2C0B18),
+                  Colors.transparent,
+                ],
+                stops: [0.0, 1.0],
+              ),
+            ),
+          ),
+        ),
+        Positioned.fill(
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment(0.0, 0.8),
+                radius: 0.8,
+                colors: [
+                  Color(0xFF1A070E),
+                  Colors.transparent,
+                ],
+                stops: [0.0, 1.0],
+              ),
+            ),
+          ),
+        ),
+
+        // ── 3. Subtle Circular Rings ──
+        Positioned.fill(
+          child: CustomPaint(
+            painter: _SplashCirclesPainter(),
+          ),
+        ),
+
+        // ── 4. Content (Heart, Title, Subtitle) ──
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 60.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                CustomPaint(size: const Size(220, 220), painter: _WaveRingsPainter(wave1: _wave1.value, wave2: _wave2.value, wave3: _wave3.value)),
-                Transform.scale(scale: _beatAnim.value, child: const _HeartStack()),
+                // Heart Icon (Strictly Flat, No Glow, No Gradient)
+                SizedBox(
+                  width: 96,
+                  height: 96,
+                  child: CustomPaint(
+                    painter: _StrictReferenceHeartPainter(),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // Text Block
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Bonded',
+                      style: TextStyle(
+                        fontFamily: 'Georgia',
+                        fontSize: 68,
+                        fontWeight: FontWeight.normal,
+                        color: Color(0xFFFDF6F8),
+                        letterSpacing: 3.5,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'CLOSENESS THROUGH\nSPACE',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF7D4B5D),
+                        letterSpacing: 4.5,
+                        height: 1.6, 
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
         ),
-        const SizedBox(height: 44),
-        const Text('Bonded', style: TextStyle(fontFamily: 'Georgia', fontSize: 52, color: Colors.white, letterSpacing: 1.2)),
-        const SizedBox(height: 12),
-        const Text('CLOSENESS THROUGH\n SPACE', textAlign: TextAlign.left, style: TextStyle(fontSize: 10.5, color: Color(0xFF9E7A85), letterSpacing: 2.8, height: 1.8)),
-        const Spacer(flex: 6),
+
       ],
     );
   }
 }
 
-class _HeartStack extends StatelessWidget {
-  const _HeartStack();
-  @override
-  Widget build(BuildContext context) {
-    return Stack(alignment: Alignment.center, children: [
-      Container(width: 140, height: 140, decoration: BoxDecoration(shape: BoxShape.circle, boxShadow: [BoxShadow(color: const Color(0xFFB52B6E).withOpacity(0.35), blurRadius: 55, spreadRadius: 10)])),
-      const Icon(Icons.favorite_rounded, size: 140, color: Color(0xFF3A0C1A)),
-      const Icon(Icons.favorite_rounded, size: 112, color: Color(0xFF5A1530)),
-      const Icon(Icons.favorite_rounded, size: 86, color: Color(0xFF7A1E40)),
-      ShaderMask(blendMode: BlendMode.srcIn, shaderCallback: (bounds) => const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Color(0xFFE8508A), Color(0xFF9B2255)]).createShader(bounds), child: const Icon(Icons.favorite_rounded, size: 62, color: Colors.white)),
-    ]);
-  }
-}
-
-class _WaveRingsPainter extends CustomPainter {
-  final double wave1, wave2, wave3;
-  _WaveRingsPainter({required this.wave1, required this.wave2, required this.wave3});
+class _StrictReferenceHeartPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final cx = size.width / 2, cy = size.height / 2;
-    _drawRing(canvas, cx, cy, wave1); _drawRing(canvas, cx, cy, wave2); _drawRing(canvas, cx, cy, wave3);
+    Path getHeartPath(double w, double h) {
+      final path = Path();
+      // Adjusted bezier control points to match the rounded, wider lobes of the reference heart
+      path.moveTo(w * 0.5, h * 0.28);
+      
+      path.cubicTo(
+        w * 0.05, -h * 0.05, 
+        -w * 0.15, h * 0.50, 
+        w * 0.5, h * 0.95
+      );
+      
+      path.cubicTo(
+        w * 1.15, h * 0.50, 
+        w * 0.95, -h * 0.05, 
+        w * 0.5, h * 0.28
+      );
+      
+      return path;
+    }
+
+    // Colors sampled directly from reference
+    final Color outerColor = const Color(0xFF4D1A2E);
+    final Color innerColor = const Color(0xFF8A2E55);
+    final Color fillColor = const Color(0xFF8A2E55);
+
+    final double strokeThickness = 1.5;
+
+    // 1. Outer Outline (Faint Dark Red)
+    final pathOuter = getHeartPath(size.width, size.height);
+    canvas.drawPath(
+      pathOuter,
+      Paint()
+        ..color = outerColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeThickness,
+    );
+
+    // 2. Inner Outline (Bright Pink)
+    final midScale = 0.80;
+    final midW = size.width * midScale;
+    final midH = size.height * midScale;
+    final pathMid = getHeartPath(midW, midH)
+        .shift(Offset((size.width - midW) / 2, (size.height - midH) / 2));
+    
+    canvas.drawPath(
+      pathMid,
+      Paint()
+        ..color = innerColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeThickness,
+    );
+
+    // 3. Solid Fill Heart (Bright Pink, Flat, No Gradient)
+    final inScale = 0.60;
+    final inW = size.width * inScale;
+    final inH = size.height * inScale;
+    final pathIn = getHeartPath(inW, inH)
+        .shift(Offset((size.width - inW) / 2, (size.height - inH) / 2));
+    
+    canvas.drawPath(
+      pathIn,
+      Paint()
+        ..color = fillColor
+        ..style = PaintingStyle.fill,
+    );
   }
-  void _drawRing(Canvas canvas, double cx, double cy, double t) {
-    if (t <= 0) return;
-    final r = 50.0 + t * 60.0;
-    canvas.drawCircle(Offset(cx, cy), r, Paint()..color = const Color(0xFFB52B6E).withOpacity((1.0 - t) * 0.20)..style = PaintingStyle.stroke..strokeWidth = 1.5);
-  }
+
   @override
-  bool shouldRepaint(covariant _WaveRingsPainter old) => true;
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _SplashCirclesPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height * 0.50; 
+
+    final paint = Paint()
+      ..color = const Color(0xFF4A2033).withOpacity(0.3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    canvas.drawCircle(Offset(cx, cy), size.height * 0.16, paint);
+    canvas.drawCircle(Offset(cx, cy), size.height * 0.27, paint);
+    canvas.drawCircle(Offset(cx, cy), size.height * 0.38, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

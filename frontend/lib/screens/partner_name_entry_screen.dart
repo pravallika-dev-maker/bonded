@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'partner_invite_screen.dart';
+import 'beginning_date_screen.dart';
 
 class PartnerNameEntryScreen extends StatefulWidget {
-  const PartnerNameEntryScreen({super.key});
+  final String userName;
+  const PartnerNameEntryScreen({super.key, required this.userName});
 
   @override
   State<PartnerNameEntryScreen> createState() => _PartnerNameEntryScreenState();
@@ -48,6 +51,7 @@ class _PartnerNameEntryScreenState extends State<PartnerNameEntryScreen> {
       ),
       child: Scaffold(
         backgroundColor: const Color(0xFF0A0408),
+        resizeToAvoidBottomInset: false,
         body: Container(
           width: double.infinity,
           height: double.infinity,
@@ -76,16 +80,16 @@ class _PartnerNameEntryScreenState extends State<PartnerNameEntryScreen> {
                 Column(
                   children: [
                     Expanded(
-                      child: SingleChildScrollView(
+                      child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 24.0),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const SizedBox(height: 48),
+                            const Spacer(flex: 2),
                             
                             // ── Top Label ──
                             Text(
-                              'STEP 3 OF 4 — THEIR NAME',
+                              'STEP 3 OF 5 — THEIR NAME',
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
@@ -94,7 +98,7 @@ class _PartnerNameEntryScreenState extends State<PartnerNameEntryScreen> {
                               ),
                             ),
                             
-                            const SizedBox(height: 32),
+                            const SizedBox(height: 24),
                             
                             // ── Title ──
                             const Text(
@@ -134,7 +138,7 @@ class _PartnerNameEntryScreenState extends State<PartnerNameEntryScreen> {
                               ),
                             ),
                             
-                            const SizedBox(height: 48),
+                            const Spacer(flex: 2),
                             
                             // ── Input Field ──
                             IntrinsicWidth(
@@ -184,7 +188,7 @@ class _PartnerNameEntryScreenState extends State<PartnerNameEntryScreen> {
                               ),
                             ),
                             
-                            const SizedBox(height: 60),
+                            const Spacer(flex: 3),
                             
                             // ── Quotes & Data Preview Card ──
                             Container(
@@ -234,7 +238,7 @@ class _PartnerNameEntryScreenState extends State<PartnerNameEntryScreen> {
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 40), // Spacing for scroll if keyboard opens
+                            const Spacer(flex: 3),
                           ],
                         ),
                       ),
@@ -249,7 +253,15 @@ class _PartnerNameEntryScreenState extends State<PartnerNameEntryScreen> {
                         child: ElevatedButton.icon(
                           onPressed: _partnerNameController.text.trim().isNotEmpty
                               ? () {
-                                  // Nav to next screen...
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => BeginningDateScreen(
+                                        userName: widget.userName,
+                                        partnerName: _partnerNameController.text.trim(),
+                                      ),
+                                    ),
+                                  );
                                 }
                               : null,
                           icon: Icon(

@@ -17,43 +17,24 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
+  // ── Bulletproof Splash State ──
+  bool _showSplash = true;
+  double _splashOpacity = 1.0;
+  double _splashScale = 1.0;
+
   @override
   void initState() {
     super.initState();
-    _startAutoProgression();
-  }
-
-  void _startAutoProgression() {
-    // ── Timer for Splash (Page 0) -> Onboarding 1 (Page 1) ──
-    Timer(const Duration(seconds: 3), () {
-      if (mounted && _currentPage == 0) {
-        _pageController.animateToPage(
-          1,
-          duration: const Duration(milliseconds: 1000),
-          curve: Curves.easeInOutQuart,
-        );
-        
-        // ── Timer for Onboarding 1 (Page 1) -> Onboarding 2 (Page 2) ──
-        Timer(const Duration(seconds: 3), () {
-          if (mounted && _currentPage == 1) {
-            _pageController.animateToPage(
-              2,
-              duration: const Duration(milliseconds: 1000),
-              curve: Curves.easeInOutQuart,
-            );
-
-            // ── Timer for Onboarding 2 (Page 2) -> Login (Page 3) ──
-            Timer(const Duration(seconds: 3), () {
-              if (mounted && _currentPage == 2) {
-                _pageController.animateToPage(
-                  3,
-                  duration: const Duration(milliseconds: 1000),
-                  curve: Curves.easeInOutQuart,
-                );
-              }
-            });
-          }
+    
+    // Hold splash screen for 3 seconds
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        // Trigger the elegant fade + scale animation
+        setState(() {
+          _splashOpacity = 0.0;
+          _splashScale = 1.05; // Expands outward smoothly as it fades
         });
+
       }
     });
   }
@@ -66,22 +47,22 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return AnnotatedRegion<SystemUiOverlayStyle>(
+    Widget mainFlow = AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
-        systemNavigationBarColor: Color(0xFF0A0408),
+        systemNavigationBarColor: Color(0xFF090204),
         systemNavigationBarIconBrightness: Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: const Color(0xFF0A0408),
+        backgroundColor: const Color(0xFF090204),
         body: Container(
           // Unified Background for the whole flow
           decoration: const BoxDecoration(
             gradient: RadialGradient(
               center: Alignment(0.0, -0.3),
               radius: 0.95,
-              colors: [Color(0xFF2A0614), Color(0xFF0A0408)],
+              colors: [Color(0xFF260814), Color(0xFF090204)],
               stops: [0.0, 1.0],
             ),
           ),
@@ -91,87 +72,93 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
                 // ── The Swipable Sequence ──
                 PageView(
                   controller: _pageController,
-                  physics: const BouncingScrollPhysics(), // Better back/forward feel
+                  physics: const NeverScrollableScrollPhysics(), // Disables swiping back or forward
                   onPageChanged: (index) {
                     setState(() {
                       _currentPage = index;
                     });
                   },
-                  children: const [
-                    SplashContent(),
-                    Onboarding1Content(),
-                    Onboarding2Content(),
-                    LoginContent(), // Now integrated as the last page
+                  children: [
+                    Onboarding1Content(
+                      onNext: () {
+                        _pageController.animateToPage(
+                          1,
+                          duration: const Duration(milliseconds: 800),
+                          curve: Curves.easeInOutQuart,
+                        );
+                      },
+                      onSkip: () {
+                        _pageController.animateToPage(
+                          2,
+                          duration: const Duration(milliseconds: 800),
+                          curve: Curves.easeInOutQuart,
+                        );
+                      },
+                    ),
+                    Onboarding2Content(
+                      onNext: () {
+                        _pageController.animateToPage(
+                          2,
+                          duration: const Duration(milliseconds: 800),
+                          curve: Curves.easeInOutQuart,
+                        );
+                      },
+                      onSkip: () {
+                        _pageController.animateToPage(
+                          2,
+                          duration: const Duration(milliseconds: 800),
+                          curve: Curves.easeInOutQuart,
+                        );
+                      },
+                    ),
+                    const LoginContent(),
                   ],
                 ),
-
-                // ── Fixed Footer Dots & Skip ──
-                // Hidden on the Login page (Page 3)
-                if (_currentPage < 3)
-                  Positioned(
-                    bottom: 24,
-                    left: 24,
-                    right: 24,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        // "skip" link on far left
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: GestureDetector(
-                            onTap: () {
-                              _pageController.animateToPage(
-                                3,
-                                duration: const Duration(milliseconds: 800),
-                                curve: Curves.easeInOutQuart,
-                              );
-                            },
-                            child: Text(
-                              'skip',
-                              style: TextStyle(
-                                fontFamily: 'Georgia',
-                                fontSize: 14,
-                                fontStyle: FontStyle.italic,
-                                color: _currentPage == 2
-                                    ? const Color(0xFFAC7827)
-                                    : const Color(0xFF7A4060).withOpacity(0.85),
-                                decoration: TextDecoration.none,
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // Dots (3 Dots for the 3 Onboarding steps)
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            _sharedDot(active: _currentPage == 0),
-                            const SizedBox(width: 8),
-                            _sharedDot(active: _currentPage == 1),
-                            const SizedBox(width: 8),
-                            _sharedDot(active: _currentPage == 2),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
               ],
             ),
           ),
         ),
       ),
     );
-  }
 
-  Widget _sharedDot({required bool active}) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 300),
-      width: active ? 22 : 7,
-      height: 5,
-      decoration: BoxDecoration(
-        color: active ? Colors.white : const Color(0xFF3A1525),
-        borderRadius: BorderRadius.circular(4),
-      ),
+    // ── Root Stack with Bulletproof Splash Overlay ──
+    return Stack(
+      children: [
+        // The main app underneath
+        mainFlow,
+
+        // The Splash Screen overlays everything and animates away
+        if (_showSplash)
+          Positioned.fill(
+            child: IgnorePointer(
+              child: TweenAnimationBuilder<double>(
+                tween: Tween<double>(begin: 1.0, end: _splashOpacity),
+                duration: const Duration(milliseconds: 600),
+                curve: Curves.easeInOut,
+                onEnd: () {
+                  if (_splashOpacity == 0.0 && mounted) {
+                    setState(() {
+                      _showSplash = false;
+                    });
+                  }
+                },
+                builder: (context, value, child) {
+                  return Opacity(
+                    opacity: value,
+                    child: Transform.scale(
+                      scale: 1.0 + (1.0 - value) * 0.05, // Scales from 1.0 up to 1.05 smoothly
+                      child: child,
+                    ),
+                  );
+                },
+                child: const Scaffold(
+                  backgroundColor: Color(0xFF090103),
+                  body: SplashContent(),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
