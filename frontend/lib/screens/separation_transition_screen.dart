@@ -75,6 +75,7 @@ class _SeparationTransitionScreenState extends State<SeparationTransitionScreen>
       ),
       child: Scaffold(
         backgroundColor: const Color(0xFF090204),
+        resizeToAvoidBottomInset: false,
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,

@@ -96,6 +96,7 @@ class _TransitionScreenState extends State<TransitionScreen>
       ),
       child: Scaffold(
         backgroundColor: const Color(0xFF0A0408),
+        resizeToAvoidBottomInset: false,
         body: Container(
           width: double.infinity,
           height: double.infinity,

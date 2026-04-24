@@ -52,6 +52,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
       ),
       child: Scaffold(
         backgroundColor: const Color(0xFF090204),
+        resizeToAvoidBottomInset: false,
         body: Container(
           width: double.infinity,
           height: double.infinity,
@@ -191,41 +192,51 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       const Spacer(flex: 1),
 
                       // ── CTA Button ──
-                      SizedBox(
-                        width: double.infinity,
-                        height: 58,
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(
-                                builder: (_) => const NameEntryScreen(),
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.of(context).pushReplacement(
+                            MaterialPageRoute(
+                              builder: (_) => const NameEntryScreen(),
+                            ),
+                          );
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: double.infinity,
+                          height: 58,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1A1214),
+                            borderRadius: BorderRadius.circular(29),
+                            border: Border.all(
+                              color: const Color(0xFF911746).withOpacity(0.5),
+                              width: 1.2,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(
+                                Icons.favorite,
+                                size: 18,
+                                color: Color(0xFFDD8F9F),
                               ),
-                            );
-                          },
-                          icon: const Icon(
-                            Icons.favorite,
-                            size: 18,
-                            color: Colors.white,
-                          ),
-                          label: const Text(
-                            'Begin your journey',
-                            style: TextStyle(
-                              fontFamily: 'Georgia',
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              fontStyle: FontStyle.italic,
-                              color: Colors.white,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF911746),
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(20),
-                            ),
+                              SizedBox(width: 12),
+                              Text(
+                                'Begin your journey',
+                                style: TextStyle(
+                                  fontFamily: 'Georgia',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  fontStyle: FontStyle.italic,
+                                  letterSpacing: 0.5,
+                                  color: Color(0xFFDD8F9F),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
+                      
 
                       const Spacer(flex: 1),
 

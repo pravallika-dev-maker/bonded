@@ -102,18 +102,7 @@ class _NewSeparationScreenState extends State<NewSeparationScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(child: Container(height: 2, color: const Color(0xFF8A2E55))),
-                        const SizedBox(width: 8),
-                        Expanded(child: Container(height: 2, color: const Color(0xFF8A2E55))),
-                        const SizedBox(width: 8),
-                        Expanded(child: Container(height: 2, color: const Color(0xFF8A2E55))),
-                        const SizedBox(width: 8),
-                        Expanded(child: Container(height: 2, color: const Color(0xFF8A2E55))),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
+
                     Row(
                       children: [
                         Container(
@@ -320,11 +309,13 @@ class _NewSeparationScreenState extends State<NewSeparationScreen> {
                           duration: const Duration(milliseconds: 200),
                           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                           decoration: BoxDecoration(
-                            color: _isAgreed ? const Color(0xFF2A0D18) : const Color(0xFF160A0E), 
+                            color: _isAgreed ? const Color(0xFF1A1214) : const Color(0xFF0D080A),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: _isAgreed ? const Color(0xFF6E2843) : const Color(0xFF26181E),
-                              width: 1.5,
+                              color: _isAgreed 
+                                  ? const Color(0xFF911746).withOpacity(0.5) 
+                                  : const Color(0xFF26151B),
+                              width: 1.2,
                             ),
                           ),
                           child: Row(
@@ -335,25 +326,25 @@ class _NewSeparationScreenState extends State<NewSeparationScreen> {
                                 height: 28,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: _isAgreed ? const Color(0xFF8A2E55) : Colors.transparent,
+                                  color: _isAgreed ? const Color(0xFFDD8F9F) : Colors.transparent,
                                   border: Border.all(
-                                    color: _isAgreed ? const Color(0xFF8A2E55) : const Color(0xFF4A2A35),
+                                    color: _isAgreed ? const Color(0xFFDD8F9F) : const Color(0xFF3B1F2B),
                                     width: 1.5,
                                   ),
                                 ),
                                 child: _isAgreed
-                                    ? const Icon(Icons.check, size: 18, color: Colors.white)
+                                    ? const Icon(Icons.check, size: 18, color: Color(0xFF1A1214))
                                     : null,
                               ),
                               const SizedBox(width: 16),
-                              const Expanded(
+                              Expanded(
                                 child: Text(
                                   '"I choose to stay in this space fully"',
                                   style: TextStyle(
                                     fontFamily: 'Georgia',
                                     fontSize: 15,
                                     fontStyle: FontStyle.italic,
-                                    color: Color(0xFFD4C4CA),
+                                    color: _isAgreed ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
                                   ),
                                 ),
                               ),
@@ -364,52 +355,49 @@ class _NewSeparationScreenState extends State<NewSeparationScreen> {
                       const SizedBox(height: 32),
 
                       // ── Submit Button ──
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton.icon(
-                          onPressed: _isAgreed ? _submit : null,
-                          icon: Icon(
-                            Icons.favorite,
-                            size: 18,
-                            color: _isAgreed ? Colors.white : const Color(0xFF261019),
-                          ),
-                          label: Text(
-                            'Begin this space',
-                            style: TextStyle(
-                              fontFamily: 'Georgia',
-                              fontSize: 16,
-                              fontStyle: FontStyle.italic,
-                              fontWeight: FontWeight.w600,
-                              color: _isAgreed ? Colors.white : const Color(0xFF261019),
+                      GestureDetector(
+                        onTap: _isAgreed ? _submit : null,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: double.infinity,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: _isAgreed ? const Color(0xFF1A1214) : const Color(0xFF0D080A),
+                            borderRadius: BorderRadius.circular(28),
+                            border: Border.all(
+                              color: _isAgreed 
+                                  ? const Color(0xFF911746).withOpacity(0.5) 
+                                  : const Color(0xFF26151B),
+                              width: 1.2,
                             ),
                           ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF8A2E55),
-                            disabledBackgroundColor: const Color(0xFF160A0E),
-                            splashFactory: NoSplash.splashFactory,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.favorite,
+                                size: 18,
+                                color: _isAgreed ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Begin this space',
+                                style: TextStyle(
+                                  fontFamily: 'Georgia',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  fontStyle: FontStyle.italic,
+                                  letterSpacing: 0.5,
+                                  color: _isAgreed ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                       const SizedBox(height: 48),
                       
-                      // Bottom Text Indicator
-                      const Center(
-                        child: Text(
-                          'STEP 4 — SET INTENTION',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.5,
-                            color: Color(0xFF3D1627),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 32),
+
                     ],
                   ),
                 ),

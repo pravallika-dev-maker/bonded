@@ -9,6 +9,7 @@ class LoginScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Scaffold(
       backgroundColor: Color(0xFF090204),
+      resizeToAvoidBottomInset: false,
       body: LoginContent(),
     );
   }
@@ -297,29 +298,45 @@ class _LoginContentState extends State<LoginContent> {
 
                 SizedBox(height: screenH * 0.05),
 
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton.icon(
-                    onPressed: _isFilled ? _onSendCode : null,
-                    icon: Icon(Icons.favorite, size: 18, color: buttonFgColor),
-                    label: Text(
-                      'Send the code',
-                      style: TextStyle(
-                        fontFamily: 'Georgia',
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        fontStyle: FontStyle.italic,
-                        color: buttonFgColor,
+                GestureDetector(
+                  onTap: _isFilled ? _onSendCode : null,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: double.infinity,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: _isFilled 
+                          ? const Color(0xFF1A1214) 
+                          : const Color(0xFF0D080A),
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(
+                        color: _isFilled 
+                            ? const Color(0xFF911746).withOpacity(0.5) 
+                            : const Color(0xFF26151B),
+                        width: 1.2,
                       ),
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: buttonBgColor,
-                      disabledBackgroundColor: const Color(0xFF1B0711),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.favorite,
+                          size: 18,
+                          color: _isFilled ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Send the code',
+                          style: TextStyle(
+                            fontFamily: 'Georgia',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            fontStyle: FontStyle.italic,
+                            letterSpacing: 0.5,
+                            color: _isFilled ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

@@ -68,6 +68,7 @@ class _HomeScreenState extends State<HomeScreen>
       ),
       child: Scaffold(
         backgroundColor: const Color(0xFF090204),
+        resizeToAvoidBottomInset: false,
         body: AnimatedBuilder(
           animation: _glowAnim,
           builder: (context, child) {

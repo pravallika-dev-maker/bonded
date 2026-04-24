@@ -31,6 +31,7 @@ class _PromiseScreenState extends State<PromiseScreen> {
       ),
       child: Scaffold(
         backgroundColor: const Color(0xFF0A0408),
+        resizeToAvoidBottomInset: false,
         body: Container(
           width: double.infinity,
           height: double.infinity,
@@ -173,15 +174,18 @@ class _PromiseScreenState extends State<PromiseScreen> {
                         _isChecked = !_isChecked;
                       });
                     },
-                    child: Container(
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
                       width: double.infinity,
                       height: 56,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF16060D),
+                        color: _isChecked ? const Color(0xFF1A1214) : const Color(0xFF0D080A),
                         borderRadius: BorderRadius.circular(28),
                         border: Border.all(
-                          color: _isChecked ? const Color(0xFFE89FB8) : const Color(0xFF381524),
-                          width: 1.5,
+                          color: _isChecked 
+                              ? const Color(0xFF911746).withOpacity(0.5) 
+                              : const Color(0xFF26151B),
+                          width: 1.2,
                         ),
                       ),
                       child: Row(
@@ -192,14 +196,14 @@ class _PromiseScreenState extends State<PromiseScreen> {
                             height: 24,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: _isChecked ? const Color(0xFFE89FB8) : Colors.transparent,
+                              color: _isChecked ? const Color(0xFFDD8F9F) : Colors.transparent,
                               border: Border.all(
-                                color: _isChecked ? const Color(0xFFE89FB8) : const Color(0xFF6B4B55),
+                                color: _isChecked ? const Color(0xFFDD8F9F) : const Color(0xFF3B1F2B),
                                 width: 1.5,
                               ),
                             ),
                             child: _isChecked
-                                ? const Icon(Icons.check, size: 16, color: Color(0xFF260814))
+                                ? const Icon(Icons.check, size: 16, color: Color(0xFF1A1214))
                                 : null,
                           ),
                           const SizedBox(width: 16),
@@ -210,7 +214,7 @@ class _PromiseScreenState extends State<PromiseScreen> {
                               fontSize: 15,
                               fontStyle: FontStyle.italic,
                               fontWeight: _isChecked ? FontWeight.w600 : FontWeight.normal,
-                              color: _isChecked ? Colors.white : const Color(0xFF8C6D77),
+                              color: _isChecked ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
                             ),
                           ),
                         ],
@@ -221,33 +225,45 @@ class _PromiseScreenState extends State<PromiseScreen> {
                   const Spacer(flex: 2),
                   
                   // Step into the space Button
-                  SizedBox(
-                    width: double.infinity,
-                    height: 52,
-                    child: ElevatedButton.icon(
-                      onPressed: _isChecked ? _proceedToTransition : null,
-                      icon: Icon(
-                        Icons.favorite,
-                        size: 18,
-                        color: _isChecked ? Colors.white.withOpacity(0.9) : const Color(0xFF4C2735),
-                      ),
-                      label: Text(
-                        "Step into the space",
-                        style: TextStyle(
-                          fontFamily: 'Georgia',
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          fontStyle: FontStyle.italic,
-                          color: _isChecked ? Colors.white.withOpacity(0.9) : const Color(0xFF4C2735),
+                  GestureDetector(
+                    onTap: _isChecked ? _proceedToTransition : null,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: double.infinity,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: _isChecked 
+                            ? const Color(0xFF1A1214) 
+                            : const Color(0xFF0D080A),
+                        borderRadius: BorderRadius.circular(26),
+                        border: Border.all(
+                          color: _isChecked 
+                              ? const Color(0xFF911746).withOpacity(0.5) 
+                              : const Color(0xFF26151B),
+                          width: 1.2,
                         ),
                       ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF6A1A3C),
-                        disabledBackgroundColor: const Color(0xFF1E0A12),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(26),
-                        ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.favorite,
+                            size: 18,
+                            color: _isChecked ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            "Step into the space",
+                            style: TextStyle(
+                              fontFamily: 'Georgia',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              fontStyle: FontStyle.italic,
+                              letterSpacing: 0.5,
+                              color: _isChecked ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

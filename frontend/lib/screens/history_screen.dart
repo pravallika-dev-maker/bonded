@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
 import 'dart:math' as math;
+import 'separation_detail_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -138,37 +139,61 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   padding: const EdgeInsets.all(24.0),
                   children: [
                     // Card 1
-                    _CompletedHistoryCard(
-                      dateText: 'MARCH 10–17 • COMPLETED',
-                      title: '7 days apart',
-                      quote: '"You found clarity near the end"',
-                      accentColor: const Color(0xFF8A2E55), // Magenta accent
-                      tags: [
-                        _Tag(label: 'Calm', bgColor: const Color(0xFF3F1629), textColor: const Color(0xFFECAABB)),
-                        _Tag(label: 'Reflective', bgColor: const Color(0xFF2D1C35), textColor: const Color(0xFF9D7CAE)),
-                        _Tag(label: '4 letters', bgColor: const Color(0xFF331521), textColor: const Color(0xFF864A5C)),
-                      ],
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const SeparationDetailScreen()),
+                        );
+                      },
+                      child: _CompletedHistoryCard(
+                        dateText: 'MARCH 10–17 • COMPLETED',
+                        title: '7 days apart',
+                        quote: '"You found clarity near the end"',
+                        accentColor: const Color(0xFF8A2E55), // Magenta accent
+                        tags: [
+                          _Tag(label: 'Calm', bgColor: const Color(0xFF3F1629), textColor: const Color(0xFFECAABB)),
+                          _Tag(label: 'Reflective', bgColor: const Color(0xFF2D1C35), textColor: const Color(0xFF9D7CAE)),
+                          _Tag(label: '4 letters', bgColor: const Color(0xFF331521), textColor: const Color(0xFF864A5C)),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
                     
                     // Card 2
-                    _CompletedHistoryCard(
-                      dateText: 'FEB 20–23 • COMPLETED',
-                      title: '3 days apart',
-                      quote: '"You missed them more than expected"',
-                      accentColor: const Color(0xFF9E7E5A), // Gold accent
-                      tags: [
-                        _Tag(label: 'Longing', bgColor: const Color(0xFF3F1629), textColor: const Color(0xFFECAABB)),
-                        _Tag(label: '2 letters', bgColor: const Color(0xFF331521), textColor: const Color(0xFF864A5C)),
-                      ],
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const SeparationDetailScreen()),
+                        );
+                      },
+                      child: _CompletedHistoryCard(
+                        dateText: 'FEB 20–23 • COMPLETED',
+                        title: '3 days apart',
+                        quote: '"You missed them more than expected"',
+                        accentColor: const Color(0xFF9E7E5A), // Gold accent
+                        tags: [
+                          _Tag(label: 'Longing', bgColor: const Color(0xFF3F1629), textColor: const Color(0xFFECAABB)),
+                          _Tag(label: '2 letters', bgColor: const Color(0xFF331521), textColor: const Color(0xFF864A5C)),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
 
                     // Card 3
-                    const _ShortHistoryCard(
-                      dateText: 'JAN 5–6 • SHORT',
-                      title: '2 days apart',
-                      quote: '"Still finding your footing"',
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const SeparationDetailScreen()),
+                        );
+                      },
+                      child: const _ShortHistoryCard(
+                        dateText: 'JAN 5–6 • SHORT',
+                        title: '2 days apart',
+                        quote: '"Still finding your footing"',
+                      ),
                     ),
                   ],
                 ),

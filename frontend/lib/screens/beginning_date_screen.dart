@@ -34,6 +34,7 @@ class _BeginningDateScreenState extends State<BeginningDateScreen> {
       ),
       child: Scaffold(
         backgroundColor: const Color(0xFF0A0408),
+        resizeToAvoidBottomInset: false,
         body: Container(
           width: double.infinity,
           height: double.infinity,
@@ -95,7 +96,7 @@ class _BeginningDateScreenState extends State<BeginningDateScreen> {
         
         // Step Header
         Text(
-          'STEP 4 OF 5 — YOUR BEGINNING',
+          'STEP 6 OF 7 — YOUR BEGINNING',
           style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.bold,
@@ -265,33 +266,45 @@ class _BeginningDateScreenState extends State<BeginningDateScreen> {
         const Spacer(flex: 2),
         
         // Save Button
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton.icon(
-            onPressed: isSelected ? _onSaveAndContinue : null,
-            icon: Icon(
-              Icons.favorite_outline,
-              size: 18,
-              color: isSelected ? Colors.white.withOpacity(0.9) : const Color(0xFF4C2735),
-            ),
-            label: Text(
-              "Save and continue",
-              style: TextStyle(
-                fontFamily: 'Georgia',
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                fontStyle: FontStyle.italic,
-                color: isSelected ? Colors.white.withOpacity(0.9) : const Color(0xFF4C2735),
+        GestureDetector(
+          onTap: isSelected ? _onSaveAndContinue : null,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: double.infinity,
+            height: 52,
+            decoration: BoxDecoration(
+              color: isSelected 
+                  ? const Color(0xFF1A1214) 
+                  : const Color(0xFF0D080A),
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(
+                color: isSelected 
+                    ? const Color(0xFF911746).withOpacity(0.5) 
+                    : const Color(0xFF26151B),
+                width: 1.2,
               ),
             ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6A1A3C),
-              disabledBackgroundColor: const Color(0xFF260D17),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(26),
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.favorite_outline,
+                  size: 18,
+                  color: isSelected ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  "Save and continue",
+                  style: TextStyle(
+                    fontFamily: 'Georgia',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    fontStyle: FontStyle.italic,
+                    letterSpacing: 0.5,
+                    color: isSelected ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                  ),
+                ),
+              ],
             ),
           ),
         ),
@@ -487,33 +500,45 @@ class _BeginningDateScreenState extends State<BeginningDateScreen> {
         const Spacer(flex: 3),
         
         // Continue Button
-        SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton.icon(
-            onPressed: _selectedReason != null ? _onSaveAndContinue : null,
-            icon: Icon(
-              Icons.favorite_outline,
-              size: 18,
-              color: _selectedReason != null ? Colors.white.withOpacity(0.9) : const Color(0xFF4C2735),
-            ),
-            label: Text(
-              "Continue without a date",
-              style: TextStyle(
-                fontFamily: 'Georgia',
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                fontStyle: FontStyle.italic,
-                color: _selectedReason != null ? Colors.white.withOpacity(0.9) : const Color(0xFF4C2735),
+        GestureDetector(
+          onTap: _selectedReason != null ? _onSaveAndContinue : null,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            width: double.infinity,
+            height: 52,
+            decoration: BoxDecoration(
+              color: _selectedReason != null 
+                  ? const Color(0xFF1A1214) 
+                  : const Color(0xFF0D080A),
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(
+                color: _selectedReason != null 
+                    ? const Color(0xFF911746).withOpacity(0.5) 
+                    : const Color(0xFF26151B),
+                width: 1.2,
               ),
             ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6A1A3C),
-              disabledBackgroundColor: const Color(0xFF1E0A12),
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(26),
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.favorite_outline,
+                  size: 18,
+                  color: _selectedReason != null ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  "Continue without a date",
+                  style: TextStyle(
+                    fontFamily: 'Georgia',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    fontStyle: FontStyle.italic,
+                    letterSpacing: 0.5,
+                    color: _selectedReason != null ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

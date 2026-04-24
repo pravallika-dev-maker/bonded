@@ -17,10 +17,12 @@ class _SeparationStep1IntentionScreenState extends State<SeparationStep1Intentio
 
   void _submit() {
     if (_selectedOption == 1) {
-      // Go to Step 4 directly for partner (as implied by the flow, or maybe it goes through the rest? Actually the flow suggests if someone else is selected we go to add person. If partner, we go to step 4)
+      // Go directly to NewSeparationScreen for partner
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (context) => const NewSeparationScreen(partnerName: "Mihail")),
+        MaterialPageRoute(
+          builder: (context) => const NewSeparationScreen(partnerName: "Mihail"),
+        ),
       );
     } else if (_selectedOption == 2) {
       Navigator.push(
@@ -45,31 +47,9 @@ class _SeparationStep1IntentionScreenState extends State<SeparationStep1Intentio
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Progress Bar ──
-                Row(
-                  children: [
-                    Expanded(child: Container(height: 2, color: const Color(0xFF8A2E55))),
-                    const SizedBox(width: 8),
-                    Expanded(child: Container(height: 2, color: const Color(0xFF2E1620))),
-                    const SizedBox(width: 8),
-                    Expanded(child: Container(height: 2, color: const Color(0xFF2E1620))),
-                    const SizedBox(width: 8),
-                    Expanded(child: Container(height: 2, color: const Color(0xFF2E1620))),
-                  ],
-                ),
-                const SizedBox(height: 32),
 
-                // ── Header Text ──
-                const Text(
-                  'STEP 1 OF 4 — INTENTION',
-                  style: TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2.0,
-                    color: Color(0xFF9E7E5A),
-                  ),
-                ),
-                const SizedBox(height: 12),
+
+
                 const Text(
                   'Who is this',
                   style: TextStyle(
@@ -288,33 +268,45 @@ class _SeparationStep1IntentionScreenState extends State<SeparationStep1Intentio
                 const Spacer(),
 
                 // ── Submit Button ──
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton.icon(
-                    onPressed: _selectedOption != 0 ? _submit : null,
-                    icon: const Icon(
-                      Icons.favorite_border,
-                      size: 18,
-                      color: Colors.white,
-                    ),
-                    label: Text(
-                      _selectedOption == 1 ? 'Continue with $partnerName' : 'Continue',
-                      style: const TextStyle(
-                        fontFamily: 'Georgia',
-                        fontSize: 16,
-                        fontStyle: FontStyle.italic,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                GestureDetector(
+                  onTap: _selectedOption != 0 ? _submit : null,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: double.infinity,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: _selectedOption != 0 
+                          ? const Color(0xFF1A1214) 
+                          : const Color(0xFF0D080A),
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(
+                        color: _selectedOption != 0 
+                            ? const Color(0xFF911746).withOpacity(0.5) 
+                            : const Color(0xFF26151B),
+                        width: 1.2,
                       ),
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF8A2E55),
-                      disabledBackgroundColor: const Color(0xFF160A0E),
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.favorite_border,
+                          size: 18,
+                          color: _selectedOption != 0 ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          _selectedOption == 1 ? 'Continue with $partnerName' : 'Continue',
+                          style: TextStyle(
+                            fontFamily: 'Georgia',
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            fontStyle: FontStyle.italic,
+                            letterSpacing: 0.5,
+                            color: _selectedOption != 0 ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),

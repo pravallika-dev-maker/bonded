@@ -12,7 +12,13 @@ class SeparationStep2AddPersonScreen extends StatefulWidget {
 class _SeparationStep2AddPersonScreenState extends State<SeparationStep2AddPersonScreen> {
   final TextEditingController _nameController = TextEditingController();
   String _selectedConnection = 'Friend';
+  String? _selectedGender;
   final List<String> _connections = ['Friend', 'Family', 'Other'];
+  final List<Map<String, dynamic>> _genders = [
+    {'label': 'He/Him', 'value': 'male'},
+    {'label': 'She/Her', 'value': 'female'},
+    {'label': 'They/Them', 'value': 'non-binary'},
+  ];
 
   void _submit() {
     final name = _nameController.text.trim();
@@ -197,6 +203,54 @@ class _SeparationStep2AddPersonScreenState extends State<SeparationStep2AddPerso
                       ),
                       const SizedBox(height: 40),
 
+                      // ── Their Gender ──
+                      const Text(
+                        'THEIR GENDER',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.5,
+                          color: Color(0xFF6A4A57),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: _genders.map((gender) {
+                          final isSelected = _selectedGender == gender['value'];
+                          return GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _selectedGender = gender['value'];
+                              });
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: isSelected ? const Color(0xFF2A0D18) : Colors.transparent,
+                                borderRadius: BorderRadius.circular(24),
+                                border: Border.all(
+                                  color: isSelected ? const Color(0xFF6E2843) : const Color(0xFF2E1620),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Text(
+                                gender['label'],
+                                style: TextStyle(
+                                  fontFamily: 'Georgia',
+                                  fontSize: 14,
+                                  fontStyle: FontStyle.italic,
+                                  color: isSelected ? const Color(0xFFDD8F9F) : const Color(0xFF7A5C67),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 40),
+
                       // ── Invite Them ──
                       Container(
                         width: double.infinity,
@@ -233,32 +287,39 @@ class _SeparationStep2AddPersonScreenState extends State<SeparationStep2AddPerso
                               ),
                             ),
                             const SizedBox(height: 24),
-                            OutlinedButton.icon(
-                              onPressed: () {},
-                              icon: const Icon(
-                                Icons.arrow_upward,
-                                size: 16,
-                                color: Color(0xFF9E7E5A),
-                              ),
-                              label: Text(
-                                _nameController.text.isEmpty
-                                    ? 'Generate invite code'
-                                    : 'Generate invite code for ${_nameController.text}',
-                                style: const TextStyle(
-                                  fontFamily: 'Georgia',
-                                  fontSize: 14,
-                                  fontStyle: FontStyle.italic,
-                                  color: Color(0xFF9E7E5A),
-                                ),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(
-                                  color: Color(0xFF4A3A2A),
-                                  width: 1.5,
-                                ),
+                            GestureDetector(
+                              onTap: () {},
+                              child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                                shape: RoundedRectangleBorder(
+                                decoration: BoxDecoration(
+                                  color: Colors.transparent,
                                   borderRadius: BorderRadius.circular(24),
+                                  border: Border.all(
+                                    color: const Color(0xFF4A3A2A),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.arrow_upward,
+                                      size: 16,
+                                      color: Color(0xFF9E7E5A),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      _nameController.text.isEmpty
+                                          ? 'Generate invite code'
+                                          : 'Generate invite code for ${_nameController.text}',
+                                      style: const TextStyle(
+                                        fontFamily: 'Georgia',
+                                        fontSize: 14,
+                                        fontStyle: FontStyle.italic,
+                                        color: Color(0xFF9E7E5A),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -268,52 +329,56 @@ class _SeparationStep2AddPersonScreenState extends State<SeparationStep2AddPerso
                       const SizedBox(height: 48),
 
                       // ── Submit Button ──
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton.icon(
-                          onPressed: _nameController.text.isNotEmpty ? _submit : null,
-                          icon: const Icon(
-                            Icons.favorite_border,
-                            size: 18,
-                            color: Colors.white,
-                          ),
-                          label: Text(
-                            _nameController.text.isEmpty
-                                ? 'Continue'
-                                : 'Continue with ${_nameController.text}',
-                            style: const TextStyle(
-                              fontFamily: 'Georgia',
-                              fontSize: 16,
-                              fontStyle: FontStyle.italic,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
+                      GestureDetector(
+                        onTap: (_nameController.text.isNotEmpty && _selectedGender != null) ? _submit : null,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: double.infinity,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: (_nameController.text.isNotEmpty && _selectedGender != null) 
+                                ? const Color(0xFF1A1214) 
+                                : const Color(0xFF0D080A),
+                            borderRadius: BorderRadius.circular(28),
+                            border: Border.all(
+                              color: (_nameController.text.isNotEmpty && _selectedGender != null) 
+                                  ? const Color(0xFF911746).withOpacity(0.5) 
+                                  : const Color(0xFF26151B),
+                              width: 1.2,
                             ),
                           ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF8A2E55),
-                            disabledBackgroundColor: const Color(0xFF160A0E),
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.favorite_border,
+                                size: 18,
+                                color: (_nameController.text.isNotEmpty && _selectedGender != null) 
+                                    ? const Color(0xFFDD8F9F) 
+                                    : const Color(0xFF5A3C47),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                _nameController.text.isEmpty
+                                    ? 'Continue'
+                                    : 'Continue with ${_nameController.text}',
+                                style: TextStyle(
+                                  fontFamily: 'Georgia',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  fontStyle: FontStyle.italic,
+                                  letterSpacing: 0.5,
+                                  color: (_nameController.text.isNotEmpty && _selectedGender != null) 
+                                      ? const Color(0xFFDD8F9F) 
+                                      : const Color(0xFF5A3C47),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                       const SizedBox(height: 16),
-                      
-                      // Bottom Text Indicator
-                      const Center(
-                        child: Text(
-                          'STEP 2 — ADD A PERSON',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.5,
-                            color: Color(0xFF3D1627),
-                          ),
-                        ),
-                      ),
+
                     ],
                   ),
                 ),
@@ -325,3 +390,4 @@ class _SeparationStep2AddPersonScreenState extends State<SeparationStep2AddPerso
     );
   }
 }
+

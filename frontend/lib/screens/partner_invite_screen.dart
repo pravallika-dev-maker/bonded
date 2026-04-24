@@ -97,7 +97,7 @@ class _PartnerInviteScreenState extends State<PartnerInviteScreen> {
 
                   // ── Step Label ──
                   const Text(
-                    'STEP 5 OF 5 — THE INVITATION',
+                    'STEP 7 OF 7 — THE INVITATION',
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
@@ -195,42 +195,42 @@ class _PartnerInviteScreenState extends State<PartnerInviteScreen> {
                   const Spacer(flex: 2),
 
                   // ── Share Button ──
-                  SizedBox(
-                    width: double.infinity,
-                    height: 54,
-                    child: OutlinedButton.icon(
-                      onPressed: _shareCode,
-                      icon: Icon(
-                        _shared ? Icons.check : Icons.ios_share_outlined,
-                        size: 18,
-                        color: _shared
-                            ? const Color(0xFF5DB373)
-                            : const Color(0xFF8A6530),
-                      ),
-                      label: Text(
-                        _shared ? 'Sent… waiting for them' : 'Share this code',
-                        style: TextStyle(
-                          fontFamily: 'Georgia',
-                          fontSize: 15,
-                          fontStyle: FontStyle.italic,
-                          color: _shared
-                              ? const Color(0xFF5DB373)
-                              : const Color(0xFF8A6530),
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(
-                          color: _shared
-                              ? const Color(0xFF194D2C)
-                              : const Color(0xFF3D1627),
+                  GestureDetector(
+                    onTap: _shareCode,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: double.infinity,
+                      height: 54,
+                      decoration: BoxDecoration(
+                        color: _shared ? const Color(0xFF0C1F15) : const Color(0xFF1A1214),
+                        borderRadius: BorderRadius.circular(27),
+                        border: Border.all(
+                          color: _shared 
+                              ? const Color(0xFF194D2C) 
+                              : const Color(0xFF911746).withOpacity(0.5),
                           width: 1.2,
                         ),
-                        backgroundColor: _shared
-                            ? const Color(0xFF0C1F15)
-                            : const Color(0xFF130610),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            _shared ? Icons.check : Icons.ios_share_outlined,
+                            size: 18,
+                            color: _shared ? const Color(0xFF5DB373) : const Color(0xFFDD8F9F),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            _shared ? 'Sent… waiting for them' : 'Share this code',
+                            style: TextStyle(
+                              fontFamily: 'Georgia',
+                              fontSize: 15,
+                              fontStyle: FontStyle.italic,
+                              letterSpacing: 0.5,
+                              color: _shared ? const Color(0xFF5DB373) : const Color(0xFFDD8F9F),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -238,31 +238,32 @@ class _PartnerInviteScreenState extends State<PartnerInviteScreen> {
                   const SizedBox(height: 14),
 
                   // ── Have a Code Button ──
-                  SizedBox(
-                    width: double.infinity,
-                    height: 54,
-                    child: OutlinedButton(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const JoinWithCodeScreen(),
-                          ),
-                        );
-                      },
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFF2E1620), width: 1.2),
-                        backgroundColor: Colors.transparent,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const JoinWithCodeScreen(),
                         ),
+                      );
+                    },
+                    child: Container(
+                      width: double.infinity,
+                      height: 54,
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(27),
+                        border: Border.all(color: const Color(0xFF2E1620), width: 1.2),
                       ),
-                      child: const Text(
-                        'I have a code to enter',
-                        style: TextStyle(
-                          fontFamily: 'Georgia',
-                          fontSize: 15,
-                          fontStyle: FontStyle.italic,
-                          color: Color(0xFF634151),
+                      child: const Center(
+                        child: Text(
+                          'I have a code to enter',
+                          style: TextStyle(
+                            fontFamily: 'Georgia',
+                            fontSize: 15,
+                            fontStyle: FontStyle.italic,
+                            letterSpacing: 0.5,
+                            color: Color(0xFF634151),
+                          ),
                         ),
                       ),
                     ),

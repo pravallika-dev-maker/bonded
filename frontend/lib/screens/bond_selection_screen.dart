@@ -24,6 +24,7 @@ class _BondSelectionScreenState extends State<BondSelectionScreen> {
       ),
       child: Scaffold(
         backgroundColor: const Color(0xFF090204),
+        resizeToAvoidBottomInset: false,
         body: Container(
           width: double.infinity,
           height: double.infinity,
@@ -48,7 +49,7 @@ class _BondSelectionScreenState extends State<BondSelectionScreen> {
                         
                         // ── Top Label ──
                         const Text(
-                          'STEP 2 OF 5 — YOUR BOND',
+                          'STEP 3 OF 7 — YOUR BOND',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
@@ -77,7 +78,7 @@ class _BondSelectionScreenState extends State<BondSelectionScreen> {
                             fontSize: 40,
                             fontWeight: FontWeight.bold,
                             fontStyle: FontStyle.italic,
-                            color: Color(0xFFE89FB8),
+                            color: Color(0xFFDD8F9F),
                             height: 1.1,
                           ),
                         ),
@@ -149,40 +150,49 @@ class _BondSelectionScreenState extends State<BondSelectionScreen> {
                 // ── Bottom Button ──
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 24.0),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => PartnerNameEntryScreen(
-                                userName: widget.userName,
-                              )),
-                        );
-                      },
-                      icon: const Icon(
-                        Icons.favorite,
-                        size: 18,
-                        color: Colors.white,
-                      ),
-                      label: const Text(
-                        "This is my bond",
-                        style: TextStyle(
-                          fontFamily: 'Georgia',
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          fontStyle: FontStyle.italic,
-                          color: Colors.white,
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => PartnerNameEntryScreen(
+                              userName: widget.userName,
+                            )),
+                      );
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: double.infinity,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1214),
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(
+                          color: const Color(0xFF911746).withOpacity(0.5),
+                          width: 1.2,
                         ),
                       ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF911746),
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(
+                            Icons.favorite,
+                            size: 18,
+                            color: Color(0xFFDD8F9F),
+                          ),
+                          SizedBox(width: 12),
+                          Text(
+                            "This is my bond",
+                            style: TextStyle(
+                              fontFamily: 'Georgia',
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              fontStyle: FontStyle.italic,
+                              letterSpacing: 0.5,
+                              color: Color(0xFFDD8F9F),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

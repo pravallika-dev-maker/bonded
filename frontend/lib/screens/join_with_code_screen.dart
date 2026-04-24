@@ -284,44 +284,55 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
                     const Spacer(flex: 1),
 
                     // ── Primary CTA Button ──
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton.icon(
-                        onPressed: _hasInput &&
-                                _state != JoinCodeState.success
-                            ? _onConnect
-                            : null,
-                        icon: Icon(
-                          Icons.favorite,
-                          size: 18,
-                          color: _hasInput ? Colors.white : const Color(0xFF3D1B28),
-                        ),
-                        label: Text(
-                          _state == JoinCodeState.success
-                              ? 'You\'re connected ✓'
-                              : 'Connect',
-                          style: TextStyle(
-                            fontFamily: 'Georgia',
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            fontStyle: FontStyle.italic,
-                            color: _hasInput
-                                ? Colors.white
-                                : const Color(0xFF3D1B28),
+                    GestureDetector(
+                      onTap: _hasInput && _state != JoinCodeState.success ? _onConnect : null,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: double.infinity,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: _state == JoinCodeState.success
+                              ? const Color(0xFF0C1F15)
+                              : _hasInput 
+                                  ? const Color(0xFF1A1214) 
+                                  : const Color(0xFF0D080A),
+                          borderRadius: BorderRadius.circular(28),
+                          border: Border.all(
+                            color: _state == JoinCodeState.success
+                                ? const Color(0xFF194D2C)
+                                : _hasInput 
+                                    ? const Color(0xFF911746).withOpacity(0.5) 
+                                    : const Color(0xFF26151B),
+                            width: 1.2,
                           ),
                         ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _state == JoinCodeState.success
-                              ? const Color(0xFF1A4D2C)
-                              : _hasInput
-                                  ? const Color(0xFF911746)
-                                  : const Color(0xFF1B0711),
-                          disabledBackgroundColor: const Color(0xFF1B0711),
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(20),
-                          ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.favorite,
+                              size: 18,
+                              color: _state == JoinCodeState.success
+                                  ? const Color(0xFF5DB373)
+                                  : _hasInput ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              _state == JoinCodeState.success
+                                  ? 'You\'re connected ✓'
+                                  : 'Connect',
+                              style: TextStyle(
+                                fontFamily: 'Georgia',
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                fontStyle: FontStyle.italic,
+                                letterSpacing: 0.5,
+                                color: _state == JoinCodeState.success
+                                    ? const Color(0xFF5DB373)
+                                    : _hasInput ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),

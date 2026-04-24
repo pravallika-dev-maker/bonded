@@ -220,34 +220,49 @@ class _OTPScreenState extends State<OTPScreen> {
           const Spacer(flex: 2),
           
           // CTA Button
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: ElevatedButton.icon(
-              onPressed: () {
-                // Submit action
-              },
-              icon: Icon(
-                Icons.favorite, 
-                size: 18, 
-                color: isError ? Colors.white : const Color(0xFF3D1B28)
-              ),
-              label: Text(
-                isError ? "Let's try once more" : "I'm here",
-                style: TextStyle(
-                  fontFamily: 'Georgia',
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  fontStyle: FontStyle.italic,
-                  color: isError ? Colors.white : const Color(0xFF3D1B28),
+          GestureDetector(
+            onTap: () {
+              // Submit action or manual verify logic
+              String otp = _controllers.map((c) => c.text).join();
+              if (otp.length == 6) {
+                _onTextChanged();
+              }
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              width: double.infinity,
+              height: 56,
+              decoration: BoxDecoration(
+                color: isError ? const Color(0xFF1A1214) : const Color(0xFF0D080A),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color: isError 
+                      ? const Color(0xFF911746).withOpacity(0.5) 
+                      : const Color(0xFF26151B),
+                  width: 1.2,
                 ),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isError ? const Color(0xFF911746) : const Color(0xFF1B0711),
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.favorite,
+                    size: 18,
+                    color: isError ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    isError ? "Let's try once more" : "I'm here",
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      fontStyle: FontStyle.italic,
+                      letterSpacing: 0.5,
+                      color: isError ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
