@@ -1,0 +1,9 @@
+[
+  {
+    "id": "update_1",
+    "roomId": "room_1",
+    "message": "Something feels warmer here tonight.",
+    "isRead": false,
+    "timestamp": "2026-05-17T08:05:00Z"
+  }
+]

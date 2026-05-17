@@ -1,0 +1,16 @@
+[
+  {
+    "day": 1,
+    "isUnlocked": true,
+    "title": "Add a Comfort Object",
+    "description": "Place something that brings you warmth.",
+    "teaserText": ""
+  },
+  {
+    "day": 2,
+    "isUnlocked": false,
+    "title": "Emotional Lighting",
+    "description": "Set the mood for your space.",
+    "teaserText": "There’s a room waiting to bloom tomorrow."
+  }
+]

@@ -1,0 +1,22 @@
+[
+  {
+    "id": "room_1",
+    "name": "Living Room",
+    "description": "A cozy place to sit and imagine our evenings.",
+    "isUnlocked": true,
+    "unlockDay": 1,
+    "ambientState": "warm_evening",
+    "baseImageUrl": "assets/mock_data/living_room_base.png",
+    "objects": ["obj_1", "obj_2"]
+  },
+  {
+    "id": "room_2",
+    "name": "Balcony",
+    "description": "Where we watch the rain and talk about the future.",
+    "isUnlocked": false,
+    "unlockDay": 3,
+    "ambientState": "rainy_night",
+    "baseImageUrl": "assets/mock_data/balcony_base.png",
+    "objects": []
+  }
+]

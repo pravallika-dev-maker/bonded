@@ -1,0 +1,24 @@
+[
+  {
+    "id": "obj_1",
+    "roomId": "room_1",
+    "name": "Fairy Lights",
+    "type": "lighting",
+    "addedBy": "partner",
+    "emotionalMeaning": "Added because you love warm evenings.",
+    "timestamp": "2026-05-17T08:00:00Z",
+    "xPos": 0.5,
+    "yPos": 0.2
+  },
+  {
+    "id": "obj_2",
+    "roomId": "room_1",
+    "name": "Cozy Couch",
+    "type": "furniture",
+    "addedBy": "me",
+    "emotionalMeaning": "A place for us to rest after a long day.",
+    "timestamp": "2026-05-17T08:30:00Z",
+    "xPos": 0.5,
+    "yPos": 0.8
+  }
+]
