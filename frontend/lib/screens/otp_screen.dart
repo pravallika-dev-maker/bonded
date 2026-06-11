@@ -1,13 +1,22 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../widgets/app_heart_icon.dart';
+import '../services/api_service.dart';
 import 'welcome_screen.dart';
 
-enum OtpState { entering, error }
+enum OtpState { entering, loading, error }
 
 class OTPScreen extends StatefulWidget {
-  const OTPScreen({super.key});
+  final String phoneNumber;
+  final String countryCode;
+
+  const OTPScreen({
+    super.key,
+    required this.phoneNumber,
+    required this.countryCode,
+  });
 
   @override
   State<OTPScreen> createState() => _OTPScreenState();
@@ -18,6 +27,7 @@ class _OTPScreenState extends State<OTPScreen> {
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   
   OtpState _state = OtpState.entering;
+  String _errorMessage = '';
 
   @override
   void initState() {
@@ -31,17 +41,46 @@ class _OTPScreenState extends State<OTPScreen> {
     });
   }
 
-  void _onTextChanged() {
+  Future<void> _onTextChanged() async {
     String otp = _controllers.map((c) => c.text).join();
     
     if (otp.length == 6) {
-      if (otp == '913725') {
-        setState(() => _state = OtpState.error);
-      } else {
-        // Navigate to Welcome screen immediately
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+      if (_state == OtpState.loading) return;
+      
+      setState(() {
+        _state = OtpState.loading;
+        _errorMessage = '';
+      });
+      
+      try {
+        await ApiService.verifyCode(
+          countryCode: widget.countryCode,
+          phoneNumber: widget.phoneNumber,
+          otp: otp,
         );
+
+        // Register FCM token upon successful login
+        try {
+          final messaging = FirebaseMessaging.instance;
+          final token = await messaging.getToken();
+          if (token != null) {
+            await ApiService.registerFcmToken(token);
+          }
+        } catch (_) {}
+        
+        if (mounted) {
+          // Navigate to Welcome screen immediately
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _state = OtpState.error;
+            _errorMessage = e.toString().replaceAll('Exception:', '').trim();
+          });
+        }
       }
     } else {
       if (_state != OtpState.entering) {
@@ -122,6 +161,7 @@ class _OTPScreenState extends State<OTPScreen> {
 
   Widget _buildEntryState() {
     bool isError = _state == OtpState.error;
+    bool isLoading = _state == OtpState.loading;
     
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 28.0),
@@ -188,14 +228,14 @@ class _OTPScreenState extends State<OTPScreen> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFF4A151D), width: 1.0),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.info_outline, color: Color(0xFF962335), size: 16),
-                  SizedBox(width: 8),
+                  const Icon(Icons.info_outline, color: Color(0xFF962335), size: 16),
+                  const SizedBox(width: 8),
                   Text(
-                    "That didn't feel right... try again",
-                    style: TextStyle(
+                    _errorMessage.isNotEmpty ? _errorMessage : "That didn't feel right... try again",
+                    style: const TextStyle(
                       fontFamily: 'Georgia',
                       fontSize: 12,
                       fontStyle: FontStyle.italic,
@@ -228,41 +268,69 @@ class _OTPScreenState extends State<OTPScreen> {
                 _onTextChanged();
               }
             },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: double.infinity,
-              height: 56,
-              decoration: BoxDecoration(
-                color: isError ? const Color(0xFF1A1214) : const Color(0xFF0D080A),
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(
+            child: Center(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOutCubic,
+                width: isLoading ? 56.0 : (MediaQuery.of(context).size.width - 56.0),
+                height: 56,
+                decoration: BoxDecoration(
                   color: isError 
-                      ? const Color(0xFF911746).withOpacity(0.5) 
-                      : const Color(0xFF26151B),
-                  width: 1.2,
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.favorite,
-                    size: 18,
-                    color: isError ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                      ? const Color(0xFF1A1214) 
+                      : (isLoading ? const Color(0xFF1F0A13) : const Color(0xFF0D080A)),
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(
+                    color: isError 
+                        ? const Color(0xFF911746).withOpacity(0.5) 
+                        : (isLoading ? const Color(0xFF8A2E55).withOpacity(0.6) : const Color(0xFF26151B)),
+                    width: 1.2,
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    isError ? "Let's try once more" : "I'm here",
-                    style: TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      fontStyle: FontStyle.italic,
-                      letterSpacing: 0.5,
-                      color: isError ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                  boxShadow: isLoading ? [
+                    BoxShadow(
+                      color: const Color(0xFF8A2E55).withOpacity(0.2),
+                      blurRadius: 12,
+                      spreadRadius: 2,
                     ),
+                  ] : null,
+                ),
+                child: Center(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: isLoading
+                        ? const SizedBox(
+                            key: ValueKey('loader'),
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.5,
+                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFDD8F9F)),
+                            ),
+                          )
+                        : Row(
+                            key: const ValueKey('text'),
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.favorite,
+                                size: 18,
+                                color: isError ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                isError ? "Let's try once more" : "I'm here",
+                                style: TextStyle(
+                                  fontFamily: 'Georgia',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  fontStyle: FontStyle.italic,
+                                  letterSpacing: 0.5,
+                                  color: isError ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                                ),
+                              ),
+                            ],
+                          ),
                   ),
-                ],
+                ),
               ),
             ),
           ),

@@ -1,19 +1,56 @@
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'dart:ui'; // For ImageFilter
+import '../services/api_service.dart';
+
 
 class JourneyScreen extends StatefulWidget {
-  const JourneyScreen({super.key});
+  final String userName;
+  final String? partnerName;
+
+  const JourneyScreen({
+    super.key,
+    required this.userName,
+    this.partnerName,
+  });
 
   @override
   State<JourneyScreen> createState() => _JourneyScreenState();
 }
 
 class _JourneyScreenState extends State<JourneyScreen> {
+  String? _partnerName;
+
   // --- Simulation Flags ---
   // In a real app, _isLastDay would be calculated based on separation dates.
   bool _isLastDay = true;
   bool _isInsightUnlocked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _partnerName = widget.partnerName;
+    _fetchPartnerName();
+  }
+
+  Future<void> _fetchPartnerName() async {
+    try {
+      final sep = await ApiService.getActiveSeparation();
+      final cachedPartnerName = await ApiService.getPartnerName();
+      if (mounted) {
+        setState(() {
+          _partnerName = sep?['partnerName'] ?? cachedPartnerName ?? widget.partnerName;
+        });
+      }
+    } catch (_) {
+      final cachedPartnerName = await ApiService.getPartnerName();
+      if (mounted) {
+        setState(() {
+          _partnerName = cachedPartnerName ?? widget.partnerName;
+        });
+      }
+    }
+  }
 
   void _unlockInsights() {
     setState(() {
@@ -42,9 +79,9 @@ class _JourneyScreenState extends State<JourneyScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Sofia & Mihail',
-                style: TextStyle(
+              Text(
+                '${widget.userName} & ${_partnerName ?? "Partner"}',
+                style: const TextStyle(
                   fontFamily: 'Georgia',
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
@@ -70,10 +107,11 @@ class _JourneyScreenState extends State<JourneyScreen> {
               // --- Status Chips ---
               Row(
                 children: [
-                  const _StatusChip(
+                  _StatusChip(
                     label: 'Quietly growing',
-                    bgColor: Color(0xFF3F1629),
-                    textColor: Color(0xFFECAABB),
+                    bgColor: const Color(0xFF8A2E55).withOpacity(0.12),
+                    textColor: const Color(0xFFDD8F9F),
+                    borderColor: const Color(0xFF8A2E55).withOpacity(0.3),
                     isItalic: true,
                   ),
                   const SizedBox(width: 12),
@@ -81,7 +119,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
                     label: 'Learning each other',
                     bgColor: Colors.transparent,
                     textColor: Color(0xFF9E7E5A),
-                    borderColor: Color(0xFF322315),
+                    borderColor: Color(0xFF3E2B1B),
                   ),
                 ],
               ),
@@ -95,12 +133,19 @@ class _JourneyScreenState extends State<JourneyScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1F0A13),
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color(0xFF1F0A13),
+                          Color(0xFF110309),
+                        ],
+                      ),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFF911746).withOpacity(0.5)),
+                      border: Border.all(color: const Color(0xFF8A2E55).withOpacity(0.4)),
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF911746).withOpacity(0.15),
+                          color: const Color(0xFF8A2E55).withOpacity(0.15),
                           blurRadius: 16,
                           spreadRadius: 2,
                         ),
@@ -161,7 +206,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
                     fontFamily: 'Georgia',
                     fontSize: 15,
                     fontStyle: FontStyle.italic,
-                    color: Color(0xFF5A3C47),
+                    color: Color(0xFF866571),
                     height: 1.5,
                   ),
                 ),
@@ -180,7 +225,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
                     fontFamily: 'Georgia',
                     fontSize: 14,
                     fontStyle: FontStyle.italic,
-                    color: Color(0xFF331521),
+                    color: Color(0xFF5A3C47),
                   ),
                 ),
               ),
@@ -658,8 +703,23 @@ class _BondProgressCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: const Color(0xFF1F0A13),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF1F0A13),
+            Color(0xFF110309),
+          ],
+        ),
         borderRadius: BorderRadius.circular(32),
+        border: Border.all(color: const Color(0xFF3E1F2C).withOpacity(0.4)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF8A2E55).withOpacity(0.15),
+            blurRadius: 30,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -682,7 +742,7 @@ class _BondProgressCard extends StatelessWidget {
                          fontFamily: 'Georgia',
                          fontSize: 20,
                          fontWeight: FontWeight.bold,
-                         color: Colors.white,
+                         color: Color(0xFFDD8F9F),
                        ),
                      ),
                      Text(
@@ -691,7 +751,7 @@ class _BondProgressCard extends StatelessWidget {
                          fontFamily: 'Georgia',
                          fontSize: 14,
                          fontStyle: FontStyle.italic,
-                         color: Color(0xFF866571),
+                         color: Color(0xFF9E7E5A),
                        ),
                      ),
                    ],
@@ -703,8 +763,8 @@ class _BondProgressCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: const [
-              Text('where you began', style: TextStyle(fontSize: 10, color: Color(0xFF4A343D))),
-              Text('still becoming', style: TextStyle(fontSize: 10, color: Color(0xFF4A343D))),
+              Text('where you began', style: TextStyle(fontSize: 10, color: Color(0xFF866571))),
+              Text('still becoming', style: TextStyle(fontSize: 10, color: Color(0xFF866571))),
             ],
           ),
           const SizedBox(height: 24),
@@ -727,7 +787,7 @@ class _ArcPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF26151B)
+      ..color = const Color(0xFF2E1020).withOpacity(0.5)
       ..strokeWidth = 12
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
@@ -744,11 +804,29 @@ class _ArcPainter extends CustomPainter {
       paint,
     );
 
+    final shader = const LinearGradient(
+      colors: [Color(0xFF8A2E55), Color(0xFFDD8F9F)],
+    ).createShader(Rect.fromCircle(center: center, radius: radius));
+
+    // Draw glow behind progress arc
+    final glowPaint = Paint()
+      ..shader = shader
+      ..strokeWidth = 18
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      math.pi,
+      math.pi * 0.7,
+      false,
+      glowPaint,
+    );
+
     // Draw progress arc
     final progressPaint = Paint()
-      ..shader = const LinearGradient(
-        colors: [Color(0xFF8A2E55), Color(0xFFDD8F9F)],
-      ).createShader(Rect.fromCircle(center: center, radius: radius))
+      ..shader = shader
       ..strokeWidth = 12
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
@@ -761,13 +839,20 @@ class _ArcPainter extends CustomPainter {
       progressPaint,
     );
 
-    // Draw indicator dot
-    final dotPaint = Paint()..color = const Color(0xFFDD8F9F);
+    // Draw indicator dot shadow / glow
     final dotAngle = math.pi + (math.pi * 0.7);
     final dotOffset = Offset(
       center.dx + radius * math.cos(dotAngle),
       center.dy + radius * math.sin(dotAngle),
     );
+
+    final dotGlowPaint = Paint()
+      ..color = const Color(0xFFDD8F9F).withOpacity(0.6)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+    canvas.drawCircle(dotOffset, 12, dotGlowPaint);
+
+    // Draw indicator dot
+    final dotPaint = Paint()..color = const Color(0xFFDD8F9F);
     canvas.drawCircle(dotOffset, 6, dotPaint);
   }
 
@@ -1053,9 +1138,16 @@ class _NextStepsCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
-        color: const Color(0xFF160A0E).withOpacity(0.5),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF160A0E),
+            Color(0xFF0F040A),
+          ],
+        ),
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: const Color(0xFF26151B), width: 1),
+        border: Border.all(color: const Color(0xFF3E1F2C).withOpacity(0.3), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1066,7 +1158,7 @@ class _NextStepsCard extends StatelessWidget {
               fontSize: 9,
               fontWeight: FontWeight.bold,
               letterSpacing: 1.5,
-              color: Color(0xFF331521),
+              color: Color(0xFF8A2E55),
             ),
           ),
           SizedBox(height: 20),
@@ -1087,7 +1179,7 @@ class _NextStepItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Icon(Icons.arrow_forward, size: 14, color: Color(0xFF331521)),
+        const Icon(Icons.arrow_forward, size: 14, color: Color(0xFF9E7E5A)),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
@@ -1096,7 +1188,7 @@ class _NextStepItem extends StatelessWidget {
               fontFamily: 'Georgia',
               fontSize: 14,
               fontStyle: FontStyle.italic,
-              color: Color(0xFF5A3C47),
+              color: Color(0xFFD4C4CA),
             ),
           ),
         ),

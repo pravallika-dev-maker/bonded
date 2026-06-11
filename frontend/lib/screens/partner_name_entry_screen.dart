@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'gender_selection_screen.dart';
 import 'partner_invite_screen.dart';
 import 'beginning_date_screen.dart';
+import '../services/api_service.dart';
 
 class PartnerNameEntryScreen extends StatefulWidget {
   final String userName;
@@ -250,22 +251,26 @@ class _PartnerNameEntryScreenState extends State<PartnerNameEntryScreen> {
                       padding: const EdgeInsets.all(24),
                       child: GestureDetector(
                         onTap: _partnerNameController.text.trim().isNotEmpty
-                            ? () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => GenderSelectionScreen(
-                                      userName: widget.userName,
-                                      targetName: _partnerNameController.text.trim(),
-                                      currentStep: 5,
-                                      totalSteps: 7,
-                                      nextScreen: BeginningDateScreen(
+                            ? () async {
+                                final pName = _partnerNameController.text.trim();
+                                await ApiService.setPartnerName(pName);
+                                if (mounted) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => GenderSelectionScreen(
                                         userName: widget.userName,
-                                        partnerName: _partnerNameController.text.trim(),
+                                        targetName: pName,
+                                        currentStep: 5,
+                                        totalSteps: 7,
+                                        nextScreen: BeginningDateScreen(
+                                          userName: widget.userName,
+                                          partnerName: pName,
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                );
+                                  );
+                                }
                               }
                             : null,
                         child: AnimatedContainer(

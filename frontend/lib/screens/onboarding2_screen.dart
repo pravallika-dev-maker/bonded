@@ -8,108 +8,119 @@ class Onboarding2Content extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(height: 16), // SafeArea top padding
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: IntrinsicHeight(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 16), // SafeArea top padding
 
-        const Spacer(flex: 2),
+                  const Spacer(flex: 2),
 
-        // ── Graphic: Journal Card with Clock ──
-        const Center(child: _JournalGraphic()),
+                  // ── Graphic: Journal Card with Clock ──
+                  const Center(child: _JournalGraphic()),
 
-        const Spacer(flex: 1),
+                  const Spacer(flex: 1),
 
-        // ── Typography ──
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Honest check-ins,',
-                style: TextStyle(
-                  fontFamily: 'Georgia',
-                  fontSize: 38,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  height: 1.1,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 4),
-              const Text(
-                'not surveillance',
-                style: TextStyle(
-                  fontFamily: 'Georgia',
-                  fontSize: 38,
-                  fontWeight: FontWeight.bold,
-                  fontStyle: FontStyle.italic,
-                  color: Color(0xFFCE9B4E),
-                  height: 1.1,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Your moods, your reflections —\nprivate as a journal, gentle as a\nnudge. We ask because we care.',
-                style: TextStyle(
-                  fontFamily: 'Inter',
-                  fontSize: 16,
-                  color: Color(0xFF867279),
-                  height: 1.6,
-                  letterSpacing: 0.1,
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        const Spacer(flex: 2),
-
-        // ── Buttons ──
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32.0),
-          child: SizedBox(
-            height: 140, // Fixed height for consistent CTA placement across screens
-            child: Column(
-              children: [
-                // Primary Button
-                ElevatedButton(
-                  onPressed: onNext,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF8E6E24), // Gold/Olive
-                    foregroundColor: const Color(0xFF30240E),
-                    elevation: 0,
-                    minimumSize: const Size(double.infinity, 58),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                  // ── Typography ──
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Honest check-ins,',
+                          style: TextStyle(
+                            fontFamily: 'Georgia',
+                            fontSize: 38,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            height: 1.1,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'not surveillance',
+                          style: TextStyle(
+                            fontFamily: 'Georgia',
+                            fontSize: 38,
+                            fontWeight: FontWeight.bold,
+                            fontStyle: FontStyle.italic,
+                            color: Color(0xFFCE9B4E),
+                            height: 1.1,
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        const Text(
+                          'Your moods, your reflections —\nprivate as a journal, gentle as a\nnudge. We ask because we care.',
+                          style: TextStyle(
+                            fontFamily: 'Inter',
+                            fontSize: 16,
+                            color: Color(0xFF867279),
+                            height: 1.6,
+                            letterSpacing: 0.1,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.star, color: Color(0xFFDCD2AE), size: 18),
-                      const SizedBox(width: 12),
-                      const Text(
-                        'That resonates with me',
-                        style: TextStyle(
-                          fontFamily: 'Georgia',
-                          fontSize: 17,
-                          fontStyle: FontStyle.italic,
-                          color: Color(0xFF30240E),
-                        ),
+
+                  const Spacer(flex: 2),
+
+                  // ── Buttons ──
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                    child: SizedBox(
+                      height: 140, // Fixed height for consistent CTA placement across screens
+                      child: Column(
+                        children: [
+                          // Primary Button
+                          ElevatedButton(
+                            onPressed: onNext,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF8E6E24), // Gold/Olive
+                              foregroundColor: const Color(0xFF30240E),
+                              elevation: 0,
+                              minimumSize: const Size(double.infinity, 58),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.star, color: Color(0xFFDCD2AE), size: 18),
+                                const SizedBox(width: 12),
+                                const Text(
+                                  'That resonates with me',
+                                  style: TextStyle(
+                                    fontFamily: 'Georgia',
+                                    fontSize: 17,
+                                    fontStyle: FontStyle.italic,
+                                    color: Color(0xFF30240E),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                  
+                  const SizedBox(height: 48), // Bottom padding
+                ],
+              ),
             ),
           ),
-        ),
-        
-        const SizedBox(height: 48), // Bottom padding
-      ],
+        );
+      },
     );
   }
 }

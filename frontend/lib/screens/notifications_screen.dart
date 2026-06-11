@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../services/api_service.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -10,38 +11,10 @@ class NotificationsScreen extends StatefulWidget {
 
 class _NotificationsScreenState extends State<NotificationsScreen> with TickerProviderStateMixin {
   late AnimationController _staggerController;
-  final List<NotificationItem> _todayItems = [
-    NotificationItem(
-      title: "It's time to sit with your feelings today",
-      time: "2h ago",
-      subtext: "Take a moment for yourself",
-    ),
-    NotificationItem(
-      title: "Your next step is ready",
-      time: "4h ago",
-    ),
-    NotificationItem(
-      title: "Something small is waiting for you",
-      time: "5h ago",
-      subtext: "A new reflection is available",
-    ),
-  ];
-
-  final List<NotificationItem> _earlierItems = [
-    NotificationItem(
-      title: "You’ve been showing up consistently",
-      time: "Yesterday",
-      subtext: "7 days in a row",
-    ),
-    NotificationItem(
-      title: "You paused instead of reacting yesterday",
-      time: "Yesterday",
-    ),
-    NotificationItem(
-      title: "Your space is still waiting for you",
-      time: "2 days ago",
-    ),
-  ];
+  
+  bool _isLoading = true;
+  List<NotificationItem> _todayItems = [];
+  List<NotificationItem> _earlierItems = [];
 
   @override
   void initState() {
@@ -50,13 +23,94 @@ class _NotificationsScreenState extends State<NotificationsScreen> with TickerPr
       vsync: this,
       duration: const Duration(milliseconds: 1200),
     );
-    _staggerController.forward();
+    _fetchNotifications();
+  }
+
+  Future<void> _fetchNotifications() async {
+    try {
+      final notifications = await ApiService.getNotifications();
+      final now = DateTime.now();
+      
+      final List<NotificationItem> today = [];
+      final List<NotificationItem> earlier = [];
+
+      for (var json in notifications) {
+        final rawTitle = json['title'] ?? 'Notification';
+        final rawSubtext = json['body'];
+        final title = _removeEmojis(rawTitle);
+        final subtext = rawSubtext != null ? _removeEmojis(rawSubtext) : null;
+        final isRead = json['isRead'] ?? true;
+        final createdAtStr = json['createdAt'] ?? '';
+        
+        DateTime? createdAt;
+        try {
+          createdAt = DateTime.parse(createdAtStr);
+        } catch (_) {}
+
+        String timeStr = '';
+        bool isToday = false;
+        
+        if (createdAt != null) {
+          final diff = now.difference(createdAt);
+          if (diff.inHours < 24 && now.day == createdAt.day) {
+            isToday = true;
+            if (diff.inHours > 0) {
+              timeStr = '${diff.inHours}h ago';
+            } else if (diff.inMinutes > 0) {
+              timeStr = '${diff.inMinutes}m ago';
+            } else {
+              timeStr = 'Just now';
+            }
+          } else {
+            isToday = false;
+            if (diff.inDays == 1 || (diff.inDays == 0 && now.day != createdAt.day)) {
+              timeStr = 'Yesterday';
+            } else {
+              timeStr = '${diff.inDays} days ago';
+            }
+          }
+        }
+
+        final item = NotificationItem(
+          title: title,
+          time: timeStr,
+          subtext: subtext,
+          isRead: isRead,
+        );
+
+        if (isToday) {
+          today.add(item);
+        } else {
+          earlier.add(item);
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _todayItems = today;
+          _earlierItems = earlier;
+          _isLoading = false;
+        });
+        _staggerController.forward();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
     _staggerController.dispose();
     super.dispose();
+  }
+
+  String _removeEmojis(String text) {
+    final regex = RegExp(r'(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])');
+    return text.replaceAll(regex, '').replaceAll(RegExp(r'\s+'), ' ').trim();
   }
 
   @override
@@ -105,30 +159,61 @@ class _NotificationsScreenState extends State<NotificationsScreen> with TickerPr
                           child: const Icon(Icons.arrow_back_ios_new, size: 14, color: Color(0xFFDD8F9F)),
                         ),
                       ),
-                      const SizedBox(width: 20),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Moments',
-                            style: TextStyle(
-                              fontFamily: 'Georgia',
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text(
+                              'Moments',
+                              style: TextStyle(
+                                fontFamily: 'Georgia',
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          const Text(
-                            '“We don’t notify often… only when it matters.”',
-                            style: TextStyle(
-                              fontFamily: 'Georgia',
-                              fontSize: 12,
-                              fontStyle: FontStyle.italic,
-                              color: Color(0xFF8A6530),
+                            SizedBox(height: 4),
+                            Text(
+                              '“Only when it matters”',
+                              style: TextStyle(
+                                fontFamily: 'Georgia',
+                                fontSize: 12,
+                                fontStyle: FontStyle.italic,
+                                color: Color(0xFF8A6530),
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () async {
+                          try {
+                            await ApiService.markAllNotificationsAsRead();
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('All notifications marked as read'),
+                                  backgroundColor: Color(0xFF26181E),
+                                  duration: Duration(seconds: 2),
+                                ),
+                              );
+                              _fetchNotifications();
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Failed to mark read: $e'),
+                                  backgroundColor: const Color(0xFF911746),
+                                ),
+                              );
+                            }
+                          }
+                        },
+                        icon: const Icon(Icons.done_all, color: Color(0xFFDD8F9F)),
+                        tooltip: 'Mark all as read',
                       ),
                     ],
                   ),
@@ -137,9 +222,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> with TickerPr
                 const SizedBox(height: 12),
 
                 Expanded(
-                  child: _todayItems.isEmpty && _earlierItems.isEmpty
-                      ? _buildEmptyState()
-                      : ListView(
+                  child: _isLoading 
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFDD8F9F)),
+                          ),
+                        )
+                      : _todayItems.isEmpty && _earlierItems.isEmpty
+                          ? _buildEmptyState()
+                          : ListView(
                           padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
                           children: [
                             if (_todayItems.isNotEmpty) ...[
@@ -212,49 +303,90 @@ class _NotificationsScreenState extends State<NotificationsScreen> with TickerPr
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: const Color(0xFF160A0E),
+          color: item.isRead ? const Color(0xFF160A0E) : const Color(0xFF26101A),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFF26181E), width: 1.2),
+          border: Border.all(
+            color: item.isRead ? const Color(0xFF26181E) : const Color(0xFF911746).withOpacity(0.5), 
+            width: 1.2
+          ),
+          boxShadow: item.isRead ? [] : [
+            BoxShadow(
+              color: const Color(0xFF911746).withOpacity(0.1),
+              blurRadius: 10,
+              spreadRadius: 1,
+            )
+          ],
         ),
-        child: Column(
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    item.title,
-                    style: const TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 16,
-                      color: Colors.white,
-                      height: 1.4,
+            if (!item.isRead) ...[
+              Container(
+                margin: const EdgeInsets.only(top: 6, right: 12),
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDD8F9F),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFDD8F9F).withOpacity(0.5),
+                      blurRadius: 4,
+                      spreadRadius: 1,
                     ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  item.time,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF5A3C47),
-                  ),
-                ),
-              ],
-            ),
-            if (item.subtext != null) ...[
-              const SizedBox(height: 6),
-              Text(
-                item.subtext!,
-                style: const TextStyle(
-                  fontFamily: 'Georgia',
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
-                  color: Color(0xFFDD8F9F),
+                  ],
                 ),
               ),
+            ] else ...[
+              const SizedBox(width: 4), // Small padding to align text roughly similar if read
             ],
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          style: TextStyle(
+                            fontFamily: 'Georgia',
+                            fontSize: 16,
+                            color: item.isRead ? Colors.white70 : Colors.white,
+                            fontWeight: item.isRead ? FontWeight.normal : FontWeight.w600,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        item.time,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: item.isRead ? const Color(0xFF5A3C47) : const Color(0xFFDD8F9F).withOpacity(0.8),
+                          fontWeight: item.isRead ? FontWeight.normal : FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (item.subtext != null && item.subtext!.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      item.subtext!,
+                      style: TextStyle(
+                        fontFamily: 'Georgia',
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
+                        color: item.isRead ? const Color(0xFF866571) : const Color(0xFFC8B3A8),
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ],
         ),
       ),
@@ -498,10 +630,12 @@ class NotificationItem {
   final String title;
   final String time;
   final String? subtext;
+  final bool isRead;
 
   NotificationItem({
     required this.title,
     required this.time,
     this.subtext,
+    this.isRead = true,
   });
 }

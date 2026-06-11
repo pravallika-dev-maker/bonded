@@ -1,11 +1,14 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'promise_screen.dart';
+import '../services/api_service.dart';
 
-enum JoinCodeState { idle, error, success }
+enum JoinCodeState { idle, loading, error, success }
 
 class JoinWithCodeScreen extends StatefulWidget {
-  const JoinWithCodeScreen({super.key});
+  final String? userName;
+  const JoinWithCodeScreen({super.key, this.userName});
 
   @override
   State<JoinWithCodeScreen> createState() => _JoinWithCodeScreenState();
@@ -16,6 +19,7 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
   final TextEditingController _codeController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   JoinCodeState _state = JoinCodeState.idle;
+  String _errorMessage = '';
 
   late AnimationController _shakeController;
   late Animation<double> _shakeAnim;
@@ -48,19 +52,58 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
 
   bool get _hasInput => _codeController.text.trim().isNotEmpty;
 
-  void _onConnect() {
+  Future<void> _onConnect() async {
     FocusScope.of(context).unfocus();
     final code = _codeController.text.trim().toUpperCase();
 
-    // Simulate validation: valid if matches WORD-N pattern (letters + dash/dot + digit)
-    final valid = RegExp(r'^[A-Z]{3,6}[\s\-·]+\d$').hasMatch(code) ||
-        code.length >= 5;
+    if (code.isEmpty) return;
 
-    if (!valid) {
-      setState(() => _state = JoinCodeState.error);
-      _shakeController.forward();
-    } else {
-      setState(() => _state = JoinCodeState.success);
+    setState(() {
+      _state = JoinCodeState.loading;
+      _errorMessage = '';
+    });
+
+    try {
+      final res = await ApiService.joinPartner(code: code);
+      if (res['success'] == true && mounted) {
+        final pName = res['partnerName'] ?? 'Partner';
+        await ApiService.setPartnerName(pName);
+
+        setState(() {
+          _state = JoinCodeState.success;
+        });
+
+        await Future.delayed(const Duration(milliseconds: 1500));
+        if (!mounted) return;
+
+        Navigator.of(context).pushReplacement(
+          PageRouteBuilder(
+            transitionDuration: const Duration(milliseconds: 600),
+            pageBuilder: (_, __, ___) => PromiseScreen(
+              userName: widget.userName ?? 'You',
+              partnerName: res['partnerName'] ?? 'Partner',
+            ),
+            transitionsBuilder: (_, anim, __, child) =>
+                FadeTransition(opacity: anim, child: child),
+          ),
+        );
+      } else {
+        if (mounted) {
+          setState(() {
+            _state = JoinCodeState.error;
+            _errorMessage = res['message'] ?? "That code didn't match… check once?";
+          });
+          _shakeController.forward();
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _state = JoinCodeState.error;
+          _errorMessage = e.toString().replaceAll('Exception:', '').trim();
+        });
+        _shakeController.forward();
+      }
     }
   }
 
@@ -267,7 +310,7 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
                     AnimatedSwitcher(
                       duration: const Duration(milliseconds: 300),
                       child: _state == JoinCodeState.error
-                          ? _ErrorBanner()
+                          ? _ErrorBanner(errorMessage: _errorMessage)
                           : _state == JoinCodeState.success
                               ? _SuccessBanner()
                               : const Text(
@@ -285,7 +328,7 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
 
                     // ── Primary CTA Button ──
                     GestureDetector(
-                      onTap: _hasInput && _state != JoinCodeState.success ? _onConnect : null,
+                      onTap: _hasInput && _state != JoinCodeState.success && _state != JoinCodeState.loading ? _onConnect : null,
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
                         width: double.infinity,
@@ -306,34 +349,45 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
                             width: 1.2,
                           ),
                         ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.favorite,
-                              size: 18,
-                              color: _state == JoinCodeState.success
-                                  ? const Color(0xFF5DB373)
-                                  : _hasInput ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              _state == JoinCodeState.success
-                                  ? 'You\'re connected ✓'
-                                  : 'Connect',
-                              style: TextStyle(
-                                fontFamily: 'Georgia',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                fontStyle: FontStyle.italic,
-                                letterSpacing: 0.5,
-                                color: _state == JoinCodeState.success
-                                    ? const Color(0xFF5DB373)
-                                    : _hasInput ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                        child: _state == JoinCodeState.loading
+                            ? const Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.0,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFDD8F9F)),
+                                  ),
+                                ),
+                              )
+                            : Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.favorite,
+                                    size: 18,
+                                    color: _state == JoinCodeState.success
+                                        ? const Color(0xFF5DB373)
+                                        : _hasInput ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    _state == JoinCodeState.success
+                                        ? 'You\'re connected ✓'
+                                        : 'Connect',
+                                    style: TextStyle(
+                                      fontFamily: 'Georgia',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      fontStyle: FontStyle.italic,
+                                      letterSpacing: 0.5,
+                                      color: _state == JoinCodeState.success
+                                          ? const Color(0xFF5DB373)
+                                          : _hasInput ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                          ],
-                        ),
                       ),
                     ),
 
@@ -429,6 +483,9 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
 
 // ── Error Banner ──────────────────────────────────────────────────────────────
 class _ErrorBanner extends StatelessWidget {
+  final String errorMessage;
+  const _ErrorBanner({required this.errorMessage});
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -439,14 +496,14 @@ class _ErrorBanner extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFF4A151D), width: 1.0),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.info_outline, color: Color(0xFF962335), size: 16),
-          SizedBox(width: 10),
+          const Icon(Icons.info_outline, color: Color(0xFF962335), size: 16),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
-              "That code didn't match… check once?",
-              style: TextStyle(
+              errorMessage.isNotEmpty ? errorMessage : "That code didn't match… check once?",
+              style: const TextStyle(
                 fontFamily: 'Georgia',
                 fontSize: 12,
                 fontStyle: FontStyle.italic,

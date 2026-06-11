@@ -4,11 +4,175 @@ import 'dart:ui';
 import 'new_letter_screen.dart';
 import 'letter_details_screen.dart';
 
-class LettersScreen extends StatelessWidget {
-  const LettersScreen({super.key});
+import '../services/api_service.dart';
+import 'package:intl/intl.dart';
+
+class LettersScreen extends StatefulWidget {
+  final int? separationId;
+  const LettersScreen({super.key, this.separationId});
+
+  @override
+  State<LettersScreen> createState() => _LettersScreenState();
+}
+
+class _LettersScreenState extends State<LettersScreen> {
+  List<Map<String, dynamic>> _letters = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLetters();
+  }
+
+  Future<void> _fetchLetters() async {
+    try {
+      final fetched = widget.separationId != null
+          ? await ApiService.getSeparationLetters(widget.separationId!)
+          : await ApiService.getMyLetters();
+      if (mounted) {
+        setState(() {
+          // Sort letters by ID descending so newest are at the top (optional but good practice)
+          fetched.sort((a, b) => (b['id'] as int? ?? 0).compareTo((a['id'] as int? ?? 0)));
+          _letters = fetched;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Error fetching letters: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Map<String, dynamic> _getTagStyle(String? tag) {
+    final t = (tag ?? 'Reflective').toLowerCase();
+    if (t.contains('longing') || t.contains('heartfelt')) {
+      return {
+        'bg': const Color(0xFF3F1629),
+        'text': const Color(0xFFECAABB),
+        'accent': const Color(0xFF8A2E55),
+      };
+    } else if (t.contains('peaceful') || t.contains('deep')) {
+      return {
+        'bg': const Color(0xFF322315),
+        'text': const Color(0xFFDCD2AE),
+        'accent': const Color(0xFF9E7E5A),
+      };
+    } else if (t.contains('growing') || t.contains('funny')) {
+      return {
+        'bg': const Color(0xFF132A1E),
+        'text': const Color(0xFF4A7A5A),
+        'accent': const Color(0xFF4A7A5A),
+      };
+    } else {
+      return {
+        'bg': const Color(0xFF1E1833),
+        'text': const Color(0xFF6A5A8E),
+        'accent': const Color(0xFF6A5A8E),
+      };
+    }
+  }
+
+  String _formatDate(String? isoString) {
+    if (isoString == null) return 'TODAY';
+    try {
+      final dt = DateTime.parse(isoString);
+      return DateFormat('MMMM d').format(dt).toUpperCase();
+    } catch (_) {
+      return 'TODAY';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    // Generate the dynamic content list
+    List<Widget> children = [];
+    if (_isLoading) {
+      children.add(
+        const Padding(
+          padding: EdgeInsets.only(top: 100),
+          child: Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF9E7E5A)),
+            ),
+          ),
+        ),
+      );
+    } else if (_letters.isEmpty) {
+      children.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 80.0),
+          child: Column(
+            children: [
+              Icon(Icons.edit_note_outlined, size: 64, color: const Color(0xFFDD8F9F).withOpacity(0.3)),
+              const SizedBox(height: 16),
+              const Text(
+                'No letters written yet',
+                style: TextStyle(
+                  fontFamily: 'Georgia',
+                  fontSize: 18,
+                  color: Colors.white70,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Your letters are kept here safely.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF866571),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } else {
+      for (int i = 0; i < _letters.length; i++) {
+        final letter = _letters[i];
+        final title = letter['title'] ?? 'Reflection';
+        final style = _getTagStyle(title);
+        final id = letter['id'] ?? 0;
+
+        children.add(
+          _LetterCard(
+            id: id,
+            date: _formatDate(letter['createdAt']),
+            day: 'LETTER ${id != 0 ? id : (i + 1)}',
+            tag: title,
+            tagBg: style['bg'],
+            tagText: style['text'],
+            accentColor: style['accent'],
+            prompt: 'Your thoughts & feelings',
+            body: letter['content'] ?? '',
+            onChanged: _fetchLetters,
+          ),
+        );
+        children.add(const SizedBox(height: 16));
+      }
+    }
+
+    // Add write entry prompt and spacer at end
+    if (widget.separationId == null) {
+      children.add(const SizedBox(height: 8));
+      children.add(GestureDetector(
+        onTap: () async {
+          final result = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const NewLetterScreen()),
+          );
+          if (result == true) {
+            _fetchLetters();
+          }
+        },
+        child: const _WriteTodayEntryPrompt(),
+      ));
+    }
+    children.add(const SizedBox(height: 120));
+
     return Scaffold(
       backgroundColor: const Color(0xFF090204),
       body: SafeArea(
@@ -45,30 +209,34 @@ class LettersScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                  OutlinedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => const NewLetterScreen()),
-                      );
-                    },
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF9E7E5A), width: 1),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
+                  if (widget.separationId == null)
+                    OutlinedButton(
+                      onPressed: () async {
+                        final result = await Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const NewLetterScreen()),
+                        );
+                        if (result == true) {
+                          _fetchLetters();
+                        }
+                      },
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFF9E7E5A), width: 1),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    ),
-                    child: const Text(
-                      '+ New entry',
-                      style: TextStyle(
-                        fontFamily: 'Georgia',
-                        fontSize: 14,
-                        fontStyle: FontStyle.italic,
-                        color: Color(0xFF9E7E5A),
+                      child: const Text(
+                        '+ New entry',
+                        style: TextStyle(
+                          fontFamily: 'Georgia',
+                          fontSize: 14,
+                          fontStyle: FontStyle.italic,
+                          color: Color(0xFF9E7E5A),
+                        ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -77,34 +245,7 @@ class LettersScreen extends StatelessWidget {
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                children: const [
-                  _LetterCard(
-                    date: 'MARCH 25',
-                    day: 'DAY 14',
-                    tag: 'Longing',
-                    tagBg: Color(0xFF3F1629),
-                    tagText: Color(0xFFECAABB),
-                    accentColor: Color(0xFF8A2E55),
-                    prompt: 'What do you miss most about them today?',
-                    body: "The way she laughs at her own jokes before finishing them. I catch myself smiling at nothing and realise it's because I'm thinking of her.",
-                  ),
-                  SizedBox(height: 16),
-                  _LetterCard(
-                    date: 'MARCH 23',
-                    day: 'DAY 12',
-                    tag: 'Peaceful',
-                    tagBg: Color(0xFF322315),
-                    tagText: Color(0xFFDCD2AE),
-                    accentColor: Color(0xFF9E7E5A),
-                    prompt: 'What are you grateful for in this space?',
-                    body: "I've had more time with myself. Found that I'm still interesting alone — that feels important.",
-                  ),
-                  SizedBox(height: 16),
-                  _LockedLetterCard(),
-                  SizedBox(height: 24),
-                  _WriteTodayEntryPrompt(),
-                  SizedBox(height: 120), // Spacer for navbar
-                ],
+                children: children,
               ),
             ),
           ],
@@ -115,6 +256,7 @@ class LettersScreen extends StatelessWidget {
 }
 
 class _LetterCard extends StatelessWidget {
+  final int id;
   final String date;
   final String day;
   final String tag;
@@ -123,8 +265,10 @@ class _LetterCard extends StatelessWidget {
   final Color accentColor;
   final String prompt;
   final String body;
+  final VoidCallback onChanged;
 
   const _LetterCard({
+    required this.id,
     required this.date,
     required this.day,
     required this.tag,
@@ -133,16 +277,18 @@ class _LetterCard extends StatelessWidget {
     required this.accentColor,
     required this.prompt,
     required this.body,
+    required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
+      onTap: () async {
+        final result = await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (context) => LetterDetailsScreen(
+              id: id,
               date: date,
               day: day,
               tag: tag,
@@ -154,6 +300,9 @@ class _LetterCard extends StatelessWidget {
             ),
           ),
         );
+        if (result == true) {
+          onChanged();
+        }
       },
       child: Container(
         decoration: BoxDecoration(
@@ -228,7 +377,7 @@ class _LetterCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  body,
+                  body.length > 100 ? '${body.substring(0, 100)}...' : body,
                   style: const TextStyle(
                     fontSize: 15,
                     color: Color(0xFFC8B3A8),
@@ -238,51 +387,6 @@ class _LetterCard extends StatelessWidget {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LockedLetterCard extends StatelessWidget {
-  const _LockedLetterCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _DashedBorderPainter(),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(24),
-        child: Row(
-          children: [
-            Icon(Icons.lock_outline, color: const Color(0xFF4A343D).withOpacity(0.5), size: 24),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '"You wrote this when it hurt more..."',
-                    style: TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 15,
-                      fontStyle: FontStyle.italic,
-                      color: const Color(0xFF866571).withOpacity(0.5),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Check in to unlock · Day 2',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: const Color(0xFF4A343D).withOpacity(0.5),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );
@@ -320,40 +424,4 @@ class _WriteTodayEntryPrompt extends StatelessWidget {
       ),
     );
   }
-}
-
-class _DashedBorderPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color(0xFF26151B)
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
-
-    final RRect rrect = RRect.fromRectAndRadius(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      const Radius.circular(24),
-    );
-
-    final Path path = Path()..addRRect(rrect);
-    final Path dashedPath = _createDashedPath(path, 8, 6);
-    
-    canvas.drawPath(dashedPath, paint);
-  }
-
-  Path _createDashedPath(Path source, double dashLength, double dashSpace) {
-    final Path dest = Path();
-    for (final PathMetric metric in source.computeMetrics()) {
-      double distance = 0.0;
-      while (distance < metric.length) {
-        final double length = math.min(dashLength, metric.length - distance);
-        dest.addPath(metric.extractPath(distance, distance + length), Offset.zero);
-        distance += dashLength + dashSpace;
-      }
-    }
-    return dest;
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

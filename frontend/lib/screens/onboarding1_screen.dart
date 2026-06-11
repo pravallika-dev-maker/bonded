@@ -28,140 +28,151 @@ class Onboarding1Content extends StatelessWidget {
           ),
         ),
 
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // ── Top Progress Bar ──
-            Padding(
-              padding: const EdgeInsets.only(top: 24.0, left: 24.0, right: 24.0),
-              child: const SizedBox(height: 3), // Maintains the same top padding but removes the indicators
-            ),
-
-            const Spacer(flex: 2),
-
-            // ── Graphic (Mathematically exact radiating waves) ──
-            const Center(child: _TwoCirclesGraphic()),
-
-            const Spacer(flex: 2),
-
-            // ── Title ──
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: RichText(
-                text: const TextSpan(
-                  children: [
-                    TextSpan(
-                      text: 'Absence makes\nthe heart\n',
-                      style: TextStyle(
-                        fontFamily: 'Georgia',
-                        fontSize: 34,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        height: 1.25,
+        LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // ── Top Progress Bar ──
+                      Padding(
+                        padding: const EdgeInsets.only(top: 24.0, left: 24.0, right: 24.0),
+                        child: const SizedBox(height: 3), // Maintains the same top padding but removes the indicators
                       ),
-                    ),
-                    TextSpan(
-                      text: 'remember',
-                      style: TextStyle(
-                        fontFamily: 'Georgia',
-                        fontSize: 34,
-                        fontWeight: FontWeight.bold,
-                        fontStyle: FontStyle.italic,
-                        color: Color(0xFFE27E9F),
-                        height: 1.25,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
 
-            const SizedBox(height: 24),
+                      const Spacer(flex: 2),
 
-            // ── Body text ──
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: const Text(
-                'Bonded holds space for two people\nto grow — not by staying close, but\nby choosing to come back.',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF7B5C66),
-                  height: 1.6,
-                  letterSpacing: 0.2,
-                ),
-              ),
-            ),
+                      // ── Graphic (Mathematically exact radiating waves) ──
+                      const Center(child: _TwoCirclesGraphic()),
 
-            const Spacer(flex: 2),
+                      const Spacer(flex: 2),
 
-            // ── Buttons ──
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32.0),
-              child: SizedBox(
-                height: 140, // Fixed height for consistent CTA placement across screens
-                child: Column(
-                  children: [
-                    SizedBox(
-                      width: double.infinity,
-                      height: 58,
-                      child: ElevatedButton.icon(
-                        onPressed: onNext ?? () {},
-                        icon: const Icon(
-                          Icons.favorite,
-                          size: 18,
-                          color: Colors.white,
-                        ),
-                        label: const Text(
-                          'Begin our story',
-                          style: TextStyle(
-                            fontFamily: 'Georgia',
-                            fontSize: 16,
-                            fontStyle: FontStyle.italic,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF8A2E55),
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    GestureDetector(
-                      onTap: onSkip ?? () {},
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Column(
-                          children: [
-                            const Text(
-                              'skip for now',
-                              style: TextStyle(
-                                fontFamily: 'Georgia',
-                                fontSize: 14,
-                                fontStyle: FontStyle.italic,
-                                color: Color(0xFF3D1B28),
+                      // ── Title ──
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                        child: RichText(
+                          text: const TextSpan(
+                            children: [
+                              TextSpan(
+                                text: 'Absence makes\nthe heart\n',
+                                style: TextStyle(
+                                  fontFamily: 'Georgia',
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                  height: 1.25,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Container(
-                              height: 1,
-                              width: 80,
-                              color: const Color(0xFF261019),
-                            ),
-                          ],
+                              TextSpan(
+                                text: 'remember',
+                                style: TextStyle(
+                                  fontFamily: 'Georgia',
+                                  fontSize: 34,
+                                  fontWeight: FontWeight.bold,
+                                  fontStyle: FontStyle.italic,
+                                  color: Color(0xFFE27E9F),
+                                  height: 1.25,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+
+                      const SizedBox(height: 24),
+
+                      // ── Body text ──
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                        child: const Text(
+                          'Bonded holds space for two people\nto grow — not by staying close, but\nby choosing to come back.',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF7B5C66),
+                            height: 1.6,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ),
+
+                      const Spacer(flex: 2),
+
+                      // ── Buttons ──
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                        child: SizedBox(
+                          height: 140, // Fixed height for consistent CTA placement across screens
+                          child: Column(
+                            children: [
+                              SizedBox(
+                                width: double.infinity,
+                                height: 58,
+                                child: ElevatedButton.icon(
+                                  onPressed: onNext ?? () {},
+                                  icon: const Icon(
+                                    Icons.favorite,
+                                    size: 18,
+                                    color: Colors.white,
+                                  ),
+                                  label: const Text(
+                                    'Begin our story',
+                                    style: TextStyle(
+                                      fontFamily: 'Georgia',
+                                      fontSize: 16,
+                                      fontStyle: FontStyle.italic,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF8A2E55),
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              GestureDetector(
+                                onTap: onSkip ?? () {},
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  child: Column(
+                                    children: [
+                                      const Text(
+                                        'skip for now',
+                                        style: TextStyle(
+                                          fontFamily: 'Georgia',
+                                          fontSize: 14,
+                                          fontStyle: FontStyle.italic,
+                                          color: Color(0xFF3D1B28),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Container(
+                                        height: 1,
+                                        width: 80,
+                                        color: const Color(0xFF261019),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 48), // Match bottom padding of onboarding2
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 48), // Match bottom padding of onboarding2
-          ],
+            );
+          },
         ),
       ],
     );

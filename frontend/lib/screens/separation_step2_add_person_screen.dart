@@ -265,8 +265,8 @@ class _SeparationStep2AddPersonScreenState extends State<SeparationStep2AddPerso
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
+                          children: const [
+                            Text(
                               'INVITE THEM',
                               style: TextStyle(
                                 fontSize: 10,
@@ -275,8 +275,8 @@ class _SeparationStep2AddPersonScreenState extends State<SeparationStep2AddPerso
                                 color: Color(0xFF7A5C67),
                               ),
                             ),
-                            const SizedBox(height: 12),
-                            const Text(
+                            SizedBox(height: 12),
+                            Text(
                               "They'll get a bond code to join the full experience",
                               style: TextStyle(
                                 fontFamily: 'Georgia',
@@ -284,43 +284,6 @@ class _SeparationStep2AddPersonScreenState extends State<SeparationStep2AddPerso
                                 fontStyle: FontStyle.italic,
                                 color: Color(0xFFD4C4CA),
                                 height: 1.5,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                            GestureDetector(
-                              onTap: () {},
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                                decoration: BoxDecoration(
-                                  color: Colors.transparent,
-                                  borderRadius: BorderRadius.circular(24),
-                                  border: Border.all(
-                                    color: const Color(0xFF4A3A2A),
-                                    width: 1.5,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.arrow_upward,
-                                      size: 16,
-                                      color: Color(0xFF9E7E5A),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      _nameController.text.isEmpty
-                                          ? 'Generate invite code'
-                                          : 'Generate invite code for ${_nameController.text}',
-                                      style: const TextStyle(
-                                        fontFamily: 'Georgia',
-                                        fontSize: 14,
-                                        fontStyle: FontStyle.italic,
-                                        color: Color(0xFF9E7E5A),
-                                      ),
-                                    ),
-                                  ],
-                                ),
                               ),
                             ),
                           ],

@@ -1,9 +1,9 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'join_with_code_screen.dart';
 import 'promise_screen.dart';
+import '../services/api_service.dart';
 
 class PartnerInviteScreen extends StatefulWidget {
   final String userName;
@@ -19,25 +19,39 @@ class PartnerInviteScreen extends StatefulWidget {
 }
 
 class _PartnerInviteScreenState extends State<PartnerInviteScreen> {
-  late final String _bondCode;
+  String? _bondCode;
   bool _shared = false; // inline confirmation flag
-
-  static const List<String> _words = [
-    'ROSE', 'LUNA', 'NOVA', 'EDEN', 'SAGE',
-    'IRIS', 'DAWN', 'STAR', 'VEIL', 'MIST',
-  ];
+  bool _isLoading = true;
+  String _errorMessage = '';
 
   @override
   void initState() {
     super.initState();
-    final rng = Random();
-    final word = _words[rng.nextInt(_words.length)];
-    final number = rng.nextInt(9) + 1;
-    _bondCode = '$word · $number';
+    _fetchInviteCode();
+  }
+
+  Future<void> _fetchInviteCode() async {
+    try {
+      final res = await ApiService.getInviteCode();
+      if (mounted) {
+        setState(() {
+          _bondCode = res['code'];
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceAll('Exception:', '').trim();
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> _shareCode() async {
-    final rawCode = _bondCode.replaceAll(' · ', '-');
+    if (_bondCode == null) return;
+    final rawCode = _bondCode!.replaceAll(' · ', '-');
     final message =
         "I'm using this app called Bonded to take a small space and understand things better.\n\n"
         "I'd like you to join me.\n\n"
@@ -164,45 +178,72 @@ class _PartnerInviteScreenState extends State<PartnerInviteScreen> {
                         ),
                       ],
                     ),
-                    child: Column(
-                      children: [
-                        // The code in big spaced letters
-                        Text(
-                          _bondCode,
-                          style: const TextStyle(
-                            fontFamily: 'Georgia',
-                            fontSize: 36,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFE89FB8),
-                            letterSpacing: 8,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        // Sub-label
-                        const Text(
-                          'YOUR BOND CODE  ·  24 HOURS',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 2.0,
-                            color: Color(0xFF5E3A4B),
-                          ),
-                        ),
-                      ],
-                    ),
+                    child: _isLoading
+                        ? const Center(
+                            child: SizedBox(
+                              width: 32,
+                              height: 32,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE89FB8)),
+                              ),
+                            ),
+                          )
+                        : _errorMessage.isNotEmpty
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                  child: Text(
+                                    _errorMessage,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontFamily: 'Georgia',
+                                      fontSize: 14,
+                                      fontStyle: FontStyle.italic,
+                                      color: Color(0xFFB55D6A),
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : Column(
+                                children: [
+                                  // The code in big spaced letters
+                                  Text(
+                                    _bondCode ?? '',
+                                    style: const TextStyle(
+                                      fontFamily: 'Georgia',
+                                      fontSize: 36,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFFE89FB8),
+                                      letterSpacing: 4,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  // Sub-label
+                                  const Text(
+                                    'YOUR BOND CODE  ·  24 HOURS',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 2.0,
+                                      color: Color(0xFF5E3A4B),
+                                    ),
+                                  ),
+                                ],
+                              ),
                   ),
 
                   const Spacer(flex: 2),
 
                   // ── Share Button ──
                   GestureDetector(
-                    onTap: _shareCode,
+                    onTap: (_isLoading || _bondCode == null) ? null : _shareCode,
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       width: double.infinity,
                       height: 54,
                       decoration: BoxDecoration(
-                        color: _shared ? const Color(0xFF0C1F15) : const Color(0xFF1A1214),
+                        color: _shared ? const Color(0xFF0C1F15) : const Color(0xFF1A1214).withOpacity((_isLoading || _bondCode == null) ? 0.5 : 1.0),
                         borderRadius: BorderRadius.circular(27),
                         border: Border.all(
                           color: _shared 
@@ -242,7 +283,7 @@ class _PartnerInviteScreenState extends State<PartnerInviteScreen> {
                     onTap: () {
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => const JoinWithCodeScreen(),
+                          builder: (_) => JoinWithCodeScreen(userName: widget.userName),
                         ),
                       );
                     },

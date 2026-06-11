@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../widgets/app_heart_icon.dart';
+import '../services/api_service.dart';
 
 class FeelScreen extends StatefulWidget {
   final VoidCallback onReturnHome;
@@ -16,6 +17,9 @@ class _FeelScreenState extends State<FeelScreen> with SingleTickerProviderStateM
   final TextEditingController _reflectionController = TextEditingController();
   bool _isSubmitting = false;
   late AnimationController _breathingController;
+
+  List<Map<String, dynamic>> _pastReflections = [];
+  bool _isLoadingPastReflections = true;
 
   final List<Map<String, dynamic>> _moods = [
     {
@@ -59,6 +63,7 @@ class _FeelScreenState extends State<FeelScreen> with SingleTickerProviderStateM
       vsync: this,
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
+    _fetchPastReflections();
   }
 
   @override
@@ -66,6 +71,24 @@ class _FeelScreenState extends State<FeelScreen> with SingleTickerProviderStateM
     _reflectionController.dispose();
     _breathingController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchPastReflections() async {
+    try {
+      final List<Map<String, dynamic>> fetched = await ApiService.getMoods();
+      if (mounted) {
+        setState(() {
+          _pastReflections = fetched;
+          _isLoadingPastReflections = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingPastReflections = false;
+        });
+      }
+    }
   }
 
   void _submit() async {
@@ -78,16 +101,42 @@ class _FeelScreenState extends State<FeelScreen> with SingleTickerProviderStateM
       _isSubmitting = true;
     });
 
-    await Future.delayed(const Duration(seconds: 2));
+    try {
+      // Find selected mood label
+      final selectedItem = _moods.firstWhere((e) => e['id'] == _selectedMood);
+      final String moodLabel = selectedItem['label'] ?? _selectedMood!;
 
-    if (mounted) {
-      widget.onReturnHome();
-      // Optional: Reset state so it's clean next time they visit
-      setState(() {
-        _isSubmitting = false;
-        _selectedMood = null;
-        _reflectionController.clear();
-      });
+      await ApiService.postMood(
+        mood: moodLabel,
+        reflection: _reflectionController.text.trim(),
+      );
+
+      // Re-fetch past reflections in background so the list is fresh!
+      _fetchPastReflections();
+
+      if (mounted) {
+        widget.onReturnHome();
+        setState(() {
+          _isSubmitting = false;
+          _selectedMood = null;
+          _reflectionController.clear();
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Oops! ${e.toString().replaceAll('Exception:', '').trim()}',
+              style: const TextStyle(fontFamily: 'Georgia'),
+            ),
+            backgroundColor: const Color(0xFF911746),
+          ),
+        );
+      }
     }
   }
 
@@ -285,6 +334,146 @@ class _FeelScreenState extends State<FeelScreen> with SingleTickerProviderStateM
                   ),
                 ),
               ),
+
+              const SizedBox(height: 40),
+              
+              // ── Past Reflections Section ──
+              const Row(
+                children: [
+                  Icon(Icons.history_toggle_off_rounded, size: 14, color: Color(0xFF9E7E5A)),
+                  SizedBox(width: 8),
+                  Text(
+                    'YOUR PAST REFLECTIONS',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5,
+                      color: Color(0xFF9E7E5A),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              
+              if (_isLoadingPastReflections)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24.0),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFDD8F9F)),
+                      ),
+                    ),
+                  ),
+                )
+              else if (_pastReflections.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF160A0E),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFF26181E), width: 1.0),
+                  ),
+                  child: const Text(
+                    'No reflections recorded yet. Your expressions will appear here.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: Color(0xFF7A5C67),
+                    ),
+                  ),
+                )
+              else
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _pastReflections.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final item = _pastReflections[index];
+                    final String mood = item['mood'] ?? 'Feeling';
+                    final String reflection = item['reflection'] ?? '';
+                    final String rawDate = item['createdAt'] ?? '';
+                    
+                    String formattedDate = '';
+                    if (rawDate.isNotEmpty) {
+                      try {
+                        final dt = DateTime.parse(rawDate).toLocal();
+                        formattedDate = DateFormat('MMM d, yyyy • h:mm a').format(dt);
+                      } catch (_) {}
+                    }
+
+                    // Map string to our cute icons/colors
+                    IconData moodIcon = Icons.favorite_border;
+                    Color moodColor = const Color(0xFFECAABB);
+                    if (mood.toLowerCase().contains('peaceful')) {
+                      moodIcon = Icons.sentiment_satisfied_outlined;
+                      moodColor = const Color(0xFF9E7E5A);
+                    } else if (mood.toLowerCase().contains('reflective')) {
+                      moodIcon = Icons.water_drop_outlined;
+                      moodColor = const Color(0xFF6A5A8E);
+                    } else if (mood.toLowerCase().contains('growing')) {
+                      moodIcon = Icons.nature;
+                      moodColor = const Color(0xFF4A7A5A);
+                    }
+
+                    return Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1F0A13).withOpacity(0.4),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFF26181E), width: 1.0),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(moodIcon, size: 16, color: moodColor),
+                              const SizedBox(width: 8),
+                              Text(
+                                mood,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: moodColor,
+                                ),
+                              ),
+                              const Spacer(),
+                              if (formattedDate.isNotEmpty)
+                                Text(
+                                  formattedDate,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: Color(0xFF7A5C67),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          if (reflection.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              '"$reflection"',
+                              style: const TextStyle(
+                                fontFamily: 'Georgia',
+                                fontSize: 13,
+                                fontStyle: FontStyle.italic,
+                                color: Color(0xFFD4C4CA),
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  },
+                ),
             ],
           ),
         ),

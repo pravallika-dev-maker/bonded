@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:math' as math;
 import 'reflection_completion_screen.dart';
+import '../services/api_service.dart';
 
 class ReflectionFlowScreen extends StatefulWidget {
   final int day;
@@ -14,48 +15,58 @@ class ReflectionFlowScreen extends StatefulWidget {
 class _ReflectionFlowScreenState extends State<ReflectionFlowScreen> with TickerProviderStateMixin {
   late AnimationController _breathingController;
   int _currentStep = 0;
-  final List<Map<String, dynamic>> _day1Steps = [
-    {
-      'type': 'text',
-      'question': 'Why are they taking this break?',
-      'hint': 'Speak your heart...',
-    },
-    {
-      'type': 'text',
-      'question': 'What do you want to improve?',
-      'hint': 'Be honest with yourself...',
-    },
-    {
-      'type': 'rating',
-      'question': 'How do you rate your relationship?',
-      'categories': ['Happiness', 'Trust', 'Communication'],
-    },
-  ];
+  bool _isLoading = true;
+  String? _errorMessage;
 
-  final List<Map<String, dynamic>> _day2Steps = [
-    {
-      'type': 'mistakes',
-      'question': 'Select the mistakes you made:',
-      'options': ['Anger', 'Overthinking', 'Ego', 'Ignoring'],
-    },
-    {
-      'type': 'text',
-      'question': 'What will I improve?',
-      'hint': 'Set your intention...',
-    },
-  ];
-
-  late List<Map<String, dynamic>> _currentSteps;
+  List<Map<String, dynamic>> _currentSteps = [];
+  int? _sessionId;
 
   @override
   void initState() {
     super.initState();
-    _currentSteps = widget.day == 1 ? _day1Steps : _day2Steps;
+    _fetchQuestions();
 
     _breathingController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 4),
     )..repeat(reverse: true);
+  }
+
+  Future<void> _fetchQuestions() async {
+    try {
+      final response = await ApiService.getTodayQuestion();
+      final data = response['data'] ?? response;
+      
+      final sessionIdRaw = data['session_id'] ?? data['sessionId'] ?? data['id'];
+      final rawQuestions = data['questions'] ?? (data is List ? data : [data]);
+
+      final List<Map<String, dynamic>> parsedSteps = [];
+      for (var rq in rawQuestions) {
+        if (rq is Map) {
+          parsedSteps.add({
+            'type': rq['question_type'] ?? rq['type'] ?? 'text',
+            'question': rq['question_text'] ?? rq['question'] ?? 'Reflect on this moment...',
+            'id': rq['id'] ?? rq['question_id'],
+            'hint': rq['hint'] ?? 'Speak your heart...',
+          });
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _sessionId = sessionIdRaw is int ? sessionIdRaw : int.tryParse(sessionIdRaw?.toString() ?? '');
+          _currentSteps = parsedSteps;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -64,7 +75,7 @@ class _ReflectionFlowScreenState extends State<ReflectionFlowScreen> with Ticker
     super.dispose();
   }
 
-  void _nextStep() {
+  void _nextStep(dynamic answer) {
     _showBondedAIFeedback();
   }
 
@@ -166,7 +177,27 @@ class _ReflectionFlowScreenState extends State<ReflectionFlowScreen> with Ticker
                 ),
 
                 Expanded(
-                  child: _buildCurrentStep(),
+                  child: _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFDD8F9F)),
+                          ),
+                        )
+                      : _errorMessage != null
+                          ? Center(
+                              child: Text(
+                                'Error: $_errorMessage',
+                                style: const TextStyle(color: Colors.white70),
+                              ),
+                            )
+                          : _currentSteps.isEmpty
+                              ? const Center(
+                                  child: Text(
+                                    'No reflection questions available today.',
+                                    style: TextStyle(color: Colors.white70),
+                                  ),
+                                )
+                              : _buildCurrentStep(),
                 ),
               ],
             ),
@@ -177,6 +208,8 @@ class _ReflectionFlowScreenState extends State<ReflectionFlowScreen> with Ticker
   }
 
   Widget _buildCurrentStep() {
+    if (_currentStep >= _currentSteps.length) return const SizedBox.shrink();
+    
     final step = _currentSteps[_currentStep];
     if (step['type'] == 'text') {
       return _ReflectionTextInput(
@@ -189,25 +222,32 @@ class _ReflectionFlowScreenState extends State<ReflectionFlowScreen> with Ticker
       return _ReflectionRatingInput(
         key: ValueKey('step_$_currentStep'),
         question: step['question'],
-        categories: step['categories'],
-        onNext: _nextStep,
+        categories: step['categories'] ?? ['Happiness', 'Trust', 'Communication'],
+        onNext: () => _nextStep(null),
       );
     } else if (step['type'] == 'mistakes') {
       return _ReflectionMistakesInput(
         key: ValueKey('step_$_currentStep'),
         question: step['question'],
-        options: step['options'],
-        onNext: _nextStep,
+        options: step['options'] ?? ['Anger', 'Overthinking', 'Ego', 'Ignoring'],
+        onNext: () => _nextStep(null),
       );
     }
-    return const SizedBox.shrink();
+    
+    // Fallback to text input for unknown types
+    return _ReflectionTextInput(
+      key: ValueKey('step_$_currentStep'),
+      question: step['question'] ?? 'Reflect...',
+      hint: 'Speak your heart...',
+      onNext: _nextStep,
+    );
   }
 }
 
 class _ReflectionTextInput extends StatefulWidget {
   final String question;
   final String hint;
-  final VoidCallback onNext;
+  final Function(String) onNext;
 
   const _ReflectionTextInput({
     super.key,
@@ -316,7 +356,9 @@ class _ReflectionTextInputState extends State<_ReflectionTextInput> {
                 // Next Button
                 Expanded(
                   child: GestureDetector(
-                    onTap: _controller.text.trim().isNotEmpty ? widget.onNext : null,
+                    onTap: _controller.text.trim().isNotEmpty 
+                        ? () => widget.onNext(_controller.text.trim()) 
+                        : null,
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       height: 56,
