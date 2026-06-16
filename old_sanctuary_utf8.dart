@@ -1,3 +1,5 @@
+﻿import 'dart:math' as math;
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../screens/separation_step1_intention_screen.dart';
 import '../screens/history_screen.dart';
@@ -5,9 +7,7 @@ import '../screens/join_with_code_screen.dart';
 import '../services/api_service.dart';
 
 class LivingSanctuarySection extends StatefulWidget {
-  final bool isActiveSeparation;
-  final bool hasPartner;
-  const LivingSanctuarySection({super.key, required this.isActiveSeparation, this.hasPartner = false});
+  const LivingSanctuarySection({super.key});
 
   @override
   State<LivingSanctuarySection> createState() => _LivingSanctuarySectionState();
@@ -70,8 +70,6 @@ class _LivingSanctuarySectionState extends State<LivingSanctuarySection>
         position: _entryOffset,
         child: Column(
           children: [
-
-
             // ── TOP BUTTONS ──
             Row(
               children: [
@@ -82,17 +80,6 @@ class _LivingSanctuarySectionState extends State<LivingSanctuarySection>
                     isPrimary: true,
                     breathingController: _breathingController,
                     onTap: () {
-                      if (widget.isActiveSeparation) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text("You are already in an active separation journey."),
-                            backgroundColor: const Color(0xFF911746),
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
-                        );
-                        return;
-                      }
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => const SeparationStep1IntentionScreen()),
@@ -121,18 +108,17 @@ class _LivingSanctuarySectionState extends State<LivingSanctuarySection>
             const SizedBox(height: 16),
 
             // ── CONNECTION PORTAL (Join) ──
-            if (!widget.hasPartner) ...[
-              _ConnectionPortalBar(
-                driftController: _ambientDriftController,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const JoinWithCodeScreen()),
-                  );
-                },
-              ),
-              const SizedBox(height: 24),
-            ],
+            _ConnectionPortalBar(
+              driftController: _ambientDriftController,
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const JoinWithCodeScreen()),
+                );
+              },
+            ),
+
+            const SizedBox(height: 24),
 
             // ── THE QUOTE CARD SANCTUARY ──
             _EmotionalSanctuaryCard(
@@ -142,128 +128,6 @@ class _LivingSanctuarySectionState extends State<LivingSanctuarySection>
           ],
         ),
       ),
-    );
-  }
-}
-
-
-// ─────────────────────────────────────────────────────────────────────────────
-// The Gentle Reminder Quote Card (minimal)
-// ─────────────────────────────────────────────────────────────────────────────
-class _EmotionalSanctuaryCard extends StatefulWidget {
-  final AnimationController breathingController;
-  final AnimationController driftController;
-
-  const _EmotionalSanctuaryCard({
-    required this.breathingController,
-    required this.driftController,
-  });
-
-  @override
-  State<_EmotionalSanctuaryCard> createState() => _EmotionalSanctuaryCardState();
-}
-
-class _EmotionalSanctuaryCardState extends State<_EmotionalSanctuaryCard> {
-  String _affirmation = '"The space between you is not a void,\nbut a garden growing in silence."';
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchAffirmation();
-  }
-
-  Future<void> _fetchAffirmation() async {
-    final data = await ApiService.getTodayAffirmation();
-    if (data != null && mounted) {
-      final text = data['text'] ?? data['content'] ?? data['quote'] ?? data['message'] ?? data['affirmation'];
-      if (text != null && text.toString().isNotEmpty) {
-        setState(() {
-          _affirmation = '"$text"';
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: widget.breathingController,
-      builder: (context, child) {
-        final breathe = widget.breathingController.value;
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                const Color(0xFF2E1020).withOpacity(0.15 + (breathe * 0.05)),
-                const Color(0xFF180710).withOpacity(0.3),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(32),
-              bottomRight: Radius.circular(32),
-              topRight: Radius.circular(12),
-              bottomLeft: Radius.circular(12),
-            ),
-            border: Border.all(
-              color: const Color(0xFFFF8BC2).withOpacity(0.08 + (breathe * 0.07)),
-              width: 1.0,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFFF8BC2).withOpacity(0.02 + (breathe * 0.03)),
-                blurRadius: 16,
-                spreadRadius: 1,
-              ),
-            ],
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Transform.translate(
-                offset: Offset(0, -1.0 + (breathe * 2.0)),
-                child: Icon(
-                  Icons.local_florist_outlined,
-                  size: 20,
-                  color: const Color(0xFFFF8BC2).withOpacity(0.6 + (breathe * 0.2)),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "GENTLE REMINDER",
-                      style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 2.0,
-                        color: const Color(0xFFFF8BC2).withOpacity(0.5 + (breathe * 0.2)),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _affirmation,
-                      style: const TextStyle(
-                        fontFamily: 'Georgia',
-                        fontSize: 13,
-                        fontStyle: FontStyle.italic,
-                        color: Color(0xFFD4B1C1),
-                        height: 1.5,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }
@@ -472,3 +336,123 @@ class _ConnectionPortalBarState extends State<_ConnectionPortalBar>
 }
 
 
+// ─────────────────────────────────────────────────────────────────────────────
+// The Gentle Reminder Quote Card (minimal)
+// ─────────────────────────────────────────────────────────────────────────────
+class _EmotionalSanctuaryCard extends StatefulWidget {
+  final AnimationController breathingController;
+  final AnimationController driftController;
+
+  const _EmotionalSanctuaryCard({
+    required this.breathingController,
+    required this.driftController,
+  });
+
+  @override
+  State<_EmotionalSanctuaryCard> createState() => _EmotionalSanctuaryCardState();
+}
+
+class _EmotionalSanctuaryCardState extends State<_EmotionalSanctuaryCard> {
+  String _affirmation = '"The space between you is not a void,\nbut a garden growing in silence."';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAffirmation();
+  }
+
+  Future<void> _fetchAffirmation() async {
+    final data = await ApiService.getTodayAffirmation();
+    if (data != null && mounted) {
+      final text = data['text'] ?? data['content'] ?? data['quote'] ?? data['message'] ?? data['affirmation'];
+      if (text != null && text.toString().isNotEmpty) {
+        setState(() {
+          _affirmation = '"$text"';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: widget.breathingController,
+      builder: (context, child) {
+        final breathe = widget.breathingController.value;
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                const Color(0xFF2E1020).withOpacity(0.15 + (breathe * 0.05)),
+                const Color(0xFF180710).withOpacity(0.3),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(32),
+              bottomRight: Radius.circular(32),
+              topRight: Radius.circular(12),
+              bottomLeft: Radius.circular(12),
+            ),
+            border: Border.all(
+              color: const Color(0xFFFF8BC2).withOpacity(0.08 + (breathe * 0.07)),
+              width: 1.0,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFFF8BC2).withOpacity(0.02 + (breathe * 0.03)),
+                blurRadius: 16,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Transform.translate(
+                offset: Offset(0, -1.0 + (breathe * 2.0)),
+                child: Icon(
+                  Icons.local_florist_outlined,
+                  size: 20,
+                  color: const Color(0xFFFF8BC2).withOpacity(0.6 + (breathe * 0.2)),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "GENTLE REMINDER",
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2.0,
+                        color: const Color(0xFFFF8BC2).withOpacity(0.5 + (breathe * 0.2)),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _affirmation,
+                      style: const TextStyle(
+                        fontFamily: 'Georgia',
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
+                        color: Color(0xFFD4B1C1),
+                        height: 1.5,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}

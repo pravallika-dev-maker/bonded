@@ -776,6 +776,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
                             (_activeSeparation!['is_active'] == true || 
                              _activeSeparation!['isActive'] == true || 
                              _activeSeparation!['status'] == 'active'),
+                        hasPartner: _partnerName != null && _partnerName!.isNotEmpty,
                       ),
 
                       const SizedBox(height: 36),
