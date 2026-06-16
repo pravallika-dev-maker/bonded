@@ -69,12 +69,13 @@ class _FlyingFairyWidgetState extends State<FlyingFairyWidget> with TickerProvid
       TweenSequenceItem(tween: Tween<double>(begin: -15.0, end: 0.0).chain(CurveTween(curve: Curves.easeInOutSine)), weight: 50),
     ]).animate(_bounceController);
 
-    // Start emitting idle sparkles immediately
-    _emitIdleSparkles();
-
-    if (widget.triggerSuccess) {
-      _triggerSuccessAnimation();
-    }
+    // Start emitting idle sparkles and check success trigger after first frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _emitIdleSparkles();
+      if (widget.triggerSuccess) {
+        _triggerSuccessAnimation();
+      }
+    });
   }
 
   @override

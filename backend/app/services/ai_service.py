@@ -249,19 +249,19 @@ You MUST return ONLY valid JSON in exactly this format, mapping to the 11 steps 
         return json.loads(text)
     except Exception as e:
         logger.error(f"Gemini generate_journey_insights failed: {{e}}")
-        return {{
-            "bondScore": {{"score": 85, "explanation": "You both showed quiet courage and honesty."}},
-            "holdsTogether": {{"strengths": ["Deep emotional care", "Willingness to try"], "explanation": "Your foundation remains strong."}},
-            "trulyMissed": {{"missed": ["Daily presence", "Quiet moments"], "interpretation": "Absence highlighted your deep bond."}},
-            "unspokenNeeds": {{"individual": ["Reassurance"], "shared": ["Emotional safety"], "explanation": "Both of you seek gentle understanding."}},
-            "howYouGrown": {{"areas": ["Patience", "Self-awareness"], "examples": "You chose reflection over reaction."}},
-            "patternsNoticed": {{"patterns": ["Holding back fears"], "whyItMatters": "Vulnerability brings you closer."}},
-            "quietLove": {{"behaviors": ["Showing up daily", "Writing letters"], "summary": "Love was present in the effort."}},
-            "leftUnsaid": {{"themes": ["Fear of disconnect"], "summary": "It's safe to share these now."}},
-            "blindSpots": {{"opportunities": ["Expressing needs sooner"], "explanation": "Don't wait for the 'perfect' moment."}},
-            "futureWant": {{"alignment": ["A peaceful reconnection"], "summary": "You both want the same thing."}},
-            "aiLetter": f"Dear {{current_user_name}},\n\nThroughout this separation, you have both shown a courage that is quiet but profound. By taking space to look inward, you've created a landscape where understanding can slowly replace reaction.\n\nTogether, you have honored this time of distance not as a separation, but as a bridge toward clearer, gentler connection.\n\nWith warmth,\nBonded AI"
-        }}
+        return {
+            "bondScore": {"score": 85, "explanation": "You both showed quiet courage and honesty."},
+            "holdsTogether": {"strengths": ["Deep emotional care", "Willingness to try"], "explanation": "Your foundation remains strong."},
+            "trulyMissed": {"missed": ["Daily presence", "Quiet moments"], "interpretation": "Absence highlighted your deep bond."},
+            "unspokenNeeds": {"individual": ["Reassurance"], "shared": ["Emotional safety"], "explanation": "Both of you seek gentle understanding."},
+            "howYouGrown": {"areas": ["Patience", "Self-awareness"], "examples": "You chose reflection over reaction."},
+            "patternsNoticed": {"patterns": ["Holding back fears"], "whyItMatters": "Vulnerability brings you closer."},
+            "quietLove": {"behaviors": ["Showing up daily", "Writing letters"], "summary": "Love was present in the effort."},
+            "leftUnsaid": {"themes": ["Fear of disconnect"], "summary": "It's safe to share these now."},
+            "blindSpots": {"opportunities": ["Expressing needs sooner"], "explanation": "Don't wait for the 'perfect' moment."},
+            "futureWant": {"alignment": ["A peaceful reconnection"], "summary": "You both want the same thing."},
+            "aiLetter": f"Dear {current_user_name},\n\nThroughout this separation, you have both shown a courage that is quiet but profound. By taking space to look inward, you've created a landscape where understanding can slowly replace reaction.\n\nTogether, you have honored this time of distance not as a separation, but as a bridge toward clearer, gentler connection.\n\nWith warmth,\nBonded AI"
+        }
 
 
 async def generate_relationship_summary(

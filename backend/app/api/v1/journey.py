@@ -18,14 +18,18 @@ import json
 
 router = APIRouter(prefix="/journey", tags=["Journey"])
 
-def get_love_word(score: int) -> dict:
-    if score <= 50:
+def get_love_word(score: int, expected_days: int = 14) -> dict:
+    # Baseline is 14 days. We scale the thresholds so it's easier to reach Soulbound on shorter separations
+    # and appropriately challenging on 30-day separations.
+    multiplier = max(0.2, expected_days / 14.0)
+    
+    if score <= 50 * multiplier:
         return {"loveWord": "Seedling", "emoji": "🌱", "message": "Just beginning — every single step counts."}
-    elif score <= 150:
+    elif score <= 150 * multiplier:
         return {"loveWord": "Blooming", "emoji": "🌸", "message": "You are growing beautifully. Keep showing up."}
-    elif score <= 300:
+    elif score <= 300 * multiplier:
         return {"loveWord": "Passionate", "emoji": "🔥", "message": "Deep investment and beautiful consistency."}
-    elif score <= 500:
+    elif score <= 500 * multiplier:
         return {"loveWord": "Devoted", "emoji": "💎", "message": "Rare level of commitment and beautiful vulnerability."}
     else:
         return {"loveWord": "Soulbound", "emoji": "👑", "message": "A truly profound, healed, and deep connection."}
@@ -124,6 +128,22 @@ def calculate_user_score(db: Session, user: User, active_rel, active_sep=None) -
 
     return score
 
+def get_expected_days_for_sep(sep: Separation) -> int:
+    if sep.expected_end_date and sep.start_date:
+        return (sep.expected_end_date - sep.start_date).days
+    
+    duration_label = (sep.duration_label or "").lower()
+    expected_days = 7  # default
+    import re
+    match = re.search(r'(\d+)', duration_label)
+    if match:
+        expected_days = int(match.group(1))
+    elif "2" in duration_label or "two" in duration_label:
+        expected_days = 14
+    elif "month" in duration_label or "30" in duration_label:
+        expected_days = 30
+    return max(1, expected_days)
+
 @router.get("/score")
 async def get_journey_score(
     background_tasks: BackgroundTasks,
@@ -171,6 +191,7 @@ async def get_journey_score(
             "presenceProgress": 0.0,
         }
 
+    expected_days = get_expected_days_for_sep(active_sep)
     score = calculate_user_score(db, current_user, active_rel, active_sep)
 
     old_couple_score = current_user.relationship_score or 0
@@ -205,18 +226,16 @@ async def get_journey_score(
         if old_total < m <= couple_score:
             crossed = m
             
-    # Removed score milestone notification as requested
-    
-    love_info = get_love_word(couple_score)
+    love_info = get_love_word(couple_score, expected_days)
 
-    # Calculate sub-indicators (percentage 0.0 to 1.0)
-    # Check-ins progress: based on reflection completions (out of 10 completions max for scale)
+    # Calculate sub-indicators (percentage 0.0 to 1.0) dynamically based on expected_days
+    # Check-ins progress: out of expected_days completions
     reflections_completed = db.query(ReflectionSession).filter(
         ReflectionSession.user_id == current_user.id,
         ReflectionSession.separation_id == active_sep.id,
         ReflectionSession.is_completed == True
     ).count()
-    checkins_progress = min(1.0, reflections_completed / 10.0)
+    checkins_progress = min(1.0, reflections_completed / float(expected_days))
 
     # Openness progress: based on emotional warmth (ratio of warm/hopeful answers)
     total_answers = db.query(ReflectionAnswer).join(
@@ -234,12 +253,12 @@ async def get_journey_score(
     ).count()
     openness_progress = (warm_answers / total_answers) if total_answers > 0 else 0.4
 
-    # Presence progress: based on mood logging frequency (out of 15 logs max)
+    # Presence progress: based on mood logging frequency (expect 1 mood log per day)
     moods_logged = db.query(Mood).filter(
         Mood.user_id == current_user.id,
         Mood.created_at >= active_sep.created_at
     ).count()
-    presence_progress = min(1.0, moods_logged / 15.0)
+    presence_progress = min(1.0, moods_logged / float(expected_days))
 
     return {
         # Couple-level — loveWord comes from BOTH partners combined
