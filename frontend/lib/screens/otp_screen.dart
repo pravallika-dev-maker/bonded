@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import '../widgets/app_heart_icon.dart';
 import '../services/api_service.dart';
 import 'welcome_screen.dart';
+import 'home_screen.dart';
 
 enum OtpState { entering, loading, error }
 
@@ -37,7 +38,27 @@ class _OTPScreenState extends State<OTPScreen> {
     }
     // Simulate auto-focus on 4th field for the default state representation
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusNodes[0].requestFocus();
+      if (mounted) {
+        _focusNodes[0].requestFocus();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Test Mode: Enter 123456 for the OTP',
+              style: TextStyle(fontFamily: 'Georgia', color: Colors.white),
+              textAlign: TextAlign.center,
+            ),
+            backgroundColor: const Color(0xFF911746),
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.only(
+              bottom: MediaQuery.of(context).size.height - 150,
+              left: 20,
+              right: 20,
+            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
     });
   }
 
@@ -65,8 +86,33 @@ class _OTPScreenState extends State<OTPScreen> {
           final token = await messaging.getToken();
           if (token != null) {
             await ApiService.registerFcmToken(token);
+            await ApiService.sendWelcomePush();
           }
         } catch (_) {}
+
+        // Check if user is already onboarded
+        try {
+          final profileResponse = await ApiService.getUserMe();
+          final profile = profileResponse['data'] ?? profileResponse;
+          
+          final rawUserName = profile['userName'] ?? profile['name'];
+          if (rawUserName != null && rawUserName.toString().trim().isNotEmpty) {
+            if (mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (_) => HomeScreen(
+                    userName: rawUserName.toString().trim(),
+                    partnerName: (profile['partnerName'] ?? '').toString().trim(),
+                  ),
+                ),
+                (route) => false,
+              );
+            }
+            return;
+          }
+        } catch (e) {
+          // Ignore and proceed to welcome screen
+        }
         
         if (mounted) {
           // Navigate to Welcome screen immediately

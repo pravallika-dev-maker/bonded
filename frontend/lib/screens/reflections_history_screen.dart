@@ -349,6 +349,7 @@ class _ReflectionsHistoryScreenState extends State<ReflectionsHistoryScreen> {
                                           final mood = item['mood'] ?? 'Feeling';
                                           final reflection = item['reflection'] ?? '';
                                           final dateStr = item['createdAt'] ?? '';
+                                          final partnerName = item['partner_name'];
 
                                           String dateFormatted = 'Today';
                                           String timeFormatted = '';
@@ -408,13 +409,36 @@ class _ReflectionsHistoryScreenState extends State<ReflectionsHistoryScreen> {
                                                         ],
                                                       ),
                                                       const Spacer(),
-                                                      Text(
-                                                        dateFormatted,
-                                                        style: const TextStyle(
-                                                          fontSize: 11,
-                                                          color: Color(0xFF866571),
-                                                          fontWeight: FontWeight.w500,
-                                                        ),
+                                                      Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                                        children: [
+                                                          Text(
+                                                            dateFormatted,
+                                                            style: const TextStyle(
+                                                              fontSize: 11,
+                                                              color: Color(0xFF866571),
+                                                              fontWeight: FontWeight.w500,
+                                                            ),
+                                                          ),
+                                                          if (partnerName != null && partnerName.toString().isNotEmpty) ...[
+                                                            const SizedBox(height: 4),
+                                                            Container(
+                                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                              decoration: BoxDecoration(
+                                                                color: const Color(0xFF3F1629),
+                                                                borderRadius: BorderRadius.circular(6),
+                                                              ),
+                                                              child: Text(
+                                                                'With $partnerName',
+                                                                style: const TextStyle(
+                                                                  fontSize: 8,
+                                                                  fontWeight: FontWeight.bold,
+                                                                  color: Color(0xFFDD8F9F),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ],
                                                       ),
                                                     ],
                                                   ),

@@ -753,7 +753,6 @@ class _RoomWorldPainter extends CustomPainter {
     if (currentDay == 2) {
       // Draw brick fireplace silhouette at Y: 300, X: 30
       final fireplacePaint = Paint()..color = const Color(0xFF140810);
-      final brickPaint = Paint()..color = const Color(0xFF381928);
       canvas.drawRect(const Rect.fromLTWH(20, 270, 48, 70), fireplacePaint);
       
       // Fire hearth cutout using a warm glow

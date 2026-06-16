@@ -44,7 +44,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> with TickerPr
         
         DateTime? createdAt;
         try {
-          createdAt = DateTime.parse(createdAtStr);
+          String parsedStr = createdAtStr;
+          if (!parsedStr.endsWith('Z')) {
+            parsedStr += 'Z';
+          }
+          createdAt = DateTime.parse(parsedStr).toLocal();
         } catch (_) {}
 
         String timeStr = '';

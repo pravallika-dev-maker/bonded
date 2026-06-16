@@ -54,6 +54,14 @@ class _LoginContentState extends State<LoginContent> {
         _isError = false;
       }
     });
+
+    if (text.length == 10 && !_isError) {
+      Future.delayed(const Duration(milliseconds: 150), () {
+        if (mounted && _phoneController.text.length == 10) {
+          _onSendCode();
+        }
+      });
+    }
   }
 
   bool get _isFilled => _phoneController.text.length >= 10 && !_isError;
@@ -74,7 +82,7 @@ class _LoginContentState extends State<LoginContent> {
   @override
   Widget build(BuildContext context) {
     // Determine colors based on state
-    Color inputBorderColor = const Color(0xFF3D1627);
+    Color inputBorderColor = const Color(0xFF5A253D);
     if (_isError) {
       inputBorderColor = const Color(0xFF7A1B29); // Dark red border for error
     } else if (_isFilled || _phoneFocusNode.hasFocus) {
@@ -110,12 +118,12 @@ class _LoginContentState extends State<LoginContent> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(height: screenH * 0.07),
+                SizedBox(height: screenH * 0.05),
 
                 // ── Glowing Heart Logo ──
                 const Center(child: _SmallGlowingHeart()),
 
-                SizedBox(height: screenH * 0.06),
+                SizedBox(height: screenH * 0.04),
 
                 const Text(
                   'WELCOME TO BONDED',
@@ -158,19 +166,19 @@ class _LoginContentState extends State<LoginContent> {
                   'Just a small step to make this\nspace truly yours',
                   style: TextStyle(
                     fontSize: 13,
-                    color: Color(0xFF5E3A4B),
+                    color: Color(0xFFA17A8C),
                     height: 1.5,
                   ),
                 ),
 
-                SizedBox(height: screenH * 0.05),
+                SizedBox(height: screenH * 0.035),
 
                 const Text(
                   'YOUR NUMBER',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF3B1525),
+                    color: Color(0xFF7A3550),
                     letterSpacing: 1.5,
                   ),
                 ),
@@ -187,7 +195,7 @@ class _LoginContentState extends State<LoginContent> {
                       decoration: BoxDecoration(
                         color: const Color(0xFF1B0711),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFF3D1627), width: 1.2),
+                        border: Border.all(color: const Color(0xFF5A253D), width: 1.2),
                       ),
                       child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -221,6 +229,16 @@ class _LoginContentState extends State<LoginContent> {
                                     controller: _phoneController,
                                     focusNode: _phoneFocusNode,
                                     keyboardType: TextInputType.phone,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.digitsOnly,
+                                      LengthLimitingTextInputFormatter(10),
+                                      TextInputFormatter.withFunction((oldValue, newValue) {
+                                        if (newValue.text.isNotEmpty && RegExp(r'^[0-4]').hasMatch(newValue.text)) {
+                                          return oldValue;
+                                        }
+                                        return newValue;
+                                      }),
+                                    ],
                                     style: const TextStyle(
                                       fontFamily: 'Georgia',
                                       fontSize: 20,
@@ -235,7 +253,7 @@ class _LoginContentState extends State<LoginContent> {
                                         fontFamily: 'Georgia',
                                         fontSize: 16,
                                         fontStyle: FontStyle.italic,
-                                        color: Color(0xFF452B36),
+                                        color: Color(0xFF8A5A70),
                                         fontWeight: FontWeight.normal,
                                         letterSpacing: 0,
                                       ),
@@ -292,73 +310,37 @@ class _LoginContentState extends State<LoginContent> {
                       fontFamily: 'Georgia',
                       fontSize: 11,
                       fontStyle: FontStyle.italic,
-                      color: Color(0xFF3B1F2B),
+                      color: Color(0xFF6B3A50),
                     ),
                   ),
 
-                SizedBox(height: screenH * 0.05),
+                SizedBox(height: screenH * 0.035),
 
-                GestureDetector(
-                  onTap: _isFilled ? _onSendCode : null,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: double.infinity,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: _isFilled 
-                          ? const Color(0xFF1A1214) 
-                          : const Color(0xFF0D080A),
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(
-                        color: _isFilled 
-                            ? const Color(0xFF911746).withOpacity(0.5) 
-                            : const Color(0xFF26151B),
-                        width: 1.2,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.favorite,
-                          size: 18,
-                          color: _isFilled ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Send the code',
-                          style: TextStyle(
-                            fontFamily: 'Georgia',
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            fontStyle: FontStyle.italic,
-                            letterSpacing: 0.5,
-                            color: _isFilled ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                
+                _SheenButton(
+                  isFilled: _isFilled,
+                  onTap: _onSendCode,
                 ),
+
 
                 const SizedBox(height: 24),
 
                 const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.shield_outlined, size: 14, color: Color(0xFF3B1F2B)),
+                    Icon(Icons.shield_outlined, size: 14, color: Color(0xFF6B3A50)),
                     SizedBox(width: 8),
                     Text(
                       'Your number stays private and secure',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Color(0xFF3B1F2B),
+                        color: Color(0xFF6B3A50),
                       ),
                     ),
                   ],
                 ),
 
-                SizedBox(height: screenH * 0.06),
+                SizedBox(height: screenH * 0.04),
 
                 const Center(
                   child: Padding(
@@ -369,7 +351,7 @@ class _LoginContentState extends State<LoginContent> {
                         fontFamily: 'Georgia',
                         fontSize: 12,
                         fontStyle: FontStyle.italic,
-                        color: Color(0xFF2E1922),
+                        color: Color(0xFF5A3142),
                       ),
                     ),
                   ),
@@ -383,54 +365,219 @@ class _LoginContentState extends State<LoginContent> {
   }
 }
 
-class _SmallGlowingHeart extends StatelessWidget {
+class _SmallGlowingHeart extends StatefulWidget {
   const _SmallGlowingHeart();
+
+  @override
+  State<_SmallGlowingHeart> createState() => _SmallGlowingHeartState();
+}
+
+class _SmallGlowingHeartState extends State<_SmallGlowingHeart> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat(reverse: true);
+    
+    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.2).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 72,
-      height: 72,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: const Color(0xFF1F0611),
-        border: Border.all(
-          color: const Color(0xFF5A1630),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF911746).withOpacity(0.18),
-            blurRadius: 30,
-            spreadRadius: 10,
+    return AnimatedBuilder(
+      animation: _pulseAnimation,
+      builder: (context, child) {
+        return Container(
+          width: 72,
+          height: 72,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFF1F0611),
+            border: Border.all(
+              color: const Color(0xFF5A1630),
+              width: 1.2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF911746).withOpacity(0.18 * _pulseAnimation.value),
+                blurRadius: 30 * _pulseAnimation.value,
+                spreadRadius: 10 * _pulseAnimation.value,
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Center(
-        child: Stack(
-          alignment: Alignment.center,
-          children: <Widget>[
-            Text(
-              String.fromCharCode(Icons.favorite.codePoint),
-              style: TextStyle(
-                fontSize: 30,
-                fontFamily: Icons.favorite.fontFamily,
-                package: Icons.favorite.fontPackage,
-                foreground: Paint()
-                  ..style = PaintingStyle.stroke
-                  ..strokeWidth = 2.0
-                  ..color = const Color(0xFFCA366C),
-              ),
+          child: Center(
+            child: Stack(
+              alignment: Alignment.center,
+              children: <Widget>[
+                Text(
+                  String.fromCharCode(Icons.favorite.codePoint),
+                  style: TextStyle(
+                    fontSize: 30,
+                    fontFamily: Icons.favorite.fontFamily,
+                    package: Icons.favorite.fontPackage,
+                    foreground: Paint()
+                      ..style = PaintingStyle.stroke
+                      ..strokeWidth = 2.0
+                      ..color = const Color(0xFFCA366C),
+                  ),
+                ),
+                Text(
+                  String.fromCharCode(Icons.favorite.codePoint),
+                  style: TextStyle(
+                    fontSize: 30,
+                    fontFamily: Icons.favorite.fontFamily,
+                    package: Icons.favorite.fontPackage,
+                    color: const Color(0xFF8F1643),
+                  ),
+                ),
+              ],
             ),
-            Text(
-              String.fromCharCode(Icons.favorite.codePoint),
-              style: TextStyle(
-                fontSize: 30,
-                fontFamily: Icons.favorite.fontFamily,
-                package: Icons.favorite.fontPackage,
-                color: const Color(0xFF8F1643),
+          ),
+        );
+      }
+    );
+  }
+}
+
+class _SheenButton extends StatefulWidget {
+  final bool isFilled;
+  final VoidCallback onTap;
+
+  const _SheenButton({required this.isFilled, required this.onTap});
+
+  @override
+  State<_SheenButton> createState() => _SheenButtonState();
+}
+
+class _SheenButtonState extends State<_SheenButton> with SingleTickerProviderStateMixin {
+  late AnimationController _sheenController;
+
+  @override
+  void initState() {
+    super.initState();
+    _sheenController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2500),
+    );
+    if (widget.isFilled) {
+      _sheenController.repeat();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _SheenButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isFilled && !oldWidget.isFilled) {
+      _sheenController.repeat();
+    } else if (!widget.isFilled && oldWidget.isFilled) {
+      _sheenController.stop();
+      _sheenController.reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _sheenController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: widget.isFilled ? widget.onTap : null,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        width: double.infinity,
+        height: 56,
+        decoration: BoxDecoration(
+          color: widget.isFilled 
+              ? const Color(0xFF911746) 
+              : const Color(0xFF1B0F14), // slightly stronger disabled bg
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(
+            color: widget.isFilled 
+                ? const Color(0xFFB5235B) 
+                : const Color(0xFF3B1525),
+            width: 1.2,
+          ),
+          boxShadow: widget.isFilled ? [
+            BoxShadow(
+              color: const Color(0xFF911746).withOpacity(0.4),
+              blurRadius: 15,
+              spreadRadius: 2,
+              offset: const Offset(0, 4),
+            )
+          ] : [],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.favorite,
+                    size: 18,
+                    color: widget.isFilled ? Colors.white : const Color(0xFF5A3C47),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Send the code',
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      fontStyle: FontStyle.italic,
+                      letterSpacing: 0.5,
+                      color: widget.isFilled ? Colors.white : const Color(0xFF7A4B5C),
+                    ),
+                  ),
+                ],
               ),
-            ),
-          ],
+              if (widget.isFilled)
+                AnimatedBuilder(
+                  animation: _sheenController,
+                  builder: (context, child) {
+                    return Positioned(
+                      left: -100 + (_sheenController.value * 500),
+                      top: 0,
+                      bottom: 0,
+                      child: Transform.rotate(
+                        angle: 0.3,
+                        child: Container(
+                          width: 40,
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.white.withOpacity(0.0),
+                                Colors.white.withOpacity(0.3),
+                                Colors.white.withOpacity(0.0),
+                              ],
+                              stops: const [0.0, 0.5, 1.0],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+            ],
+          ),
         ),
       ),
     );

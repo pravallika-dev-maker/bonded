@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'gender_selection_screen.dart';
-import 'bond_selection_screen.dart';
+import '../services/api_service.dart';
 
 class NameEntryScreen extends StatefulWidget {
   const NameEntryScreen({super.key});
@@ -173,6 +174,9 @@ class _NameEntryScreenState extends State<NameEntryScreen> {
                                     ),
                                     keyboardType: TextInputType.name,
                                     textCapitalization: TextCapitalization.words,
+                                    inputFormatters: [
+                                      FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                                    ],
                                   ),
                                 ),
                                 Expanded(
@@ -236,11 +240,15 @@ class _NameEntryScreenState extends State<NameEntryScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 24.0),
                       child: GestureDetector(
                         onTap: _nameController.text.trim().isNotEmpty
-                            ? () {
+                            ? () async {
+                                final name = _nameController.text.trim();
+                                final prefs = await SharedPreferences.getInstance();
+                                await prefs.setString('onboarding_userName', name);
+                                if (!context.mounted) return;
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(builder: (context) => GenderSelectionScreen(
-                                    userName: _nameController.text.trim(),
+                                    userName: name,
                                     currentStep: 2,
                                     totalSteps: 7,
                                   )),

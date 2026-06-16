@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/premium_nav_bar.dart';
+import '../widgets/premium_sheen.dart';
 import 'separation_step1_intention_screen.dart';
 import 'history_screen.dart';
 import 'feel_screen.dart';
@@ -12,109 +16,358 @@ import 'journey_screen.dart';
 import 'profile_screen.dart';
 import 'reflection_flow_screen.dart';
 import 'reflection_completion_screen.dart';
+import '../widgets/post_journey_sanctuary_card.dart';
+import '../widgets/connected_ready_hero_card.dart';
 import 'notifications_screen.dart';
 import 'dream_house/dream_house_world_screen.dart';
 import 'dart:math' as math;
 import 'dart:ui';
 import '../services/api_service.dart';
+import '../services/app_event_bus.dart';
 import '../widgets/living_journey_card.dart';
+import '../widgets/unconnected_hero_card.dart';
 import '../widgets/living_sanctuary_section.dart';
 import '../widgets/floating_connection_pill.dart';
+import 'partner_invite_screen.dart';
 
 class MainDashboardScreen extends StatefulWidget {
   final String userName;
   final String? partnerName;
-  const MainDashboardScreen({super.key, required this.userName, this.partnerName});
+  final int initialIndex;
+  final bool isWaitingForPartner;
+  const MainDashboardScreen({super.key, required this.userName, this.partnerName, this.initialIndex = 0, this.isWaitingForPartner = false});
 
   @override
   State<MainDashboardScreen> createState() => _MainDashboardScreenState();
 }
 
-class _MainDashboardScreenState extends State<MainDashboardScreen> {
-  int _currentIndex = 0;
+class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsBindingObserver {
+  late int _currentIndex;
+  // _isCheckedIn is derived from the backend on load (not session-only).
+  // true when: daily insight API says is_locked==false, OR user has a mood entry today.
   bool _isCheckedIn = false;
   bool _insightViewed = false;
+  String? _todayInsightDate;
   bool _reflectionCompletedToday = false;
+  // true when backend confirms partner completed today's reflection.
+  bool _partnerCompletedToday = false;
+  // true ONLY when active journey day < calendar day (genuine missed-day scenario)
+  bool _isMissedDayFlow = false;
 
   bool _isLoadingSeparation = true;
+  bool _hasAcknowledgedCompletion = false;
   Map<String, dynamic>? _activeSeparation;
   Map<String, dynamic>? _reflectionStatus;
+  
+  bool _sharedPresence = false; // fires animation each time backend returns true
+  Timer? _presenceTimer;
+  StreamSubscription<AppEvent>? _eventBusSubscription;
   String? _partnerName;
-  bool _showConnectedPill = true;
+  bool _isPartnerConnected = false;
+  bool _hasPastRelationship = false;
+  bool _hasCompletedSeparation = false;
+  bool _showConnectedPill = false;
+  bool _isHeroEmpty = true;
+  late String _currentUserName;
+  late bool _localIsWaitingForPartner;
+  int _unreadCount = 0;
 
   // Derived from active separation API — no hardcoded values
-  int _currentDay = 1;
-  int _totalDays = 21;
-  String _moodPhrase = 'Every quiet moment brings deeper clarity.';
-  int _completedReflections = 0;
+  int? _currentDay;
+  int? _totalDays;
+  String? _moodPhrase;
+  int? _completedReflections;
 
   @override
   void initState() {
     super.initState();
-    _partnerName = widget.partnerName;
-    if (widget.partnerName != null) {
-      ApiService.setPartnerName(widget.partnerName!);
-    }
+    _currentIndex = widget.initialIndex;
+    WidgetsBinding.instance.addObserver(this);
+    _currentUserName = widget.userName;
+    _localIsWaitingForPartner = widget.isWaitingForPartner;
+    _partnerName = null; // Clear stale state initially
+    _isLoadingSeparation = true;
+    _setupPushNotifications();
     _fetchDashboardData();
+    
+    // Poll for shared presence every 15 seconds to keep both users active and detect each other
+    _presenceTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      _pollSharedPresence();
+    });
+
+    // Subscribe to global app events — instantly refresh on partner connect/disconnect/time-travel
+    _eventBusSubscription = AppEventBus().stream.listen((event) {
+      if (!mounted) return;
+      if (event == AppEvent.partnerDisconnected) {
+        _localIsWaitingForPartner = false;
+      }
+      _fetchDashboardData();
+    });
   }
 
-  /// Fetches active separation and today's reflection status in parallel.
+  Future<void> _acknowledgeCompletion() async {
+    try {
+      await ApiService.acknowledgeJourneyCompletion();
+      if (mounted) {
+        setState(() {
+          _hasAcknowledgedCompletion = true;
+        });
+      }
+    } catch (e) {
+      debugPrint("Failed to acknowledge completion: $e");
+    }
+  }
+
+  Future<void> _setupPushNotifications() async {
+    if (!kIsWeb) {
+      FirebaseMessaging messaging = FirebaseMessaging.instance;
+      
+      // Request permission for push notifications (Shows Android 13 prompt since UI is now mounted)
+      await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      // Get the token each time the application loads
+      String? token = await messaging.getToken();
+      if (token != null) {
+        ApiService.registerFcmToken(token).catchError((_) {});
+      }
+
+      // Any time the token refreshes, store this in the database too.
+      messaging.onTokenRefresh.listen((newToken) {
+        ApiService.registerFcmToken(newToken).catchError((_) {});
+      });
+    }
+  }
+
+  Future<void> _pollSharedPresence() async {
+    if (!mounted) return;
+    try {
+      final homeHero = await ApiService.getHomeHero();
+      final bool presence = homeHero['shared_presence'] == true;
+      final bool partnerConnected = homeHero['partner_connected'] == true || 
+                                    homeHero['partnerConnected'] == true;
+                                    
+      bool needsSetState = false;
+      if (presence != _sharedPresence) {
+        _sharedPresence = presence;
+        needsSetState = true;
+      }
+      
+      // Dynamically detect if partner connected while app is open!
+      if (!_isPartnerConnected && partnerConnected) {
+        _fetchDashboardData();
+        return; // _fetchDashboardData calls setState itself
+      }
+
+      // Dynamically detect if partner DISCONNECTED while app is open
+      if (_isPartnerConnected && !partnerConnected) {
+        _localIsWaitingForPartner = false;
+        _fetchDashboardData();
+        return;
+      }
+
+      if (mounted && needsSetState) {
+        setState(() {});
+      }
+    } catch (_) {
+      // Ignore background errors
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _fetchDashboardData();
+    }
+  }
+
+  @override
+  void dispose() {
+    _presenceTimer?.cancel();
+    _eventBusSubscription?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// Fetches all dashboard data in parallel and derives UI state from backend responses.
+  /// _isCheckedIn and _partnerCompletedToday are always derived from the API,
+  /// never from ephemeral session state — ensuring persistence across refreshes.
   Future<void> _fetchDashboardData() async {
+    // Also fetch moods list to detect if user submitted a check-in today
     final results = await Future.wait([
       ApiService.getActiveSeparation().catchError((_) => null),
       ApiService.getReflectionTodayStatus().catchError((_) => null),
+      ApiService.getHomeHero().catchError((_) => null),
+      ApiService.getDailyInsight().catchError((_) => null),
+      ApiService.getMoods().catchError((_) => <Map<String, dynamic>>[]),
+      ApiService.getUserProfile().catchError((_) => null),
+      ApiService.getUnreadNotificationsCount().catchError((_) => 0),
     ]);
 
     final sep = results[0] as Map<String, dynamic>?;
     final reflStatus = results[1] as Map<String, dynamic>?;
+    final homeHero = results[2] as Map<String, dynamic>?;
+    final dailyInsight = results[3] as Map<String, dynamic>?;
+    final moodsList = results[4] as List<Map<String, dynamic>>? ?? [];
+    final profileData = results[5] as Map<String, dynamic>?;
+    final unreadCount = results[6] as int? ?? 0;
+
     final cachedPartnerName = await ApiService.getPartnerName();
+    final cachedIsConnected = await ApiService.getIsPartnerConnected();
+    final prefs = await SharedPreferences.getInstance();
 
     if (!mounted) return;
     setState(() {
+      _unreadCount = unreadCount;
       _activeSeparation = sep;
       _reflectionStatus = reflStatus;
+      
+      if (profileData != null) {
+        final pd = profileData['data'] ?? profileData;
+        if (pd['userName'] != null || pd['name'] != null) {
+          _currentUserName = pd['userName'] ?? pd['name'];
+        }
+        
+        // Extract partner name from profile if available
+        if (pd['partnerName'] != null && pd['partnerName'].toString().trim().isNotEmpty) {
+          _partnerName = pd['partnerName'];
+        }
+      }
 
-      // ── Partner name ──
-      _partnerName = sep?['partner_name'] ?? sep?['partnerName'] ??
+      // ── Partner name from Home Hero or cached — and fall back to widget.partnerName
+      // if all else fails (e.g. they just entered it during solo separation creation).
+      _partnerName ??= homeHero?['partner_name'] ?? homeHero?['partnerName'] ??
+          sep?['partner_name'] ?? sep?['partnerName'] ??
           cachedPartnerName ?? widget.partnerName;
+          
+      // If all API sources returned null (e.g. after disconnect) explicitly clear name.
+      if (_partnerName == null || _partnerName!.trim().isEmpty || _partnerName == 'null') {
+        _partnerName = null;
+      }
 
-      if (sep != null && (sep['is_active'] == true || sep['isActive'] == true || sep['status'] == 'active')) {
-        // ── Day number: days_elapsed from /separations/active ──
-        final rawElapsed = sep['days_elapsed'] ?? sep['daysElapsed'] ?? sep['day'];
-        _currentDay = rawElapsed is int ? rawElapsed : int.tryParse(rawElapsed?.toString() ?? '') ?? 1;
+      // Helper function to extract days from durationLabel to fix hardcoded values
+      int _extractDaysFromLabel(String label) {
+        final lower = label.toLowerCase();
+        final match = RegExp(r'(\d+)').firstMatch(lower);
+        if (match != null) {
+          int value = int.tryParse(match.group(1)!) ?? 21;
+          if (lower.contains('week')) return value * 7;
+          if (lower.contains('month')) return value * 30;
+          return value;
+        }
+        if (lower.contains('one week') || lower.contains('a week')) return 7;
+        if (lower.contains('two week')) return 14;
+        if (lower.contains('three week')) return 21;
+        if (lower.contains('one month') || lower.contains('a month')) return 30;
+        return 21; // fallback
+      }
 
-        // ── Total days: calculated from start_date + expected_end_date or total_days ──
-        final rawTotal = sep['total_days'] ?? sep['totalDays'];
-        if (rawTotal != null) {
-          _totalDays = rawTotal is int ? rawTotal : int.tryParse(rawTotal.toString()) ?? (_currentDay > 21 ? _currentDay : 21);
-        } else {
-          final startRaw = sep['start_date'] ?? sep['startDate'] ?? sep['started_at'];
-          final endRaw = sep['expected_end_date'] ?? sep['expectedEndDate'] ?? sep['end_date'] ?? sep['endDate'];
-          if (startRaw != null && endRaw != null) {
-            try {
-              final start = DateTime.parse(startRaw.toString());
-              final end = DateTime.parse(endRaw.toString());
-              final diff = end.difference(start).inDays;
-              _totalDays = diff > 0 ? diff : (_currentDay > 21 ? _currentDay : 21);
-            } catch (_) {
-              _totalDays = _currentDay > 21 ? _currentDay : 21;
-            }
-          } else {
-            // Check durationLabel or use currentDay + 7 as a reasonable dynamic fallback
-            final durLabel = sep['durationLabel'] ?? sep['duration_label'] ?? sep['duration'];
-            if (durLabel != null) {
-              final match = RegExp(r'\d+').firstMatch(durLabel.toString());
-              _totalDays = match != null ? int.parse(match.group(0)!) : (_currentDay > 21 ? _currentDay : 21);
-            } else {
-              _totalDays = _currentDay > 21 ? _currentDay : 21; // Reasonable fallback
-            }
+      int parsedTotalDays = 21;
+      if (sep != null) {
+        if (sep['start_date'] != null && sep['expected_end_date'] != null) {
+          try {
+            final start = DateTime.parse(sep['start_date'].toString());
+            final end = DateTime.parse(sep['expected_end_date'].toString());
+            parsedTotalDays = end.difference(start).inDays;
+            if (parsedTotalDays <= 0) parsedTotalDays = 1;
+          } catch (_) {
+            final label = sep['duration_label'] ?? sep['durationLabel'] ?? '';
+            parsedTotalDays = _extractDaysFromLabel(label.toString());
           }
+        } else {
+          final label = sep['duration_label'] ?? sep['durationLabel'] ?? '';
+          parsedTotalDays = _extractDaysFromLabel(label.toString());
+        }
+      }
+
+      // ── Home Hero Data ──
+      bool hasHeroData = false;
+      if (homeHero != null) {
+        // Extract comfort message and total duration unconditionally if present
+        final heroPhrase = homeHero['comfort_message'] ?? homeHero['comfortMessage'];
+        if (heroPhrase != null && heroPhrase.toString().trim().isNotEmpty) {
+          _moodPhrase = heroPhrase.toString();
+        }
+        
+        if (homeHero['total_duration_days'] != null || homeHero['totalDurationDays'] != null) {
+          _totalDays = homeHero['total_duration_days'] ?? homeHero['totalDurationDays'];
+        } else {
+          _totalDays = parsedTotalDays;
         }
 
-        // ── Mood phrase: mood_phrase from /separations/active ──
-        _moodPhrase = sep['mood_phrase'] ?? sep['moodPhrase'] ??
-            'Every quiet moment brings deeper clarity.';
+        if (homeHero['current_day'] != null || homeHero['currentDay'] != null) {
+          hasHeroData = true;
+          _currentDay = homeHero['current_day'] ?? homeHero['currentDay'] ?? 1;
+        }
+        
+        // Backend signals missed-day flow: active journey day < calendar day
+        _isMissedDayFlow = homeHero['is_missed_day_flow'] == true || homeHero['isMissedDayFlow'] == true;
+      } 
+      
+      bool isSepActive = sep != null && (sep['is_active'] == true || sep['isActive'] == true || sep['status'] == 'active');
+
+      // ── Determine waiting state early so we can suppress day data below ──
+      final bool isWaitingFromHero = homeHero?['is_waiting_for_partner'] == true || homeHero?['isWaitingForPartner'] == true;
+      final bool effectivelyWaiting = widget.isWaitingForPartner || isWaitingFromHero;
+
+      if (!hasHeroData && isSepActive && !effectivelyWaiting) {
+        // Fallback to active separation
+        final rawElapsed = sep['days_elapsed'] ?? sep['daysElapsed'] ?? sep['day'];
+        _currentDay = rawElapsed is int ? rawElapsed : int.tryParse(rawElapsed?.toString() ?? '') ?? 1;
+        if (_totalDays == null) {
+          _totalDays = parsedTotalDays; // Use parsed duration instead of simplified 21 fallback
+        }
       }
+
+      // ── Daily Insight — derive _isCheckedIn from API, not from session ──
+      if (dailyInsight != null) {
+        final isLocked = dailyInsight['is_locked'] == true || dailyInsight['isLocked'] == true;
+        if (!isLocked) {
+          // Backend says insight is unlocked → user has checked in, persist this across refreshes
+          _isCheckedIn = true;
+          
+          _todayInsightDate = dailyInsight['date']?.toString();
+          // Use backend is_viewed as source of truth (persists across devices/restarts)
+          _insightViewed = dailyInsight['is_viewed'] == true || dailyInsight['isViewed'] == true;
+
+          if (dailyInsight['insight'] != null) {
+            final text = dailyInsight['insight'].toString();
+            final currentStatic = _dailyInsights[_currentDay ?? 1] ?? _dailyInsights.values.first;
+            _dailyInsights[_currentDay ?? 1] = InsightData(
+              lockedTitle: currentStatic.lockedTitle,
+              reflectionHeader: currentStatic.reflectionHeader,
+              reflectionMain: "Today's Insight",
+              reflectionMiddle: text,
+              awarenessTitle: currentStatic.awarenessTitle,
+              awarenessText: currentStatic.awarenessText,
+              bottomQuote: currentStatic.bottomQuote,
+              finalLine: currentStatic.finalLine,
+            );
+          }
+        } else {
+          _insightViewed = false;
+          _isCheckedIn = false;
+          // Backend says insight is still locked
+          if (dailyInsight['lock_reason'] != null) {
+            final currentStatic = _dailyInsights[_currentDay ?? 1] ?? _dailyInsights.values.first;
+            _dailyInsights[_currentDay ?? 1] = InsightData(
+              lockedTitle: dailyInsight['lock_reason'].toString(),
+              reflectionHeader: currentStatic.reflectionHeader,
+              reflectionMain: currentStatic.reflectionMain,
+              reflectionMiddle: currentStatic.reflectionMiddle,
+              awarenessTitle: currentStatic.awarenessTitle,
+              awarenessText: currentStatic.awarenessText,
+              bottomQuote: currentStatic.bottomQuote,
+              finalLine: currentStatic.finalLine,
+            );
+          }
+        }
+      }
+
+      // ── Fallback removed: Always trust the backend insight response for unlock status ──
 
       // ── Completed reflections: user_total_completed from /reflections/today/status ──
       final rawCompleted = reflStatus?['user_total_completed'] ??
@@ -124,17 +377,74 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
           ? rawCompleted
           : int.tryParse(rawCompleted?.toString() ?? '') ?? 0;
 
-      // ── Reflection completed today ──
-      _reflectionCompletedToday = reflStatus?['is_completed'] == true ||
-          reflStatus?['isCompleted'] == true;
+      // ── Reflection completed today (exact field: user_completed) ──
+      _reflectionCompletedToday = reflStatus?['userCompleted'] == true || reflStatus?['user_completed'] == true;
+
+      // ── Partner completed today (exact field: partner_completed) ──
+      _partnerCompletedToday = reflStatus?['partnerCompleted'] == true || reflStatus?['partner_completed'] == true;
 
       _isLoadingSeparation = false;
 
-      if (sep == null) {
-        Future.delayed(const Duration(seconds: 4), () {
-          if (mounted) setState(() => _showConnectedPill = false);
-        });
+      // ── Connected Pill & Hero State ──
+      if (homeHero != null) {
+        _isPartnerConnected = homeHero['partner_connected'] == true ||
+            homeHero['partnerConnected'] == true ||
+            homeHero['is_partner_connected'] == true;
+        _hasPastRelationship = homeHero['has_past_relationship'] == true;
+        _hasCompletedSeparation = homeHero['has_completed_separation'] == true || homeHero['hasCompletedSeparation'] == true;
+        _hasAcknowledgedCompletion = homeHero['has_acknowledged_completion'] == true || homeHero['hasAcknowledgedCompletion'] == true;
+      } else {
+        // Fall back to cached connection state if API fails
+        _isPartnerConnected = profileData != null 
+            ? (profileData['data'] ?? profileData)['isPartnerConnected'] == true
+            : cachedIsConnected;
+        _hasCompletedSeparation = false;
       }
+
+      // ── When journey is completed (e.g. via Time Travel), immediately unlock final
+      // insights for both partners — don't wait for a mood check-in.
+      if (_hasCompletedSeparation) {
+        _isCheckedIn = true;
+      }
+
+      if (_isPartnerConnected) {
+        final bool bannerShown = prefs.getBool('partner_connected_banner_shown') ?? false;
+        if (!bannerShown) {
+          _showConnectedPill = true;
+          prefs.setBool('partner_connected_banner_shown', true);
+          Future.delayed(const Duration(seconds: 5), () {
+            if (mounted) setState(() => _showConnectedPill = false);
+          });
+        } else {
+          _showConnectedPill = false;
+        }
+      } else {
+        _showConnectedPill = false;
+        prefs.setBool('partner_connected_banner_shown', false);
+        
+        final isWaiting = homeHero?['is_waiting_for_partner'] == true || homeHero?['isWaitingForPartner'] == true;
+        
+        // If widget said we are waiting, keep it true for this session, otherwise use backend.
+        _localIsWaitingForPartner = widget.isWaitingForPartner || isWaiting;
+
+        // If the backend says we're completely disconnected and not waiting, clear partner state
+        if (!_localIsWaitingForPartner) {
+          if (cachedPartnerName != null) {
+            prefs.remove('partner_name');
+          }
+          _partnerName = null;
+        }
+      }
+
+      // Only assign if it's actually active, otherwise let it be null so waiting pill stays hidden
+      _activeSeparation = isSepActive ? sep : null;
+
+      // Hero is empty if there are no hero values and no active separation
+      _isHeroEmpty = !hasHeroData && !isSepActive;
+
+      // ── Shared Presence: play animation every time backend says both are active ──
+      final bool presence = homeHero?['shared_presence'] == true;
+      _sharedPresence = presence;
     });
   }
 
@@ -223,25 +533,44 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
           children: [
             Positioned.fill(
               child: _currentIndex == 1
-                  ? FeelScreen(onReturnHome: () {
-                      setState(() {
-                        _currentIndex = 0;
-                        _isCheckedIn = true;
-                      });
-                    })
+                  ? FeelScreen(
+                      onReturnHome: () {
+                        setState(() {
+                          _currentIndex = 0;
+                          _isCheckedIn = true;
+                        });
+                        _fetchDashboardData();
+                      },
+                      insightText: (_isCheckedIn && !_insightViewed) ? (_dailyInsights[_currentDay]?.reflectionMiddle ?? _dailyInsights.values.first.reflectionMiddle) : null,
+                      awarenessText: (_isCheckedIn && !_insightViewed) ? (_dailyInsights[_currentDay]?.awarenessText ?? _dailyInsights.values.first.awarenessText) : null,
+                      bottomQuote: (_isCheckedIn && !_insightViewed) ? (_dailyInsights[_currentDay]?.bottomQuote ?? _dailyInsights.values.first.bottomQuote) : null,
+                      finalLine: (_isCheckedIn && !_insightViewed) ? (_dailyInsights[_currentDay]?.finalLine ?? _dailyInsights.values.first.finalLine) : null,
+                      onInsightViewed: () {
+                        setState(() { _insightViewed = true; });
+                        ApiService.markInsightViewed();
+                      },
+                    )
                   : _currentIndex == 2
-                      ? const LettersScreen()
+                      ? LettersScreen(separationId: _activeSeparation?['relationship_id'] ?? _activeSeparation?['relationshipId'])
                       : _currentIndex == 3
                           ? JourneyScreen(
-                              userName: widget.userName,
+                              userName: _currentUserName,
                               partnerName: _partnerName,
+                              isWaitingForPartner: _localIsWaitingForPartner,
                             )
                           : _currentIndex == 4
                               ? ProfileScreen(
-                                  userName: widget.userName,
+                                  userName: _currentUserName,
                                   partnerName: _partnerName,
+                                  onProfileUpdated: _fetchDashboardData,
                                 )
-                              : SingleChildScrollView(
+                              : _isLoadingSeparation
+                                  ? const Center(
+                                      child: CircularProgressIndicator(
+                                        color: Color(0xFFDD8F9F),
+                                      ),
+                                    )
+                                  : SingleChildScrollView(
                 padding: const EdgeInsets.only(left: 24.0, right: 24.0, bottom: 120.0), // Padding to clear navbar
                 child: SafeArea(
                   bottom: false,
@@ -255,74 +584,61 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          _DashboardAnimatedGreeting(userName: widget.userName),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const NotificationsScreen(),
-                                ),
-                              );
-                            },
-                            child: Stack(
-                              clipBehavior: Clip.none,
-                              children: [
-                                Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: const Color(0xFF260D1A),
-                                    border: Border.all(
-                                      color: const Color(0xFF3D1627),
-                                      width: 1,
-                                    ),
-                                  ),
-                                  child: const Center(
-                                    child: Icon(
-                                      Icons.favorite,
-                                      color: Color(0xFF914660),
-                                      size: 18,
-                                    ),
-                                  ),
-                                ),
-                                Positioned(
-                                  top: -2,
-                                  right: -2,
-                                  child: Container(
-                                    width: 16,
-                                    height: 16,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: const Color(0xFF090204),
-                                      border: Border.all(
-                                        color: const Color(0xFFDD8F9F).withOpacity(0.8),
-                                        width: 1.2,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: const Color(0xFFDD8F9F).withOpacity(0.2),
-                                          blurRadius: 4,
-                                          spreadRadius: 1,
+                          _DashboardAnimatedGreeting(userName: _currentUserName),
+                          Row(
+                            children: [
+                              if (_sharedPresence)
+                                AnimatedOpacity(
+                                  duration: const Duration(milliseconds: 500),
+                                  opacity: _sharedPresence ? 1.0 : 0.0,
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(right: 12.0),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 6,
+                                          height: 6,
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF4ADE80),
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: const Color(0xFF4ADE80).withOpacity(0.4),
+                                                blurRadius: 4,
+                                                spreadRadius: 1,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          '${_partnerName ?? "Partner"} Online',
+                                          style: const TextStyle(
+                                            color: Color(0xFFDD8F9F),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            fontStyle: FontStyle.italic,
+                                          ),
                                         ),
                                       ],
                                     ),
-                                    child: const Center(
-                                      child: Text(
-                                        '3',
-                                        style: TextStyle(
-                                          fontSize: 8,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFFDD8F9F),
-                                          letterSpacing: -0.5,
-                                        ),
-                                      ),
-                                    ),
                                   ),
                                 ),
-                              ],
-                            ),
+                              _PresencePulseHeart(
+                                key: const ValueKey('presence_heart'),
+                                triggerPulse: _sharedPresence,
+                                unreadCount: _unreadCount,
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const NotificationsScreen(),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -330,74 +646,151 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
                       const SizedBox(height: 20),
 
                       // ── Active Separation Card (HERO) ──
-                      if (_activeSeparation != null)
+                      // Priority order:
+                      // 1. No partner, not waiting         → UnconnectedHeroCard (create/join)
+                      // 2. No partner, WAITING for partner → UnconnectedHeroCard (waiting state)
+                      // 3. Journey completed, unacknowledged → completion card
+                      // 4. Journey completed, acknowledged → PostJourneySanctuary
+                      // 5. Hero empty (no data)            → empty card
+                      // 6. Active separation + partner joined → LivingJourneyCard
+                      if (_isHeroEmpty && !_isPartnerConnected && !_localIsWaitingForPartner && !(_activeSeparation != null && (_activeSeparation!['is_active'] == true || _activeSeparation!['isActive'] == true || _activeSeparation!['status'] == 'active')))
+                        UnconnectedHeroCard(
+                          isWaitingState: false,
+                          onCreateInvite: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => PartnerInviteScreen(
+                                  userName: _currentUserName,
+                                  partnerName: 'Your Partner',
+                                  fromDashboard: true,
+                                ),
+                              ),
+                            );
+                          },
+                          onJoinInvite: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const JoinWithCodeScreen(fromDashboard: true)),
+                            );
+                          },
+                        )
+                      // ── WAITING FOR PARTNER: separation created, partner not yet joined ──
+                      else if (!_isPartnerConnected && _localIsWaitingForPartner)
+                        UnconnectedHeroCard(
+                          isWaitingState: true,
+                          onCreateInvite: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => PartnerInviteScreen(
+                                  userName: _currentUserName,
+                                  partnerName: 'Your Partner',
+                                  fromDashboard: true,
+                                ),
+                              ),
+                            );
+                          },
+                          onJoinInvite: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const JoinWithCodeScreen(fromDashboard: true)),
+                            );
+                          },
+                        )
+                      else if (_isHeroEmpty && _hasCompletedSeparation && !_hasAcknowledgedCompletion)
                         LivingJourneyCard(
-                          currentDay: _currentDay,
-                          totalDays: _totalDays,
-                          moodPhrase: _moodPhrase,
+                          currentDay: _totalDays ?? 21,
+                          totalDays: _totalDays ?? 21,
+                          moodPhrase: 'You did it!',
+                          statusLine: 'Congratulations, your journey is complete!',
+                          isEmpty: false,
+                          isCompleted: true,
                           partnerName: _partnerName,
-                          statusLine: _completedReflections > 0
+                          onClose: () => _acknowledgeCompletion(),
+                        )
+                      else if (_isHeroEmpty && _hasCompletedSeparation && _hasAcknowledgedCompletion)
+                        PostJourneySanctuaryCard(
+                          partnerName: _partnerName ?? 'your partner',
+                          onBeginNewJourney: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const SeparationStep1IntentionScreen()),
+                            );
+                          },
+                          onSharedMemories: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const HistoryScreen()),
+                            );
+                          },
+                        )
+                      // Scenario 2: Partner connected, no active separation yet
+                      else if (_isHeroEmpty)
+                        ConnectedReadyHeroCard(
+                          partnerName: _partnerName ?? 'your partner',
+                          onBeginSeparation: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const SeparationStep1IntentionScreen()),
+                            );
+                          },
+                          onSharedMemories: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const HistoryScreen()),
+                            );
+                          },
+                        )
+                      else if (_activeSeparation != null || (_currentDay ?? 0) > 0)
+                        LivingJourneyCard(
+                          currentDay: _currentDay ?? 1,
+                          totalDays: _totalDays ?? 21,
+                          moodPhrase: _moodPhrase ?? '',
+                          partnerName: _partnerName,
+                          statusLine: (_completedReflections ?? 0) > 0
                               ? '$_completedReflections of $_totalDays reflections done'
                               : _formatStartDate(
                                   _activeSeparation?['start_date'] ??
-                                  _activeSeparation?['startDate']),
+                                  _activeSeparation?['startDate'] ?? DateTime.now().toIso8601String()),
                         )
                       else
                         const SizedBox.shrink(),
 
                       const SizedBox(height: 28),
 
-                      // ── Waiting Pill (below hero) ──
-                      if (_activeSeparation != null)
-                        FloatingConnectionPill(partnerName: _partnerName ?? 'Alex')
-                      else if (_showConnectedPill)
+                      if (_showConnectedPill)
                         AnimatedOpacity(
                           duration: const Duration(milliseconds: 800),
                           opacity: _showConnectedPill ? 1.0 : 0.0,
                           child: Center(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF1B2E1D).withOpacity(0.8),
-                                borderRadius: BorderRadius.circular(24),
-                                border: Border.all(color: const Color(0xFF4CAF50).withOpacity(0.3)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.check_circle, color: Color(0xFF4CAF50), size: 16),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    "${_partnerName ?? 'Alex'} connected",
-                                    style: const TextStyle(
-                                      fontFamily: 'Georgia',
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
+                            child: _ShimmeringConnectedPill(partnerName: _partnerName ?? 'your partner'),
                           ),
                         ),
 
                       const SizedBox(height: 36),
 
                       // ── Magical Emotional Sanctuary ──
-                      const LivingSanctuarySection(),
+                      LivingSanctuarySection(
+                        isActiveSeparation: _activeSeparation != null && 
+                            (_activeSeparation!['is_active'] == true || 
+                             _activeSeparation!['isActive'] == true || 
+                             _activeSeparation!['status'] == 'active'),
+                      ),
 
                       const SizedBox(height: 36),
 
                       // ── Insight Card ──
                       _InsightCard(
-                        day: _currentDay,
-                        insight: _dailyInsights[_currentDay] ?? _dailyInsights.values.first,
+                        day: _currentDay ?? 1,
+                        insight: _dailyInsights[_currentDay ?? 1] ?? _dailyInsights.values.first,
                         isCheckedIn: _isCheckedIn,
                         isViewed: _insightViewed,
                         onTap: () {
                           if (_isCheckedIn) {
-                            _showReflectionModal(context, _dailyInsights[_currentDay] ?? _dailyInsights.values.first);
+                            setState(() {
+                              _currentIndex = 1;
+                            });
                           }
                         },
                         onLockedTap: () {
@@ -412,18 +805,27 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
                       // ── Sit with your feelings Button ──
                       GestureDetector(
                         onTap: _reflectionCompletedToday
-                            ? null
+                            ? () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('You have already completed today\'s reflection.', style: TextStyle(color: Colors.white)),
+                                    backgroundColor: Color(0xFF8A2E55),
+                                    duration: Duration(seconds: 2),
+                                  ),
+                                );
+                              }
                             : () {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
-                                    builder: (context) => ReflectionFlowScreen(day: _currentDay),
+                                    builder: (context) => ReflectionFlowScreen(day: _currentDay ?? 1),
                                   ),
                                 ).then((completed) {
                                   if (completed == true) {
                                     setState(() {
                                       _reflectionCompletedToday = true;
                                     });
+                                    _fetchDashboardData();
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
@@ -495,7 +897,9 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
                                     Text(
                                       _reflectionCompletedToday
                                           ? 'See you tomorrow'
-                                          : 'Sit with your feelings',
+                                          : _isMissedDayFlow
+                                              ? 'Continue Day ${_currentDay ?? 1}'
+                                              : 'Sit with your feelings',
                                       style: TextStyle(
                                         fontFamily: 'Georgia',
                                         fontSize: 17,
@@ -540,26 +944,8 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> {
       ),
     );
   }
-
-
-
-  void _showReflectionModal(BuildContext context, InsightData insight) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _ReflectionView(
-        insight: insight,
-        onComplete: () {
-          setState(() {
-            _insightViewed = true;
-          });
-          Navigator.pop(context);
-        },
-      ),
-    );
-  }
 }
+
 
 class _StatCard extends StatelessWidget {
   final String value;
@@ -791,19 +1177,27 @@ class _InsightCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: const Color(0xFF3D1627), width: 1.2),
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.check_circle_outline, color: Color(0xFF8A6530), size: 24),
-            const SizedBox(width: 16),
-            const Expanded(
-              child: Text(
-                'You unlocked today’s reflection',
-                style: TextStyle(
-                  fontFamily: 'Georgia',
-                  fontSize: 15,
-                  fontStyle: FontStyle.italic,
-                  color: Color(0xFF866571),
-                ),
+            const Text(
+              '✨ Today\'s Insight Unlocked',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFFDD8F9F),
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'You\'ve already explored today\'s insight.',
+              style: TextStyle(
+                fontFamily: 'Georgia',
+                fontSize: 15,
+                fontStyle: FontStyle.italic,
+                color: Color(0xFF866571),
+                height: 1.4,
               ),
             ),
           ],
@@ -814,7 +1208,11 @@ class _InsightCard extends StatelessWidget {
     // Unlocked but not viewed state
     return GestureDetector(
       onTap: onTap,
-      child: Container(
+      child: PremiumSheen(
+        animationDuration: const Duration(milliseconds: 1800),
+        pauseDuration: const Duration(seconds: 4),
+        sheenOpacity: 0.15,
+        child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(28),
         decoration: BoxDecoration(
@@ -907,219 +1305,26 @@ class _InsightCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _ReflectionView extends StatelessWidget {
-  final InsightData insight;
-  final VoidCallback onComplete;
-
-  const _ReflectionView({required this.insight, required this.onComplete});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.92,
-      decoration: const BoxDecoration(
-        color: Color(0xFF090204),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
-      ),
-      child: Stack(
-        children: [
-          // Content
-          ClipRRect(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(32.0, 32.0, 32.0, 40.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox(height: 40),
-                  Text(
-                    insight.reflectionHeader,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 2.0,
-                      color: Color(0xFF8A6530),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '"${insight.reflectionMain}"',
-                    style: const TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(28),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1F0A13),
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: Text(
-                      insight.reflectionMiddle,
-                      style: const TextStyle(
-                        fontFamily: 'Georgia',
-                        fontSize: 15,
-                        fontStyle: FontStyle.italic,
-                        color: Color(0xFFD4C4CA),
-                        height: 1.6,
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 24),
-                  
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF160A0E),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFF322315).withOpacity(0.2)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          insight.awarenessTitle,
-                          style: const TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.5,
-                            color: Color(0xFF9E7E5A),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          '"${insight.awarenessText}"',
-                          style: const TextStyle(
-                            fontFamily: 'Georgia',
-                            fontSize: 15,
-                            fontStyle: FontStyle.italic,
-                            color: Color(0xFFCE9B4E),
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 48),
-                  
-                  Center(
-                    child: Column(
-                      children: [
-                        Text(
-                          '"${insight.bottomQuote}"',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontFamily: 'Georgia',
-                            fontSize: 14,
-                            fontStyle: FontStyle.italic,
-                            color: Color(0xFF5A3C47),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          insight.finalLine,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF3D242E),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 40),
-                  
-                  SizedBox(
-                    width: double.infinity,
-                    height: 60,
-                    child: ElevatedButton(
-                      onPressed: onComplete,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF8A2E55),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'I\'ll reflect on this',
-                        style: TextStyle(
-                          fontFamily: 'Georgia',
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          fontStyle: FontStyle.italic,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  Center(
-                    child: TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text(
-                        'Got it',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF4A343D),
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Close button - kept on top
-          Positioned(
-            top: 24,
-            right: 24,
-            child: GestureDetector(
-              onTap: () => Navigator.pop(context),
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.08),
-                ),
-                child: const Icon(Icons.close, size: 20, color: Colors.white70),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
 }
+
 
 class _DreamHouseEntryCardWidget extends StatefulWidget {
   final int currentDay;
   final String userName;
+  final String? partnerName;
 
   const _DreamHouseEntryCardWidget({
     super.key,
     required this.currentDay,
+    required this.totalDays,
     required this.userName,
+    this.partnerName,
   });
+
+  final int totalDays;
 
   @override
   State<_DreamHouseEntryCardWidget> createState() => _DreamHouseEntryCardWidgetState();
@@ -1345,9 +1550,9 @@ class _DreamHouseEntryCardWidgetState extends State<_DreamHouseEntryCardWidget>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Soft floating "Day X of 7" header text
+                            // Soft floating "Day X of Total" header text
                             Text(
-                              "Day ${widget.currentDay} of 7 • Home Haven",
+                              "Day ${widget.currentDay} of ${widget.totalDays} • Home Haven",
                               style: const TextStyle(
                                 fontFamily: 'Georgia',
                                 fontSize: 11,
@@ -1394,7 +1599,7 @@ class _DreamHouseEntryCardWidgetState extends State<_DreamHouseEntryCardWidget>
                                   MaterialPageRoute(
                                     builder: (context) => DreamHouseWorldScreen(
                                       userName: widget.userName,
-                                      partnerName: "Nikhil",
+                                      partnerName: widget.partnerName ?? "Partner",
                                     ),
                                   ),
                                 );
@@ -2556,6 +2761,13 @@ class _DashboardAnimatedGreetingState extends State<_DashboardAnimatedGreeting>
     super.dispose();
   }
 
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'GOOD MORNING';
+    if (hour < 17) return 'GOOD AFTERNOON';
+    return 'GOOD EVENING';
+  }
+
   @override
   Widget build(BuildContext context) {
     return FadeTransition(
@@ -2565,16 +2777,17 @@ class _DashboardAnimatedGreetingState extends State<_DashboardAnimatedGreeting>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'GOOD MORNING',
-              style: TextStyle(
+            Text(
+              _getGreeting(),
+              style: const TextStyle(
+                fontFamily: 'Inter',
                 fontSize: 10,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w600,
                 letterSpacing: 2.0,
-                color: Color(0xFF6E4555),
+                color: Color(0xFF866571),
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Row(
               children: [
                 Stack(
@@ -2585,14 +2798,14 @@ class _DashboardAnimatedGreetingState extends State<_DashboardAnimatedGreeting>
                       animation: _pulseController,
                       builder: (context, child) {
                         return Container(
-                          width: 120,
-                          height: 40,
+                          width: 80,
+                          height: 30,
                           decoration: BoxDecoration(
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF911746).withOpacity(0.15 + 0.1 * _pulseController.value),
-                                blurRadius: 20 + 10 * _pulseController.value,
-                                spreadRadius: 5,
+                                color: const Color(0xFF8A2E55).withValues(alpha: 0.05 + 0.05 * _pulseController.value),
+                                blurRadius: 15 + 5 * _pulseController.value,
+                                spreadRadius: 2,
                               ),
                             ],
                           ),
@@ -2603,9 +2816,9 @@ class _DashboardAnimatedGreetingState extends State<_DashboardAnimatedGreeting>
                       widget.userName,
                       style: const TextStyle(
                         fontFamily: 'Georgia',
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        fontSize: 24, // Reduced from 32
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFFE0D4D8), // Softer color
                       ),
                     ),
                   ],
@@ -2615,15 +2828,15 @@ class _DashboardAnimatedGreetingState extends State<_DashboardAnimatedGreeting>
                   animation: _pulseController,
                   builder: (context, child) {
                     return Transform.scale(
-                      scale: 1.0 + 0.15 * _pulseController.value,
+                      scale: 1.0 + 0.1 * _pulseController.value,
                       child: const Icon(
                         Icons.favorite,
-                        color: Color(0xFFCA366C),
-                        size: 18,
+                        color: Color(0xFFB06E82), // Softer heart
+                        size: 14, // Smaller heart
                         shadows: [
                           Shadow(
-                            color: Color(0xFF911746),
-                            blurRadius: 8,
+                            color: Color(0xFF8A2E55),
+                            blurRadius: 6,
                           ),
                         ],
                       ),
@@ -2635,6 +2848,337 @@ class _DashboardAnimatedGreetingState extends State<_DashboardAnimatedGreeting>
           ],
         ),
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRESENCE PULSE HEART WIDGET
+// Wraps the existing heart button. When triggerPulse=true it plays a 3-second
+// ambient animation (scale + glow + particles) then returns to normal.
+// No new UI elements; identical resting appearance to the original.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _PresencePulseHeart extends StatefulWidget {
+  final bool triggerPulse;
+  final int unreadCount;
+  final VoidCallback onTap;
+
+  const _PresencePulseHeart({
+    super.key,
+    required this.triggerPulse,
+    this.unreadCount = 0,
+    required this.onTap,
+  });
+
+  @override
+  State<_PresencePulseHeart> createState() => _PresencePulseHeartState();
+}
+
+class _PresencePulseHeartState extends State<_PresencePulseHeart>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  // Heart scale: 1.0 → 1.08 → 1.0
+  late final Animation<double> _scaleAnim;
+  // Ring glow: 1.0 → 1.6 → 1.0
+  late final Animation<double> _glowAnim;
+  // Particles: 0.0 → 1.0 (drives both position and opacity)
+  late final Animation<double> _particleAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2800),
+    );
+
+    _scaleAnim = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.15).chain(CurveTween(curve: Curves.easeInOut)), weight: 35),
+      TweenSequenceItem(tween: Tween(begin: 1.15, end: 1.0).chain(CurveTween(curve: Curves.easeInOut)), weight: 35),
+      TweenSequenceItem(tween: ConstantTween(1.0), weight: 30),
+    ]).animate(_ctrl);
+
+    _glowAnim = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 2.2).chain(CurveTween(curve: Curves.easeOut)), weight: 40),
+      TweenSequenceItem(tween: Tween(begin: 2.2, end: 1.0).chain(CurveTween(curve: Curves.easeIn)), weight: 60),
+    ]).animate(_ctrl);
+
+    _particleAnim = CurvedAnimation(parent: _ctrl, curve: const Interval(0.1, 0.85, curve: Curves.easeOut));
+
+    if (widget.triggerPulse) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _ctrl.repeat(); // Loop infinitely
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(_PresencePulseHeart old) {
+    super.didUpdateWidget(old);
+    if (widget.triggerPulse && !old.triggerPulse) {
+      _ctrl.repeat(); // Loop continuously while active
+    } else if (!widget.triggerPulse && old.triggerPulse) {
+      _ctrl.forward(); // Let the current cycle finish and stop
+    }
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: AnimatedBuilder(
+        animation: _ctrl,
+        builder: (context, _) {
+          return CustomPaint(
+            // Particles are painted BEHIND the heart button
+            foregroundPainter: _PresenceParticlePainter(progress: _particleAnim.value),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // ── Heart circle (same as original) ──
+                Transform.scale(
+                  scale: _scaleAnim.value,
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF260D1A),
+                      border: Border.all(
+                        color: const Color(0xFF3D1627),
+                        width: 1,
+                      ),
+                      boxShadow: _ctrl.value > 0
+                          ? [
+                              BoxShadow(
+                                color: const Color(0xFF914660).withAlpha(
+                                  (60 * (_glowAnim.value - 1.0)).clamp(0, 120).toInt(),
+                                ),
+                                blurRadius: 12 * (_glowAnim.value - 1.0).clamp(0, 1) + 4,
+                                spreadRadius: 2 * (_glowAnim.value - 1.0).clamp(0, 1),
+                              )
+                            ]
+                          : [],
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.favorite,
+                        color: Color(0xFF914660),
+                        size: 18,
+                      ),
+                    ),
+                  ),
+                ),
+                // ── Notification badge (same as original) ──
+                if (widget.unreadCount > 0)
+                  Positioned(
+                    top: -2,
+                    right: -2,
+                    child: Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF090204),
+                        border: Border.all(
+                          color: const Color(0xFFDD8F9F).withAlpha(204),
+                          width: 1.2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFDD8F9F).withAlpha(51),
+                            blurRadius: 4,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: Center(
+                        child: Text(
+                          '${widget.unreadCount}',
+                          style: const TextStyle(
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFDD8F9F),
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PRESENCE PARTICLE PAINTER
+// Draws 4 soft particles that drift outward and fade as progress goes 0→1.
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _PresenceParticlePainter extends CustomPainter {
+  final double progress; // 0.0 → 1.0
+
+  _PresenceParticlePainter({required this.progress});
+
+  static const List<_Particle> _particles = [
+    _Particle(angle: -45, startRadius: 24, endRadius: 40, size: 2.5),
+    _Particle(angle: 45,  startRadius: 24, endRadius: 44, size: 2.0),
+    _Particle(angle: 135, startRadius: 24, endRadius: 38, size: 2.2),
+    _Particle(angle: 200, startRadius: 24, endRadius: 42, size: 1.8),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress <= 0.0) return;
+
+    final center = Offset(size.width / 2, size.height / 2);
+
+    for (final p in _particles) {
+      final rad = p.angle * (math.pi / 180);
+      final r = p.startRadius + (p.endRadius - p.startRadius) * progress;
+      final opacity = (1.0 - progress).clamp(0.0, 1.0);
+
+      final pos = center + Offset(math.cos(rad) * r, math.sin(rad) * r);
+
+      final paint = Paint()
+        ..color = const Color(0xFFDD8F9F).withAlpha((opacity * 180).toInt())
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5);
+
+      canvas.drawCircle(pos, p.size * (1.0 - progress * 0.4), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_PresenceParticlePainter old) => old.progress != progress;
+}
+
+class _Particle {
+  final double angle;
+  final double startRadius;
+  final double endRadius;
+  final double size;
+  const _Particle({
+    required this.angle,
+    required this.startRadius,
+    required this.endRadius,
+    required this.size,
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SHIMMERING CONNECTED PILL
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _ShimmeringConnectedPill extends StatefulWidget {
+  final String partnerName;
+  const _ShimmeringConnectedPill({required this.partnerName});
+
+  @override
+  State<_ShimmeringConnectedPill> createState() => _ShimmeringConnectedPillState();
+}
+
+class _ShimmeringConnectedPillState extends State<_ShimmeringConnectedPill> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 3000),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final shimmerValue = _controller.value;
+        final pulse = math.sin(shimmerValue * math.pi * 2);
+
+        return Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF1B2E1D).withOpacity(0.9),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFF4CAF50).withOpacity(0.4)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF4CAF50).withOpacity(0.2 + 0.1 * pulse),
+                blurRadius: 15 + 5 * pulse,
+                spreadRadius: 2,
+              )
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Main Content
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.check_circle, color: Color(0xFF4CAF50), size: 16),
+                      const SizedBox(width: 8),
+                      Text(
+                        "${widget.partnerName} connected",
+                        style: const TextStyle(
+                          fontFamily: 'Georgia',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Shimmer overlay
+                Positioned.fill(
+                  child: FractionalTranslation(
+                    translation: Offset(shimmerValue * 2.5 - 1.25, 0), 
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            Colors.white.withOpacity(0.0),
+                            Colors.white.withOpacity(0.6),
+                            const Color(0xFF4CAF50).withOpacity(0.5),
+                            Colors.white.withOpacity(0.0),
+                          ],
+                          stops: const [0.0, 0.4, 0.6, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -14,8 +14,7 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen>
-    with SingleTickerProviderStateMixin {
-  bool _isTimeline = true;
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   bool _isLoading = true;
   String? _errorMessage;
   List<Map<String, dynamic>> _separations = [];
@@ -24,59 +23,95 @@ class _HistoryScreenState extends State<HistoryScreen>
   String? _relationType;
   String? _gender;
 
-  late AnimationController _switchController;
-  late Animation<double> _fadeAnimation;
-
   @override
   void initState() {
     super.initState();
-    _switchController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 280),
-    );
-    _fadeAnimation = CurvedAnimation(
-      parent: _switchController,
-      curve: Curves.easeInOut,
-    );
-    _switchController.forward();
+    WidgetsBinding.instance.addObserver(this);
     _fetchHistory();
   }
 
-  @override
   void dispose() {
-    _switchController.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _fetchHistory();
+    }
   }
 
   Future<void> _fetchHistory() async {
     try {
-      final history = await ApiService.getRelationshipsHistory();
+      final results = await Future.wait([
+        ApiService.getRelationshipsHistory(),
+        ApiService.getActiveSeparation(),
+      ]);
       
-      if (mounted) {
-        setState(() {
-          final pastSeps = <Map<String, dynamic>>[];
-          Map<String, dynamic>? activeSep;
-          
-          for (final sep in history) {
-            final status = (sep['status'] ?? '').toString().toLowerCase();
-            if (status == 'active' || status == 'in_progress' || status == 'in progress') {
-              activeSep = sep;
-            } else {
-              pastSeps.add(sep);
+      final history = results[0] as List<Map<String, dynamic>>;
+      final activeSep = results[1] as Map<String, dynamic>?;
+
+      List<Map<String, dynamic>> allSeparations = [];
+      String? parsedPartnerName;
+      String? parsedRelationType;
+      String? parsedGender;
+
+      if (history.isNotEmpty) {
+        final referenceRel = history.first;
+        parsedPartnerName = referenceRel['partner_name'] ?? referenceRel['partnerName'] ?? referenceRel['partner'];
+        parsedRelationType = (referenceRel['relationship_type'] ?? referenceRel['relationType'])?.toString().toLowerCase();
+        parsedGender = referenceRel['partner_gender'] ?? referenceRel['gender'] ?? referenceRel['partnerGender'];
+        
+        final currentRelId = referenceRel['relationship_id'] ?? referenceRel['id'] ?? referenceRel['_id'];
+        if (activeSep != null) {
+          activeSep['relationship_id'] = currentRelId;
+        }
+
+        for (final rel in history) {
+          final relId = rel['relationship_id'] ?? rel['id'];
+          final relPartnerName = rel['partner_name'] ?? rel['partnerName'] ?? rel['partner'] ?? parsedPartnerName;
+          final relRelationType = rel['relationship_type'] ?? rel['relationType'] ?? parsedRelationType;
+          final relGender = rel['partner_gender'] ?? rel['gender'] ?? rel['partnerGender'] ?? parsedGender;
+
+          if (relId != null) {
+            final seps = await ApiService.getRelationshipSeparations(int.parse(relId.toString()));
+            for (var sep in seps) {
+              sep['partner_name'] = sep['partner_name'] ?? sep['partnerName'] ?? sep['partner'] ?? relPartnerName ?? 'your partner';
+              sep['relationship_type'] = sep['relationship_type'] ?? sep['relationType'] ?? relRelationType;
+              sep['partner_gender'] = sep['partner_gender'] ?? sep['partnerGender'] ?? relGender;
+              sep['relationship_id'] = relId;
+
+              final sepStatus = (sep['status'] ?? 'COMPLETED').toString().toLowerCase();
+              if (sepStatus == 'active' || sepStatus == 'in_progress') {
+                continue; // Never show active separations in Past Spaces
+              }
+
+              // Validate required fields (Removed daysElapsed as it's not always in completed response)
+              final durationLabel = sep['durationLabel'] ?? sep['duration_label'];
+              final description = sep['reason'] ?? sep['description'] ?? sep['title'];
+
+              if (durationLabel != null && description != null) {
+                allSeparations.add(sep);
+              }
             }
           }
-          
+        }
+      }
+
+      allSeparations.sort((a, b) {
+        final startA = a['started_at'] ?? a['startDate'] ?? '';
+        final startB = b['started_at'] ?? b['startDate'] ?? '';
+        return startB.toString().compareTo(startA.toString());
+      });
+
+      if (mounted) {
+        setState(() {
           _activeSeparation = activeSep;
-          _separations = pastSeps;
-          
-          // Use verified backend field names from GET /api/v1/relationships/history:
-          // relationship_id, partner_name, partner_gender, relationship_type
-          final referenceSep = _activeSeparation ?? (_separations.isNotEmpty ? _separations.first : null);
-          if (referenceSep != null) {
-            _partnerName = referenceSep['partner_name'] ?? referenceSep['partnerName'] ?? referenceSep['partner'];
-            _relationType = (referenceSep['relationship_type'] ?? referenceSep['relationType'])?.toString().toLowerCase();
-            _gender = referenceSep['partner_gender'] ?? referenceSep['gender'] ?? referenceSep['partnerGender'];
-          }
+          _separations = allSeparations;
+          _partnerName = parsedPartnerName;
+          _relationType = parsedRelationType;
+          _gender = parsedGender;
           
           _isLoading = false;
           _errorMessage = null;
@@ -92,13 +127,7 @@ class _HistoryScreenState extends State<HistoryScreen>
     }
   }
 
-  void _switchTab(bool toTimeline) {
-    if (_isTimeline == toTimeline) return;
-    _switchController.reverse().then((_) {
-      setState(() => _isTimeline = toTimeline);
-      _switchController.forward();
-    });
-  }
+
 
   String _formatDateRange(dynamic start, dynamic end) {
     if (start == null) return 'UNKNOWN DATES';
@@ -126,15 +155,15 @@ class _HistoryScreenState extends State<HistoryScreen>
     }
     final start = item['started_at'] ?? item['startDate'];
     final end = item['ended_at'] ?? item['endDate'];
-    if (start != null && end != null) {
+    if (start != null) {
       try {
         final s = DateTime.parse(start.toString());
-        final e = DateTime.parse(end.toString());
+        final e = end != null ? DateTime.parse(end.toString()) : DateTime.now();
         final days = e.difference(s).inDays;
         return '$days ${days == 1 ? 'day' : 'days'} apart';
       } catch (_) {}
     }
-    return '3 days apart';
+    return '';
   }
 
   List<_Tag> _buildTags(Map<String, dynamic> item) {
@@ -232,7 +261,8 @@ class _HistoryScreenState extends State<HistoryScreen>
               ),
 
               // ── Header ──
-              Padding(
+              Container(
+                width: double.infinity,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
                 child: Column(
@@ -269,88 +299,6 @@ class _HistoryScreenState extends State<HistoryScreen>
                         height: 1.1,
                       ),
                     ),
-                    const SizedBox(height: 32),
-
-                    // ── Segmented Toggle ──
-                    Container(
-                      height: 52,
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF160A0E),
-                        borderRadius: BorderRadius.circular(26),
-                        border: Border.all(color: const Color(0xFF26151B), width: 1.5),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => _switchTab(true),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 250),
-                                curve: Curves.easeInOut,
-                                decoration: BoxDecoration(
-                                  color: _isTimeline
-                                      ? const Color(0xFFDD8F9F).withOpacity(0.15)
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(24),
-                                  border: _isTimeline
-                                      ? Border.all(color: const Color(0xFFDD8F9F).withOpacity(0.3), width: 1)
-                                      : Border.all(color: Colors.transparent, width: 1),
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  'Timeline',
-                                  style: TextStyle(
-                                    fontFamily: 'Georgia',
-                                    fontSize: 14,
-                                    fontStyle: _isTimeline ? FontStyle.italic : FontStyle.normal,
-                                    fontWeight: _isTimeline
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                    color: _isTimeline
-                                        ? const Color(0xFFDD8F9F)
-                                        : const Color(0xFF5A3C47),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => _switchTab(false),
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 250),
-                                curve: Curves.easeInOut,
-                                decoration: BoxDecoration(
-                                  color: !_isTimeline
-                                      ? const Color(0xFFDD8F9F).withOpacity(0.15)
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(24),
-                                  border: !_isTimeline
-                                      ? Border.all(color: const Color(0xFFDD8F9F).withOpacity(0.3), width: 1)
-                                      : Border.all(color: Colors.transparent, width: 1),
-                                ),
-                                alignment: Alignment.center,
-                                child: Text(
-                                  'Calendar',
-                                  style: TextStyle(
-                                    fontFamily: 'Georgia',
-                                    fontSize: 14,
-                                    fontStyle: !_isTimeline ? FontStyle.italic : FontStyle.normal,
-                                    fontWeight: !_isTimeline
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                    color: !_isTimeline
-                                        ? const Color(0xFFDD8F9F)
-                                        : const Color(0xFF5A3C47),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -366,12 +314,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                       )
                     : _errorMessage != null
                         ? _buildErrorState()
-                        : FadeTransition(
-                            opacity: _fadeAnimation,
-                            child: _isTimeline
-                                ? _buildTimeline()
-                                : _buildCalendar(),
-                          ),
+                        : _buildTimeline(),
               ),
             ],
           ),
@@ -414,11 +357,19 @@ class _HistoryScreenState extends State<HistoryScreen>
     );
   }
 
+  /// Returns true only when the backend confirms an active separation.
+  bool get _isActiveSeparation {
+    if (_activeSeparation == null) return false;
+    final v = _activeSeparation!['isActive'] ?? _activeSeparation!['is_active'];
+    if (v == null) return false;
+    return v == true;
+  }
+
   Widget _buildTimeline() {
     return ListView(
       padding: const EdgeInsets.all(24.0),
       children: [
-        if (_activeSeparation != null) ...[
+        if (_isActiveSeparation || _separations.isNotEmpty) ...[
           const Padding(
             padding: EdgeInsets.only(bottom: 16.0, top: 8.0, left: 4.0),
             child: Text(
@@ -431,8 +382,10 @@ class _HistoryScreenState extends State<HistoryScreen>
               ),
             ),
           ),
-          _buildActiveSeparationCard(_activeSeparation!),
+          _buildActiveSeparationCard(_activeSeparation),
           const SizedBox(height: 32),
+        ],
+        if (_separations.isNotEmpty) ...[
           const Padding(
             padding: EdgeInsets.only(bottom: 16.0, left: 4.0),
             child: Text(
@@ -446,7 +399,7 @@ class _HistoryScreenState extends State<HistoryScreen>
             ),
           ),
         ],
-        if (_separations.isEmpty && _activeSeparation == null)
+        if (_separations.isEmpty)
           Container(
             padding:
                 const EdgeInsets.symmetric(vertical: 32, horizontal: 20),
@@ -458,13 +411,15 @@ class _HistoryScreenState extends State<HistoryScreen>
             ),
             child: Column(
               children: [
-                const Icon(Icons.auto_awesome,
-                    color: Color(0xFF9E7E5A), size: 36),
+                Icon(!_isActiveSeparation ? Icons.auto_awesome : Icons.history,
+                    color: const Color(0xFF9E7E5A), size: 36),
                 const SizedBox(height: 16),
-                const Text(
-                  'Your shared space timeline is clear.',
+                Text(
+                  !_isActiveSeparation 
+                      ? 'Your shared space timeline is clear.' 
+                      : 'No past spaces yet.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontFamily: 'Georgia',
                     fontSize: 16,
                     fontStyle: FontStyle.italic,
@@ -512,8 +467,8 @@ class _HistoryScreenState extends State<HistoryScreen>
           final pGen = item['partner_gender'] ?? item['partnerGender'] ?? item['gender'] ?? _gender;
           final pRel = (item['relationship_type'] ?? item['relationType'])?.toString().toLowerCase() ?? _relationType;
 
-          String partnerInfo = pName != null ? 'With $pName' : 'Shared Space';
-          if (pGen != null && pGen.isNotEmpty) {
+          String partnerInfo = pName != null ? 'With $pName' : '';
+          if (partnerInfo.isNotEmpty && pGen != null && pGen.isNotEmpty) {
             partnerInfo += ' • $pGen';
           }
 
@@ -557,22 +512,67 @@ class _HistoryScreenState extends State<HistoryScreen>
     );
   }
 
-  Widget _buildActiveSeparationCard(Map<String, dynamic> activeSep) {
+  Widget _buildActiveSeparationCard(Map<String, dynamic>? activeSep) {
+    final durationLabel = activeSep?['durationLabel'] ?? activeSep?['duration_label'];
+    final description = activeSep?['reason'] ?? activeSep?['description'] ?? activeSep?['title'];
+    final daysElapsed = activeSep?['days_elapsed'] ?? activeSep?['daysElapsed'];
+    final pName = activeSep?['partner_name'] ?? activeSep?['partnerName'] ?? activeSep?['partner'] ?? _partnerName;
+    
+    final bool hasNullValues = activeSep != null && (durationLabel == null || description == null || daysElapsed == null || pName == null);
+
+    if (activeSep == null || activeSep['isActive'] == false || activeSep['is_active'] == false || hasNullValues) {
+      return Container(
+        width: double.infinity,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        padding: const EdgeInsets.all(28),
+        decoration: BoxDecoration(
+          color: const Color(0xFF160A0E),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFF26151B), width: 1),
+        ),
+        child: Column(
+          children: [
+            const Icon(Icons.auto_awesome, color: Color(0xFF9E7E5A), size: 36),
+            const SizedBox(height: 16),
+            const Text(
+              '🌱 No active space yet.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Georgia',
+                fontSize: 16,
+                fontStyle: FontStyle.italic,
+                color: Colors.white70,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              "Every meaningful connection grows through patience and understanding.\n\nStart a separation journey whenever you're ready to create space for reflection, growth, and deeper connection.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF866571),
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final titleStr = activeSep['title'] ?? activeSep['name'] ?? _getDurationText(activeSep);
-    final quoteStr = activeSep['reason'] != null ? '"${activeSep['reason']}"' : '"Growing through space"';
+    final quoteStr = activeSep['reason'] != null ? '"${activeSep['reason']}"' : null;
     final status = (activeSep['status'] ?? 'IN PROGRESS').toString().toUpperCase();
     final startKey = activeSep['started_at'] ?? activeSep['startDate'];
     final endKey = activeSep['ended_at'] ?? activeSep['endDate'];
-    final dateStr = '${_formatDateRange(startKey, endKey)} • $status';
+    final dateStr = startKey != null ? '${_formatDateRange(startKey, endKey)} • $status' : status;
 
     final sepCount = activeSep['separation_count'] ?? (_separations.length + 1);
     final relationshipId = activeSep['relationship_id'] ?? activeSep['id'] ?? activeSep['_id'];
 
-    final pName = activeSep['partner_name'] ?? activeSep['partnerName'] ?? activeSep['partner'] ?? _partnerName;
     final pGen = activeSep['partner_gender'] ?? activeSep['partnerGender'] ?? activeSep['gender'] ?? _gender;
     final pRel = (activeSep['relationship_type'] ?? activeSep['relationType'])?.toString().toLowerCase() ?? _relationType;
-    String partnerInfo = pName != null ? 'With $pName' : 'Shared Space';
-    if (pGen != null && pGen.isNotEmpty) {
+    String partnerInfo = pName != null ? 'With $pName' : '';
+    if (partnerInfo.isNotEmpty && pGen != null && pGen.isNotEmpty) {
       partnerInfo += ' • $pGen';
     }
 
@@ -659,44 +659,50 @@ class _HistoryScreenState extends State<HistoryScreen>
               ],
             ),
             const SizedBox(height: 24),
-            Row(
-              children: [
-                const Icon(Icons.people_alt_outlined, color: Color(0xFFDD8F9F), size: 16),
-                const SizedBox(width: 8),
-                Text(
-                  partnerInfo,
-                  style: const TextStyle(
-                    fontFamily: 'Georgia',
-                    fontSize: 16,
-                    fontStyle: FontStyle.italic,
-                    color: Color(0xFFDD8F9F),
+            if (partnerInfo.isNotEmpty) ...[
+              Row(
+                children: [
+                  const Icon(Icons.people_alt_outlined, color: Color(0xFFDD8F9F), size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    partnerInfo,
+                    style: const TextStyle(
+                      fontFamily: 'Georgia',
+                      fontSize: 16,
+                      fontStyle: FontStyle.italic,
+                      color: Color(0xFFDD8F9F),
+                    ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (titleStr.isNotEmpty) ...[
+              Text(
+                titleStr,
+                style: const TextStyle(
+                  fontFamily: 'Georgia',
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  height: 1.1,
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              titleStr,
-              style: const TextStyle(
-                fontFamily: 'Georgia',
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                height: 1.1,
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              quoteStr,
-              style: const TextStyle(
-                fontFamily: 'Georgia',
-                fontSize: 16,
-                fontStyle: FontStyle.italic,
-                color: Color(0xFFECAABB),
-                height: 1.4,
+              const SizedBox(height: 16),
+            ],
+            if (quoteStr != null && quoteStr.isNotEmpty) ...[
+              Text(
+                quoteStr,
+                style: const TextStyle(
+                  fontFamily: 'Georgia',
+                  fontSize: 16,
+                  fontStyle: FontStyle.italic,
+                  color: Color(0xFFECAABB),
+                  height: 1.4,
+                ),
               ),
-            ),
-            const SizedBox(height: 28),
+              const SizedBox(height: 28),
+            ],
             Row(
               children: [
                 const Text(
@@ -721,683 +727,6 @@ class _HistoryScreenState extends State<HistoryScreen>
             )
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _buildCalendar() {
-    return _CalendarView(
-      separations: _separations,
-      onSeparationTap: (item) {
-        final totalSeps = _separations.length;
-        final index = _separations.indexOf(item);
-        final separationCount = index != -1 ? totalSeps - index : null;
-        final relationshipId = item['relationship_id'] ?? item['id'] ?? item['_id'];
-        final pGen = item['partner_gender'] ?? item['partnerGender'] ?? item['gender'] ?? _gender;
-        final pRel = (item['relationship_type'] ?? item['relationType'])?.toString().toLowerCase() ?? _relationType;
-        
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => SeparationDetailScreen(
-              separationData: item,
-              separationCount: separationCount,
-              relationshipId: relationshipId != null ? int.tryParse(relationshipId.toString()) : null,
-              relationType: pRel,
-              gender: pGen,
-            ),
-          ),
-        );
-      },
-      formatDateRange: _formatDateRange,
-      getDurationText: _getDurationText,
-      partnerName: _partnerName,
-      relationType: _relationType,
-      gender: _gender,
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Calendar View
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _CalendarView extends StatefulWidget {
-  final List<Map<String, dynamic>> separations;
-  final void Function(Map<String, dynamic>) onSeparationTap;
-  final String Function(dynamic, dynamic) formatDateRange;
-  final String Function(Map<String, dynamic>) getDurationText;
-  final String? partnerName;
-  final String? relationType;
-  final String? gender;
-
-  const _CalendarView({
-    required this.separations,
-    required this.onSeparationTap,
-    required this.formatDateRange,
-    required this.getDurationText,
-    this.partnerName,
-    this.relationType,
-    this.gender,
-  });
-
-  @override
-  State<_CalendarView> createState() => _CalendarViewState();
-}
-
-class _CalendarViewState extends State<_CalendarView>
-    with SingleTickerProviderStateMixin {
-  late DateTime _focusedMonth;
-  Map<String, dynamic>? _selectedSeparation;
-  DateTime? _selectedDay;
-
-  late AnimationController _monthController;
-  late Animation<double> _monthFade;
-  int _slideDirection = 1; // 1 = forward, -1 = backward
-
-  @override
-  void initState() {
-    super.initState();
-    _focusedMonth = DateTime(DateTime.now().year, DateTime.now().month);
-    _monthController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 320),
-    );
-    _monthFade = CurvedAnimation(
-      parent: _monthController,
-      curve: Curves.easeInOut,
-    );
-    _monthController.forward();
-
-    // Default focus on the most recent separation's month
-    if (widget.separations.isNotEmpty) {
-      try {
-        final recent = widget.separations.last;
-        final dt = DateTime.parse(recent['startDate'].toString());
-        _focusedMonth = DateTime(dt.year, dt.month);
-      } catch (_) {}
-    }
-  }
-
-  @override
-  void dispose() {
-    _monthController.dispose();
-    super.dispose();
-  }
-
-  void _changeMonth(int delta) {
-    _slideDirection = delta;
-    _monthController.reverse().then((_) {
-      setState(() {
-        _focusedMonth =
-            DateTime(_focusedMonth.year, _focusedMonth.month + delta);
-        _selectedDay = null;
-        _selectedSeparation = null;
-      });
-      _monthController.forward();
-    });
-  }
-
-  /// Returns the separation that contains this date, or null.
-  Map<String, dynamic>? _separationForDay(DateTime day) {
-    for (final sep in widget.separations) {
-      try {
-        final start =
-            DateTime.parse(sep['startDate'].toString()).toLocal();
-        final end =
-            DateTime.parse(sep['endDate'].toString()).toLocal();
-        final d = DateTime(day.year, day.month, day.day);
-        final s = DateTime(start.year, start.month, start.day);
-        final e = DateTime(end.year, end.month, end.day);
-        if (!d.isBefore(s) && !d.isAfter(e)) return sep;
-      } catch (_) {}
-    }
-    return null;
-  }
-
-  bool _isRangeStart(DateTime day) {
-    for (final sep in widget.separations) {
-      try {
-        final start =
-            DateTime.parse(sep['startDate'].toString()).toLocal();
-        if (DateTime(day.year, day.month, day.day) ==
-            DateTime(start.year, start.month, start.day)) { return true; }
-      } catch (_) {}
-    }
-    return false;
-  }
-
-  bool _isRangeEnd(DateTime day) {
-    for (final sep in widget.separations) {
-      try {
-        final end =
-            DateTime.parse(sep['endDate'].toString()).toLocal();
-        if (DateTime(day.year, day.month, day.day) ==
-            DateTime(end.year, end.month, end.day)) { return true; }
-      } catch (_) {}
-    }
-    return false;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final firstDay = DateTime(_focusedMonth.year, _focusedMonth.month, 1);
-    final daysInMonth =
-        DateTime(_focusedMonth.year, _focusedMonth.month + 1, 0).day;
-    final startWeekday = firstDay.weekday % 7; // Sun=0 ... Sat=6
-
-    final today = DateTime.now();
-
-    return Column(
-      children: [
-        // ── Month Navigator ──
-        Padding(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 24.0, vertical: 8.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _MonthNavButton(
-                icon: Icons.chevron_left,
-                onTap: () => _changeMonth(-1),
-              ),
-              Column(
-                children: [
-                  Text(
-                    DateFormat('MMMM').format(_focusedMonth).toUpperCase(),
-                    style: const TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
-                  Text(
-                    _focusedMonth.year.toString(),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF9E7E5A),
-                      letterSpacing: 2.0,
-                    ),
-                  ),
-                ],
-              ),
-              _MonthNavButton(
-                icon: Icons.chevron_right,
-                onTap: () => _changeMonth(1),
-              ),
-            ],
-          ),
-        ),
-
-        const SizedBox(height: 8),
-
-        // ── Weekday Labels ──
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0),
-          child: Row(
-            children: ['S', 'M', 'T', 'W', 'T', 'F', 'S']
-                .map((d) => Expanded(
-                      child: Center(
-                        child: Text(
-                          d,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1.5,
-                            color: Color(0xFF5A3C47),
-                          ),
-                        ),
-                      ),
-                    ))
-                .toList(),
-          ),
-        ),
-        const SizedBox(height: 8),
-
-        // ── Calendar Grid ──
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20.0),
-          child: FadeTransition(
-            opacity: _monthFade,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: Offset(_slideDirection * 0.08, 0),
-                end: Offset.zero,
-              ).animate(_monthFade),
-              child: _buildGrid(
-                  startWeekday, daysInMonth, firstDay, today),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 16),
-
-        // ── Separation Count Pill ──
-        _buildMonthSummary(),
-
-        const SizedBox(height: 12),
-
-        // ── Selected Card ──
-        if (_selectedSeparation != null)
-          Expanded(child: _buildSelectedCard(_selectedSeparation!))
-        else
-          Expanded(child: _buildCalendarEmptyHint()),
-      ],
-    );
-  }
-
-  Widget _buildGrid(
-      int startWeekday, int daysInMonth, DateTime firstDay, DateTime today) {
-    final totalCells = startWeekday + daysInMonth;
-    final rows = (totalCells / 7).ceil();
-
-    return Column(
-      children: List.generate(rows, (row) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 6.0),
-          child: Row(
-            children: List.generate(7, (col) {
-              final cellIndex = row * 7 + col;
-              final dayNum = cellIndex - startWeekday + 1;
-
-              if (dayNum < 1 || dayNum > daysInMonth) {
-                return const Expanded(child: SizedBox());
-              }
-
-              final day = DateTime(
-                  _focusedMonth.year, _focusedMonth.month, dayNum);
-              final sep = _separationForDay(day);
-              final isHighlighted = sep != null;
-              final isStart = _isRangeStart(day);
-              final isEnd = _isRangeEnd(day);
-              final isSelected = _selectedDay != null &&
-                  _selectedDay!.year == day.year &&
-                  _selectedDay!.month == day.month &&
-                  _selectedDay!.day == day.day;
-              final isToday = day.year == today.year &&
-                  day.month == today.month &&
-                  day.day == today.day;
-
-              return Expanded(
-                child: GestureDetector(
-                  onTap: isHighlighted
-                      ? () {
-                          setState(() {
-                            _selectedDay = day;
-                            _selectedSeparation = sep;
-                          });
-                        }
-                      : null,
-                  child: _DayCell(
-                    day: dayNum,
-                    isHighlighted: isHighlighted,
-                    isStart: isStart,
-                    isEnd: isEnd,
-                    isSelected: isSelected,
-                    isToday: isToday,
-                  ),
-                ),
-              );
-            }),
-          ),
-        );
-      }),
-    );
-  }
-
-  Widget _buildMonthSummary() {
-    int count = 0;
-    for (final sep in widget.separations) {
-      try {
-        final start =
-            DateTime.parse(sep['startDate'].toString()).toLocal();
-        final end =
-            DateTime.parse(sep['endDate'].toString()).toLocal();
-        // Check if any part of this separation overlaps with the focused month
-        final monthStart =
-            DateTime(_focusedMonth.year, _focusedMonth.month, 1);
-        final monthEnd =
-            DateTime(_focusedMonth.year, _focusedMonth.month + 1, 0);
-        if (!start.isAfter(monthEnd) && !end.isBefore(monthStart)) {
-          count++;
-        }
-      } catch (_) {}
-    }
-
-    if (count == 0) return const SizedBox.shrink();
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24.0),
-      padding:
-          const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1F0A13),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF3F1629), width: 1),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.favorite,
-              color: Color(0xFF8A2E55), size: 12),
-          const SizedBox(width: 8),
-          Text(
-            '$count separation${count == 1 ? '' : 's'} this month',
-            style: const TextStyle(
-              fontSize: 11,
-              color: Color(0xFF866571),
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSelectedCard(Map<String, dynamic> sep) {
-    final dateStr =
-        widget.formatDateRange(sep['startDate'], sep['endDate']);
-    final duration = widget.getDurationText(sep);
-    final reason = sep['reason'] ?? 'A space of quiet growth';
-
-    final totalSeps = widget.separations.length;
-    final index = widget.separations.indexOf(sep);
-    final separationCount = index != -1 ? totalSeps - index : null;
-
-    String partnerInfo = widget.partnerName != null ? 'With ${widget.partnerName}' : 'Shared Space';
-    if (widget.relationType == 'lovers' && widget.gender != null && widget.gender!.isNotEmpty) {
-      partnerInfo += ' • ${widget.gender!}';
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
-      child: GestureDetector(
-        onTap: () => widget.onSeparationTap(sep),
-        child: Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: const Color(0xFF1F0A13),
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: Container(
-              decoration: const BoxDecoration(
-                border: Border(
-                  left: BorderSide(color: Color(0xFF8A2E55), width: 4),
-                ),
-              ),
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      if (separationCount != null)
-                        Text(
-                          'SEPARATION #$separationCount',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 2.0,
-                            color: Color(0xFF8A2E55),
-                          ),
-                        ),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF3F1629),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Text(
-                          'TAP TO VIEW',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.5,
-                            color: Color(0xFF864A5C),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    dateStr,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 2.0,
-                      color: Color(0xFF866747),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      const Icon(Icons.people_outline, color: Color(0xFFDD8F9F), size: 14),
-                      const SizedBox(width: 8),
-                      Text(
-                        partnerInfo,
-                        style: const TextStyle(
-                          fontFamily: 'Georgia',
-                          fontSize: 14,
-                          fontStyle: FontStyle.italic,
-                          color: Color(0xFFDD8F9F),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    duration,
-                    style: const TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 26,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '"$reason"',
-                    style: const TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 14,
-                      fontStyle: FontStyle.italic,
-                      color: Color(0xFF866571),
-                      height: 1.4,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 16),
-                  const Row(
-                    children: [
-                      Icon(Icons.arrow_forward_ios,
-                          color: Color(0xFF4A343D), size: 12),
-                      SizedBox(width: 6),
-                      Text(
-                        'View full reflection',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF4A343D),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCalendarEmptyHint() {
-    if (widget.separations.isEmpty) {
-      return SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 24.0),
-        child: Container(
-          padding:
-              const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-          decoration: BoxDecoration(
-            color: const Color(0xFF160A0E),
-            borderRadius: BorderRadius.circular(24),
-            border:
-                Border.all(color: const Color(0xFF26151B), width: 1),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.calendar_today_outlined,
-                  color: Color(0xFF9E7E5A), size: 32),
-              const SizedBox(height: 14),
-              const Text(
-                'No separations recorded yet.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'Georgia',
-                  fontSize: 15,
-                  fontStyle: FontStyle.italic,
-                  color: Colors.white70,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Completed separations will be highlighted on the calendar.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFF866571),
-                  height: 1.4,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.touch_app_outlined,
-              color: Color(0xFF3F1629), size: 28),
-          const SizedBox(height: 10),
-          const Text(
-            'Tap a highlighted date\nto see its reflection',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontFamily: 'Georgia',
-              fontSize: 14,
-              fontStyle: FontStyle.italic,
-              color: Color(0xFF5A3C47),
-              height: 1.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Day Cell
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _DayCell extends StatelessWidget {
-  final int day;
-  final bool isHighlighted;
-  final bool isStart;
-  final bool isEnd;
-  final bool isSelected;
-  final bool isToday;
-
-  const _DayCell({
-    required this.day,
-    required this.isHighlighted,
-    required this.isStart,
-    required this.isEnd,
-    required this.isSelected,
-    required this.isToday,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Color? bgColor;
-    Color textColor = const Color(0xFF5A3C47);
-    Color? borderColor;
-
-    if (isSelected && isHighlighted) {
-      bgColor = const Color(0xFFDD8F9F);
-      textColor = Colors.white;
-    } else if (isStart || isEnd) {
-      bgColor = const Color(0xFF8A2E55);
-      textColor = Colors.white;
-    } else if (isHighlighted) {
-      bgColor = const Color(0xFF3F1629);
-      textColor = const Color(0xFFECAABB);
-    } else if (isToday) {
-      borderColor = const Color(0xFF9E7E5A);
-      textColor = const Color(0xFF9E7E5A);
-    } else {
-      textColor = const Color(0xFF5A3C47);
-    }
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      margin: const EdgeInsets.all(2),
-      height: 36,
-      decoration: BoxDecoration(
-        color: bgColor,
-        shape: BoxShape.circle,
-        border: borderColor != null
-            ? Border.all(color: borderColor, width: 1.2)
-            : null,
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        day.toString(),
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight:
-              (isHighlighted || isToday) ? FontWeight.w600 : FontWeight.normal,
-          color: textColor,
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Month Navigation Button
-// ─────────────────────────────────────────────────────────────────────────────
-
-class _MonthNavButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-
-  const _MonthNavButton({required this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: const Color(0xFF160A0E),
-          shape: BoxShape.circle,
-          border: Border.all(color: const Color(0xFF26151B), width: 1),
-        ),
-        child: Icon(icon, color: const Color(0xFF7A5C67), size: 20),
       ),
     );
   }

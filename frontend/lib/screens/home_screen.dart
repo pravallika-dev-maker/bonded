@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import '../widgets/premium_sheen.dart';
 import '../services/api_service.dart';
 import 'main_dashboard_screen.dart';
 
@@ -120,13 +121,57 @@ class _HomeScreenState extends State<HomeScreen>
       final response = await ApiService.getUserMe();
       final profile = response['data'] ?? response;
 
+      Map<String, dynamic>? heroResponse;
+      try {
+        heroResponse = await ApiService.getHomeHero();
+      } catch (_) {}
+
       if (mounted) {
         setState(() {
           _userName = profile['name'] ?? profile['userName'] ?? _userName;
-          _partnerName = profile['partnerName'] ?? _partnerName;
+          _partnerName = heroResponse?['partner_name'] ?? heroResponse?['partnerName'] ??
+              profile['partnerName'] ?? _partnerName;
         });
 
-        if (profile['isPartnerConnected'] == true) {
+        // Check partner connection from heroResponse first (preferred source of truth),
+        // then fall back to profile data — covering all possible field names the backend may use.
+        bool isPartnerConnected = false;
+        if (heroResponse != null) {
+          isPartnerConnected =
+              heroResponse['partner_connected'] == true ||
+              heroResponse['partnerConnected'] == true ||
+              heroResponse['is_partner_connected'] == true;
+        }
+        
+        // If they started a solo separation, they should also go to the dashboard
+        if (!isPartnerConnected) {
+          try {
+            final activeSep = await ApiService.getActiveSeparation().catchError((_) => null);
+            if (activeSep != null && (activeSep['is_active'] == true || activeSep['isActive'] == true || activeSep['status'] == 'active')) {
+              isPartnerConnected = true; // Force navigation to main dashboard
+            }
+          } catch (_) {}
+        }
+        
+        // Always also check from profile as a fallback
+        if (!isPartnerConnected) {
+          isPartnerConnected =
+              profile['isPartnerConnected'] == true ||
+              profile['is_partner_connected'] == true ||
+              profile['partner_connected'] == true ||
+              (profile['partner'] != null && profile['partner'] is Map);
+              
+          if (!isPartnerConnected) {
+            try {
+              final activeSep = await ApiService.getActiveSeparation().catchError((_) => null);
+              if (activeSep != null && (activeSep['is_active'] == true || activeSep['isActive'] == true || activeSep['status'] == 'active')) {
+                isPartnerConnected = true;
+              }
+            } catch (_) {}
+          }
+        }
+
+        if (isPartnerConnected) {
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (_) => MainDashboardScreen(
@@ -238,6 +283,7 @@ class _HomeScreenState extends State<HomeScreen>
                                   MaterialPageRoute(
                                     builder: (_) => MainDashboardScreen(
                                       userName: _userName,
+                                      isWaitingForPartner: true,
                                     ),
                                   ),
                                 );
@@ -456,10 +502,18 @@ class _SoulsConnectingCenterpiecePainter extends CustomPainter {
     final controlY = centerY + 12.0 * math.sin(time * 2 * math.pi * 0.35);
     path.quadraticBezierTo(controlX, controlY, orbBCenter.dx, orbBCenter.dy);
 
+    // Blurred glowing stroke beneath the solid stroke
+    final threadGlowPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0
+      ..color = const Color(0xFFCA366C).withOpacity(0.3)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0);
+    canvas.drawPath(path, threadGlowPaint);
+
     final threadPaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5
-      ..color = const Color(0xFF3D1627); // Dark/muted pink border color
+      ..color = const Color(0xFF5C233B); // Slightly brighter/warmer than before
     canvas.drawPath(path, threadPaint);
 
     // 2. Animate small connecting particles along the path
@@ -470,17 +524,42 @@ class _SoulsConnectingCenterpiecePainter extends CustomPainter {
         final currentT = (p.tOffset + time * p.speed) % 1.0;
         final pos = metric.getTangentForOffset(metric.length * currentT)?.position ?? Offset.zero;
         
+        // Comet trail effect
+        final trailT = (currentT - 0.05).clamp(0.0, 1.0);
+        final trailPos = metric.getTangentForOffset(metric.length * trailT)?.position ?? pos;
+        
         final double sparkleOpacity = (0.2 + 0.8 * math.sin(time * 2 * math.pi * 1.0 + p.tOffset).abs()).clamp(0.0, 1.0);
-        final particlePaint = Paint()
-          ..color = const Color(0xFFE89FB8).withOpacity(sparkleOpacity * 0.75);
+        
+        final trailPaint = Paint()
+          ..color = const Color(0xFFCA366C).withOpacity(sparkleOpacity * 0.4)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = p.size * 0.7
+          ..strokeCap = StrokeCap.round;
+        canvas.drawLine(trailPos, pos, trailPaint);
 
-        canvas.drawCircle(pos, p.size * 0.7, particlePaint);
+        final particlePaint = Paint()
+          ..color = const Color(0xFFFFFFFF).withOpacity(sparkleOpacity);
+
+        canvas.drawCircle(pos, p.size * 0.6, particlePaint);
+        
+        // Sparkle glow
+        canvas.drawCircle(pos, p.size * 1.5, Paint()..color = const Color(0xFFE89FB8).withOpacity(sparkleOpacity * 0.5)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.0));
       }
     }
 
     // 3. Draw Left Orb (User - Active/Connected state in onboarding style)
     final double radiusA = 22.0 + 1.5 * math.sin(time * 2 * math.pi * 0.5);
     
+    // Add soft breathing radial gradient glow behind it
+    final glowPaintA = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0xFFCA366C).withOpacity(0.4),
+          const Color(0xFFCA366C).withOpacity(0.0),
+        ],
+      ).createShader(Rect.fromCircle(center: orbACenter, radius: radiusA * 2.5));
+    canvas.drawCircle(orbACenter, radiusA * 2.5, glowPaintA);
+
     // Fill left orb with dark burgundy
     final fillPaintA = Paint()
       ..color = const Color(0xFF41182B)
@@ -494,34 +573,74 @@ class _SoulsConnectingCenterpiecePainter extends CustomPainter {
       ..strokeWidth = 2.0;
     canvas.drawCircle(orbACenter, radiusA, strokePaintA);
 
-    // Inner dot (representing active user presence)
-    final dotPaintA = Paint()
+    // Heart icon inside active user orb (using Path to avoid web font issues)
+    final double hw = 16.0;
+    final double hh = 16.0;
+    final Path heartPath = Path();
+    heartPath.moveTo(0, hh * 0.35);
+    heartPath.cubicTo(0, 0, hw * 0.5, 0, hw * 0.5, hh * 0.35);
+    heartPath.cubicTo(hw * 0.5, 0, hw, 0, hw, hh * 0.35);
+    heartPath.cubicTo(hw, hh * 0.7, hw * 0.5, hh * 0.9, hw * 0.5, hh);
+    heartPath.cubicTo(hw * 0.5, hh * 0.9, 0, hh * 0.7, 0, hh * 0.35);
+    heartPath.close();
+
+    final Paint heartFillPaint = Paint()
       ..color = const Color(0xFFE89FB8)
       ..style = PaintingStyle.fill;
-    canvas.drawCircle(orbACenter, 5.0, dotPaintA);
+      
+    canvas.save();
+    canvas.translate(orbACenter.dx - hw / 2, orbACenter.dy - hh / 2 - 2); // Shifted slightly up for visual center
+    canvas.drawPath(heartPath, heartFillPaint);
+    canvas.restore();
 
     // 4. Draw Right Orb (Waiting Partner - Muted/Outline state in onboarding style)
-    final double radiusB = 20.0;
+    final double radiusB = 20.0 + 1.0 * math.sin(time * 2 * math.pi * 0.8);
     
-    // Fill right orb with deep black-burgundy (waiting state)
+    // Pulsating empty glow instead of flat dark fill
+    final glowPaintB = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0xFFE89FB8).withOpacity(0.15 + 0.1 * math.sin(time * 2 * math.pi * 0.8)),
+          const Color(0xFFE89FB8).withOpacity(0.0),
+        ],
+      ).createShader(Rect.fromCircle(center: orbBCenter, radius: radiusB * 2.5));
+    canvas.drawCircle(orbBCenter, radiusB * 2.5, glowPaintB);
+
     final fillPaintB = Paint()
       ..color = const Color(0xFF180710)
       ..style = PaintingStyle.fill;
     canvas.drawCircle(orbBCenter, radiusB, fillPaintB);
 
-    // Border of right orb (muted border)
     final strokePaintB = Paint()
-      ..color = const Color(0xFF3D1627)
+      ..color = const Color(0xFFE89FB8).withOpacity(0.4 + 0.2 * math.sin(time * 2 * math.pi * 0.8))
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
     canvas.drawCircle(orbBCenter, radiusB, strokePaintB);
     
-    // Draw a small waiting dot or keep empty. Let's make it a small hollow inner circle
+    // Draw a rippling inner circle
+    final double rippleRadius = 4.0 + 8.0 * ((time * 0.8) % 1.0);
+    final double rippleOpacity = 1.0 - ((time * 0.8) % 1.0);
     final innerStrokePaintB = Paint()
-      ..color = const Color(0xFF2E1620)
+      ..color = const Color(0xFFE89FB8).withOpacity(0.6 * rippleOpacity)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
-    canvas.drawCircle(orbBCenter, 6.0, innerStrokePaintB);
+    canvas.drawCircle(orbBCenter, rippleRadius, innerStrokePaintB);
+
+    // Heart outline icon inside waiting partner orb
+    final heartPainterB = TextPainter(
+      text: TextSpan(
+        text: String.fromCharCode(Icons.favorite_border.codePoint),
+        style: TextStyle(
+          fontSize: 18,
+          fontFamily: Icons.favorite_border.fontFamily,
+          package: Icons.favorite_border.fontPackage,
+          color: const Color(0xFFE89FB8).withOpacity(0.6),
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    heartPainterB.layout();
+    heartPainterB.paint(canvas, Offset(orbBCenter.dx - heartPainterB.width / 2, orbBCenter.dy - heartPainterB.height / 2));
   }
 
   @override
@@ -737,58 +856,75 @@ class _WaitingCardState extends State<_WaitingCard>
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _floatController,
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E0E14),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: const Color(0xFF331C24),
+            width: 1.2,
+          ),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFF180710),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: const Color(0xFF3D1627),
+                  width: 1.2,
+                ),
+              ),
+              alignment: Alignment.center,
+              child: const Text(
+                '⏳',
+                style: TextStyle(fontSize: 20),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Waiting for ${widget.partnerName}',
+                    style: const TextStyle(
+                      fontFamily: 'Georgia',
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Your shared world will unlock once they accept.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF7B5C66),
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            const _ActivityIndicator(),
+          ],
+        ),
+      ),
       builder: (context, child) {
         final floatY = math.sin(_floatController.value * 2 * math.pi) * 3.0;
 
         return Transform.translate(
           offset: Offset(0, floatY),
-          child: Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E0E14),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: const Color(0xFF331C24),
-                width: 1.2,
-              ),
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                const _HourglassParticles(),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Waiting for ${widget.partnerName}',
-                        style: const TextStyle(
-                          fontFamily: 'Georgia',
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        'Your shared world will unlock once they accept.',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF7B5C66),
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-                const _ActivityIndicator(),
-              ],
-            ),
-          ),
+          child: child,
         );
       },
     );
@@ -852,8 +988,14 @@ class _HourglassPainter extends CustomPainter {
       ..color = const Color(0xFF331C24);
     canvas.drawCircle(Offset(cx, cy), w / 2, ringPaint);
 
+    final frameGlowPaint = Paint()
+      ..color = const Color(0xFFCA366C).withOpacity(0.2 + 0.1 * math.sin(progress * 2 * math.pi))
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4.0
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.0);
+
     final framePaint = Paint()
-      ..color = const Color(0xFF7B5C66)
+      ..color = const Color(0xFFE89FB8).withOpacity(0.6)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
     
@@ -865,22 +1007,36 @@ class _HourglassPainter extends CustomPainter {
       ..lineTo(cx - 10, cy + 14)
       ..lineTo(cx - 2, cy)
       ..close();
+    
+    canvas.drawPath(glassPath, frameGlowPaint);
     canvas.drawPath(glassPath, framePaint);
 
     canvas.drawLine(Offset(cx - 12, cy - 14), Offset(cx + 12, cy - 14), framePaint);
     canvas.drawLine(Offset(cx - 12, cy + 14), Offset(cx + 12, cy + 14), framePaint);
 
-    final sandColor = const Color(0xFF974967);
+    final sandColor = const Color(0xFFE89FB8);
     final sandPaint = Paint()..color = sandColor;
 
     final double streamProgress = (progress * 3) % 1.0;
     for (double y = cy - 10; y < cy + 12; y += 3) {
       final double offset = (y - (cy - 10)) / 22.0;
       final double alpha = math.sin((offset + streamProgress) * math.pi);
+      
+      final particlePos = Offset(cx + 0.8 * math.sin(y * 2.0 + progress * 10.0), y);
+      
+      // Glow for falling sand
       canvas.drawCircle(
-        Offset(cx + 0.5 * math.sin(y * 2.0 + progress * 10.0), y),
+        particlePos,
+        1.5,
+        Paint()
+          ..color = sandColor.withOpacity(0.4 * alpha)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5)
+      );
+
+      canvas.drawCircle(
+        particlePos,
         0.8,
-        sandPaint..color = sandColor.withOpacity((0.3 + 0.7 * alpha).clamp(0.0, 1.0)),
+        sandPaint..color = Colors.white.withOpacity((0.3 + 0.7 * alpha).clamp(0.0, 1.0)),
       );
     }
 
@@ -893,7 +1049,7 @@ class _HourglassPainter extends CustomPainter {
       ..close();
     canvas.drawPath(
       topSandPath,
-      Paint()..color = sandColor.withOpacity(0.35)..style = PaintingStyle.fill,
+      Paint()..color = sandColor.withOpacity(0.5)..style = PaintingStyle.fill,
     );
 
     final double bottomHeight = 10 * (progress % 1.0);
@@ -903,15 +1059,33 @@ class _HourglassPainter extends CustomPainter {
       ..lineTo(cx + 8 * (progress % 1.0), cy + 14 - bottomHeight)
       ..lineTo(cx - 8 * (progress % 1.0), cy + 14 - bottomHeight)
       ..close();
+    
+    // Bottom sand glow
     canvas.drawPath(
       bottomSandPath,
-      Paint()..color = sandColor.withOpacity(0.45)..style = PaintingStyle.fill,
+      Paint()
+        ..color = const Color(0xFFCA366C).withOpacity(0.3)
+        ..style = PaintingStyle.fill
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0),
+    );
+
+    canvas.drawPath(
+      bottomSandPath,
+      Paint()..color = sandColor.withOpacity(0.6)..style = PaintingStyle.fill,
     );
 
     canvas.drawCircle(
       Offset(cx, cy + 11),
       4.0 * (progress % 1.0),
-      Paint()..color = sandColor..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.0),
+      Paint()
+        ..color = sandColor
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.0),
+    );
+
+    canvas.drawCircle(
+      Offset(cx, cy + 11),
+      4.0 * (progress % 1.0),
+      Paint()..color = Colors.white.withOpacity(0.8),
     );
   }
 
@@ -982,17 +1156,39 @@ class _ActivityPainter extends CustomPainter {
     path.lineTo(w * 0.75, cy);
     path.lineTo(w, cy);
 
+    // Thicker, blurred glowing stroke
+    final pulseOpacity = (0.3 + 0.7 * math.sin(progress * 2 * math.pi)).clamp(0.0, 1.0);
+    final glowPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3.0
+      ..color = const Color(0xFFCA366C).withOpacity(0.4 * pulseOpacity)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.0);
+    canvas.drawPath(path, glowPaint);
+
     final linePaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5
-      ..color = const Color(0xFF974967);
+      ..color = const Color(0xFFE89FB8).withOpacity(0.5 + 0.5 * pulseOpacity);
     canvas.drawPath(path, linePaint);
 
-    final double starProgress = progress * 2 * math.pi;
-    final dotPaint = Paint()
-      ..color = const Color(0xFFE89FB8).withOpacity(0.3 + 0.7 * math.sin(starProgress).abs());
-    
-    canvas.drawCircle(Offset(w * 0.5, cy + 3.0 * math.sin(starProgress)), 1.5, dotPaint);
+    // The Moving Signal (glowing spark)
+    final pathMetrics = path.computeMetrics().toList();
+    if (pathMetrics.isNotEmpty) {
+      final metric = pathMetrics.first;
+      final currentT = progress % 1.0;
+      final pos = metric.getTangentForOffset(metric.length * currentT)?.position ?? Offset(w * 0.5, cy);
+      
+      // Spark aura
+      final sparkAuraPaint = Paint()
+        ..color = const Color(0xFFCA366C).withOpacity(0.8)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0);
+      canvas.drawCircle(pos, 3.5, sparkAuraPaint);
+
+      // Spark core
+      final sparkCorePaint = Paint()
+        ..color = Colors.white;
+      canvas.drawCircle(pos, 1.5, sparkCorePaint);
+    }
   }
 
   @override
@@ -1185,8 +1381,12 @@ class _OnboardingStyleCTAButtonState extends State<_OnboardingStyleCTAButton> {
       child: AnimatedScale(
         scale: _scale,
         duration: const Duration(milliseconds: 100),
-        child: Container(
-          width: double.infinity,
+        child: PremiumSheen(
+          animationDuration: const Duration(milliseconds: 1500),
+          pauseDuration: const Duration(seconds: 8),
+          sheenOpacity: 0.15,
+          child: Container(
+            width: double.infinity,
           height: 54,
           decoration: BoxDecoration(
             color: const Color(0xFF1A1214),
@@ -1218,6 +1418,7 @@ class _OnboardingStyleCTAButtonState extends State<_OnboardingStyleCTAButton> {
               ),
             ],
           ),
+        ),
         ),
       ),
     );

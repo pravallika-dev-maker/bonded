@@ -3,31 +3,70 @@ import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 import 'join_with_code_screen.dart';
 import 'promise_screen.dart';
+import 'home_screen.dart';
 import '../services/api_service.dart';
 
 class PartnerInviteScreen extends StatefulWidget {
   final String userName;
   final String partnerName;
+  final bool fromDashboard;
   const PartnerInviteScreen({
     super.key,
     required this.userName,
     required this.partnerName,
+    this.fromDashboard = false,
   });
 
   @override
   State<PartnerInviteScreen> createState() => _PartnerInviteScreenState();
 }
 
-class _PartnerInviteScreenState extends State<PartnerInviteScreen> {
+class _PartnerInviteScreenState extends State<PartnerInviteScreen> with TickerProviderStateMixin {
   String? _bondCode;
   bool _shared = false; // inline confirmation flag
   bool _isLoading = true;
   String _errorMessage = '';
 
+  late AnimationController _entranceController;
+  late Animation<double> _fadeAnim1;
+  late Animation<double> _fadeAnim2;
+  late Animation<double> _fadeAnim3;
+  late Animation<double> _slideAnim1;
+  late Animation<double> _slideAnim2;
+
   @override
   void initState() {
     super.initState();
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+
+    _fadeAnim1 = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _entranceController, curve: const Interval(0.1, 0.6, curve: Curves.easeOut)),
+    );
+    _fadeAnim2 = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _entranceController, curve: const Interval(0.3, 0.8, curve: Curves.easeOut)),
+    );
+    _fadeAnim3 = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _entranceController, curve: const Interval(0.5, 1.0, curve: Curves.easeOut)),
+    );
+
+    _slideAnim1 = Tween<double>(begin: 30, end: 0).animate(
+      CurvedAnimation(parent: _entranceController, curve: const Interval(0.1, 0.6, curve: Curves.easeOutCubic)),
+    );
+    _slideAnim2 = Tween<double>(begin: 20, end: 0).animate(
+      CurvedAnimation(parent: _entranceController, curve: const Interval(0.3, 0.8, curve: Curves.easeOutCubic)),
+    );
+
+    _entranceController.forward();
     _fetchInviteCode();
+  }
+
+  @override
+  void dispose() {
+    _entranceController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchInviteCode() async {
@@ -66,17 +105,31 @@ class _PartnerInviteScreenState extends State<PartnerInviteScreen> {
     await Future.delayed(const Duration(milliseconds: 1500));
     if (!mounted) return;
 
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 600),
-        pageBuilder: (_, __, ___) => PromiseScreen(
-          userName: widget.userName,
-          partnerName: widget.partnerName,
+    if (widget.fromDashboard) {
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          transitionDuration: const Duration(milliseconds: 600),
+          pageBuilder: (_, __, ___) => HomeScreen(
+            userName: widget.userName,
+            partnerName: widget.partnerName,
+          ),
+          transitionsBuilder: (_, anim, __, child) =>
+              FadeTransition(opacity: anim, child: child),
         ),
-        transitionsBuilder: (_, anim, __, child) =>
-            FadeTransition(opacity: anim, child: child),
-      ),
-    );
+      );
+    } else {
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          transitionDuration: const Duration(milliseconds: 600),
+          pageBuilder: (_, __, ___) => PromiseScreen(
+            userName: widget.userName,
+            partnerName: widget.partnerName,
+          ),
+          transitionsBuilder: (_, anim, __, child) =>
+              FadeTransition(opacity: anim, child: child),
+        ),
+      );
+    }
   }
 
   @override
@@ -110,168 +163,203 @@ class _PartnerInviteScreenState extends State<PartnerInviteScreen> {
                   const Spacer(flex: 2),
 
                   // ── Step Label ──
-                  const Text(
-                    'STEP 7 OF 7 — THE INVITATION',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 2.0,
-                      color: Color(0xFF8A6530),
+                  if (!widget.fromDashboard) ...[
+                    const Text(
+                      'STEP 7 OF 7 — THE INVITATION',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 2.0,
+                        color: Color(0xFF8A6530),
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 24),
+                  ],
 
-                  const SizedBox(height: 24),
-
-                  // ── Title ──
-                  const Text(
-                    'Invite your',
-                    style: TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 40,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      height: 1.1,
+                  // ── Title & Subtitle ──
+                  AnimatedBuilder(
+                    animation: _entranceController,
+                    builder: (context, child) => Opacity(
+                      opacity: _fadeAnim1.value,
+                      child: Transform.translate(
+                        offset: Offset(0, _slideAnim1.value),
+                        child: child,
+                      ),
                     ),
-                  ),
-                  const Text(
-                    'person',
-                    style: TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 40,
-                      fontWeight: FontWeight.bold,
-                      fontStyle: FontStyle.italic,
-                      color: Color(0xFFE89FB8),
-                      height: 1.1,
-                    ),
-                  ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.fromDashboard ? 'Invite them' : 'Invite your',
+                          style: const TextStyle(
+                            fontFamily: 'Georgia',
+                            fontSize: 40,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            height: 1.1,
+                          ),
+                        ),
+                        Text(
+                          widget.fromDashboard ? 'in' : 'person',
+                          style: const TextStyle(
+                            fontFamily: 'Georgia',
+                            fontSize: 40,
+                            fontWeight: FontWeight.bold,
+                            fontStyle: FontStyle.italic,
+                            color: Color(0xFFE89FB8),
+                            height: 1.1,
+                          ),
+                        ),
 
-                  const SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
-                  // ── Subtitle ──
-                  const Text(
-                    'Share this code. When they enter it,\nyou\'re quietly, privately connected.',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF5E3A4B),
-                      height: 1.55,
+                        // ── Subtitle ──
+                        Text(
+                          widget.fromDashboard
+                              ? 'Share this code to bring your partner into your space. Once they enter it, your journey together begins.'
+                              : 'Share this code. When they enter it,\nyou\'re quietly, privately connected.',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF5E3A4B),
+                            height: 1.55,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
 
                   const Spacer(flex: 2),
 
                   // ── Bond Code Box ──
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 28),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF180710),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: const Color(0xFF3D1627),
-                        width: 1.2,
+                  AnimatedBuilder(
+                    animation: _entranceController,
+                    builder: (context, child) => Opacity(
+                      opacity: _fadeAnim2.value,
+                      child: Transform.translate(
+                        offset: Offset(0, _slideAnim2.value),
+                        child: child,
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF911746).withOpacity(0.08),
-                          blurRadius: 32,
-                          spreadRadius: 4,
-                        ),
-                      ],
                     ),
-                    child: _isLoading
-                        ? const Center(
-                            child: SizedBox(
-                              width: 32,
-                              height: 32,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.5,
-                                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE89FB8)),
-                              ),
-                            ),
-                          )
-                        : _errorMessage.isNotEmpty
-                            ? Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                                  child: Text(
-                                    _errorMessage,
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontFamily: 'Georgia',
-                                      fontSize: 14,
-                                      fontStyle: FontStyle.italic,
-                                      color: Color(0xFFB55D6A),
-                                    ),
-                                  ),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 28),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF180710),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: const Color(0xFF3D1627),
+                          width: 1.2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF911746).withOpacity(0.08),
+                            blurRadius: 32,
+                            spreadRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: _isLoading
+                          ? const Center(
+                              child: SizedBox(
+                                width: 32,
+                                height: 32,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFE89FB8)),
                                 ),
-                              )
-                            : Column(
-                                children: [
-                                  // The code in big spaced letters
-                                  Text(
-                                    _bondCode ?? '',
-                                    style: const TextStyle(
-                                      fontFamily: 'Georgia',
-                                      fontSize: 36,
-                                      fontWeight: FontWeight.bold,
-                                      color: Color(0xFFE89FB8),
-                                      letterSpacing: 4,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  // Sub-label
-                                  const Text(
-                                    'YOUR BOND CODE  ·  24 HOURS',
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 2.0,
-                                      color: Color(0xFF5E3A4B),
-                                    ),
-                                  ),
-                                ],
                               ),
+                            )
+                          : _errorMessage.isNotEmpty
+                              ? Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                                    child: Text(
+                                      _errorMessage,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontFamily: 'Georgia',
+                                        fontSize: 14,
+                                        fontStyle: FontStyle.italic,
+                                        color: Color(0xFFB55D6A),
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Column(
+                                  children: [
+                                    // The code in big spaced letters
+                                    Text(
+                                      _bondCode ?? '',
+                                      style: const TextStyle(
+                                        fontFamily: 'Georgia',
+                                        fontSize: 36,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFFE89FB8),
+                                        letterSpacing: 4,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    // Sub-label
+                                    const Text(
+                                      'YOUR BOND CODE  ·  24 HOURS',
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 2.0,
+                                        color: Color(0xFF5E3A4B),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                    ),
                   ),
 
                   const Spacer(flex: 2),
 
                   // ── Share Button ──
-                  GestureDetector(
-                    onTap: (_isLoading || _bondCode == null) ? null : _shareCode,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: double.infinity,
-                      height: 54,
-                      decoration: BoxDecoration(
-                        color: _shared ? const Color(0xFF0C1F15) : const Color(0xFF1A1214).withOpacity((_isLoading || _bondCode == null) ? 0.5 : 1.0),
-                        borderRadius: BorderRadius.circular(27),
-                        border: Border.all(
-                          color: _shared 
-                              ? const Color(0xFF194D2C) 
-                              : const Color(0xFF911746).withOpacity(0.5),
-                          width: 1.2,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            _shared ? Icons.check : Icons.ios_share_outlined,
-                            size: 18,
-                            color: _shared ? const Color(0xFF5DB373) : const Color(0xFFDD8F9F),
+                  AnimatedBuilder(
+                    animation: _entranceController,
+                    builder: (context, child) => Opacity(
+                      opacity: _fadeAnim3.value,
+                      child: child,
+                    ),
+                    child: GestureDetector(
+                      onTap: (_isLoading || _bondCode == null) ? null : _shareCode,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: double.infinity,
+                        height: 54,
+                        decoration: BoxDecoration(
+                          color: _shared ? const Color(0xFF0C1F15) : const Color(0xFF1A1214).withOpacity((_isLoading || _bondCode == null) ? 0.5 : 1.0),
+                          borderRadius: BorderRadius.circular(27),
+                          border: Border.all(
+                            color: _shared 
+                                ? const Color(0xFF194D2C) 
+                                : const Color(0xFF911746).withOpacity(0.5),
+                            width: 1.2,
                           ),
-                          const SizedBox(width: 12),
-                          Text(
-                            _shared ? 'Sent… waiting for them' : 'Share this code',
-                            style: TextStyle(
-                              fontFamily: 'Georgia',
-                              fontSize: 15,
-                              fontStyle: FontStyle.italic,
-                              letterSpacing: 0.5,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _shared ? Icons.check : Icons.ios_share_outlined,
+                              size: 18,
                               color: _shared ? const Color(0xFF5DB373) : const Color(0xFFDD8F9F),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 12),
+                            Text(
+                              _shared ? 'Sent… waiting for them' : 'Share this code',
+                              style: TextStyle(
+                                fontFamily: 'Georgia',
+                                fontSize: 15,
+                                fontStyle: FontStyle.italic,
+                                letterSpacing: 0.5,
+                                color: _shared ? const Color(0xFF5DB373) : const Color(0xFFDD8F9F),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -329,12 +417,12 @@ class _PartnerInviteScreenState extends State<PartnerInviteScreen> {
                   const Spacer(flex: 1),
 
                   // ── Bottom Label ──
-                  const Center(
+                  Center(
                     child: Padding(
-                      padding: EdgeInsets.only(bottom: 12.0),
+                      padding: const EdgeInsets.only(bottom: 12.0),
                       child: Text(
-                        'PARTNER INVITE',
-                        style: TextStyle(
+                        widget.fromDashboard ? 'CONNECT SPACE' : 'PARTNER INVITE',
+                        style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 2.5,

@@ -13,14 +13,15 @@ class NewSeparationScreen extends StatefulWidget {
 }
 
 class _NewSeparationScreenState extends State<NewSeparationScreen> {
-  String _selectedDuration = 'A few days';
+  String _selectedDuration = '1 Week';
   DateTime _selectedDate = DateTime.now();
+  DateTime? _customEndDate;
   bool _isAgreed = false;
   final TextEditingController _reasonController = TextEditingController();
   bool _isLoading = false;
   String _errorMessage = '';
 
-  final List<String> _durations = ['A few days', 'A week', 'Longer', 'Custom'];
+  final List<String> _durations = ['1 Week', '2 Weeks', '1 Month', 'Custom'];
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
@@ -46,6 +47,37 @@ class _NewSeparationScreenState extends State<NewSeparationScreen> {
     if (picked != null && picked != _selectedDate) {
       setState(() {
         _selectedDate = picked;
+        if (_customEndDate != null && _customEndDate!.isBefore(_selectedDate.add(const Duration(days: 1)))) {
+          _customEndDate = _selectedDate.add(const Duration(days: 7));
+        }
+      });
+    }
+  }
+
+  Future<void> _selectEndDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _customEndDate ?? _selectedDate.add(const Duration(days: 7)),
+      firstDate: _selectedDate.add(const Duration(days: 1)),
+      lastDate: _selectedDate.add(const Duration(days: 365 * 5)),
+      builder: (context, child) {
+        return Theme(
+          data: ThemeData.dark().copyWith(
+            colorScheme: const ColorScheme.dark(
+              primary: Color(0xFF8A2E55),
+              onPrimary: Colors.white,
+              surface: Color(0xFF160B10),
+              onSurface: Colors.white,
+            ),
+            dialogBackgroundColor: const Color(0xFF090204),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        _customEndDate = picked;
       });
     }
   }
@@ -59,8 +91,15 @@ class _NewSeparationScreenState extends State<NewSeparationScreen> {
     });
 
     try {
+      String durationLabelToSubmit = _selectedDuration;
+      if (_selectedDuration == 'Custom') {
+        final end = _customEndDate ?? _selectedDate.add(const Duration(days: 7));
+        final diff = end.difference(_selectedDate).inDays + 1;
+        durationLabelToSubmit = '$diff Days';
+      }
+
       await ApiService.createSeparation(
-        durationLabel: _selectedDuration,
+        durationLabel: durationLabelToSubmit,
         startDate: _selectedDate.toIso8601String(),
         reason: _reasonController.text.trim(),
       );
@@ -104,6 +143,9 @@ class _NewSeparationScreenState extends State<NewSeparationScreen> {
     final dateStr = isToday
         ? 'Today — ${DateFormat('MMMM d').format(_selectedDate)}'
         : DateFormat('MMMM d, yyyy').format(_selectedDate);
+
+    final endDateToUse = _customEndDate ?? _selectedDate.add(const Duration(days: 7));
+    final endStr = DateFormat('MMMM d, yyyy').format(endDateToUse);
 
     return Theme(
       data: Theme.of(context).copyWith(
@@ -287,11 +329,15 @@ class _NewSeparationScreenState extends State<NewSeparationScreen> {
                               spacing: 12,
                               runSpacing: 12,
                               children: _durations.map((duration) {
-                                final isSelected = _selectedDuration == duration;
+                                final bool isSelected = _selectedDuration == duration;
+
                                 return GestureDetector(
                                   onTap: () {
                                     setState(() {
                                       _selectedDuration = duration;
+                                      if (duration == 'Custom' && _customEndDate == null) {
+                                        _customEndDate = _selectedDate.add(const Duration(days: 7));
+                                      }
                                     });
                                   },
                                   child: AnimatedContainer(
@@ -357,6 +403,46 @@ class _NewSeparationScreenState extends State<NewSeparationScreen> {
                               ),
                             ),
                             const SizedBox(height: 40),
+
+                            if (_selectedDuration == 'Custom') ...[
+                              // ── End Date Section ──
+                              const _SectionHeader(title: 'WHEN DOES THIS END?'),
+                              const SizedBox(height: 16),
+                              GestureDetector(
+                                onTap: () => _selectEndDate(context),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF160A0E),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: const Color(0xFF2E1620),
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Text(
+                                        endStr,
+                                        style: const TextStyle(
+                                          fontFamily: 'Georgia',
+                                          fontSize: 17,
+                                          fontStyle: FontStyle.italic,
+                                          color: Color(0xFFD4C4CA),
+                                        ),
+                                      ),
+                                      const Icon(
+                                        Icons.calendar_today_outlined,
+                                        color: Color(0xFF7A5C67),
+                                        size: 20,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 40),
+                            ],
 
                             // ── Reason Section ──
                             const _SectionHeader(title: 'WHY DOES THIS MATTER TO YOU?'),

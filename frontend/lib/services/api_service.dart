@@ -7,6 +7,8 @@ import '../config/api_config.dart';
 class ApiService {
   static const String _tokenKey = 'auth_token';
   static const String _partnerNameKey = 'partner_name';
+  static const String _userNameKey = 'user_name';
+  static const String _isPartnerConnectedKey = 'is_partner_connected';
 
   /// Gets the stored auth token
   static Future<String?> getToken() async {
@@ -25,6 +27,8 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_partnerNameKey);
+    await prefs.remove(_userNameKey);
+    await prefs.remove(_isPartnerConnectedKey);
   }
 
   /// Gets the cached partner name
@@ -37,6 +41,30 @@ class ApiService {
   static Future<void> setPartnerName(String name) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_partnerNameKey, name);
+  }
+
+  /// Gets the cached user name
+  static Future<String?> getUserName() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_userNameKey);
+  }
+
+  /// Caches the user name
+  static Future<void> setUserName(String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_userNameKey, name);
+  }
+
+  /// Gets the cached connection status
+  static Future<bool> getIsPartnerConnected() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_isPartnerConnectedKey) ?? false;
+  }
+
+  /// Caches the connection status
+  static Future<void> setIsPartnerConnected(bool isConnected) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_isPartnerConnectedKey, isConnected);
   }
 
   /// Sends a verification code to the provided country code and phone number.
@@ -95,14 +123,14 @@ class ApiService {
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         // Try to find token in response and save it
-        print('API_DEBUG verifyCode - Response data: $responseData');
+        debugPrint('API_DEBUG verifyCode - Response data: $responseData');
         final token = responseData['token'] ?? responseData['accessToken'] ?? responseData['access_token'];
-        print('API_DEBUG verifyCode - Extracted token: $token');
+        debugPrint('API_DEBUG verifyCode - Extracted token: $token');
         if (token != null && token is String) {
           await setToken(token);
-          print('API_DEBUG verifyCode - Token saved successfully');
+          debugPrint('API_DEBUG verifyCode - Token saved successfully');
         } else {
-          print('API_DEBUG verifyCode - Warning: Token was null or not a String!');
+          debugPrint('API_DEBUG verifyCode - Warning: Token was null or not a String!');
         }
         return responseData;
       } else {
@@ -134,6 +162,33 @@ class ApiService {
         return decoded.map((e) => Map<String, dynamic>.from(e)).toList();
       } else {
         throw Exception('Failed to load past reflections');
+      }
+    } catch (e) {
+      throw Exception('Network error: ${e.toString()}');
+    }
+  }
+
+  /// Fetches the user's mood history for the calendar view.
+  static Future<List<Map<String, dynamic>>> getMoodHistory() async {
+    try {
+      final token = await getToken();
+      final headers = {
+        'accept': 'application/json',
+      };
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+
+      final response = await http.get(
+        Uri.parse('${ApiConfig.moods}history'),
+        headers: headers,
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final List<dynamic> decoded = jsonDecode(response.body);
+        return decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+      } else {
+        throw Exception('Failed to load mood history');
       }
     } catch (e) {
       throw Exception('Network error: ${e.toString()}');
@@ -238,6 +293,59 @@ class ApiService {
     }
   }
 
+  /// Disconnects from the current partner.
+  static Future<void> disconnectPartner() async {
+    try {
+      final token = await getToken();
+      if (token == null) throw Exception('Not authenticated');
+
+      final response = await http.delete(
+        Uri.parse(ApiConfig.disconnectPartner),
+        headers: {
+          'accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final decoded = jsonDecode(response.body);
+        throw Exception(decoded['detail'] ?? decoded['message'] ?? 'Failed to disconnect partner');
+      }
+
+      // Clear local partner caching
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_partnerNameKey);
+    } catch (e) {
+      throw Exception('Network error: ${e.toString()}');
+    }
+  }
+
+  /// Deletes the user account permanently.
+  static Future<void> deleteAccount() async {
+    try {
+      final token = await getToken();
+      if (token == null) throw Exception('Not authenticated');
+
+      final response = await http.delete(
+        Uri.parse(ApiConfig.userMe),
+        headers: {
+          'accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      );
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        final decoded = jsonDecode(response.body);
+        throw Exception(decoded['detail'] ?? decoded['message'] ?? 'Failed to delete account');
+      }
+
+      // Clear local token and partner caching
+      await clearToken();
+    } catch (e) {
+      throw Exception('Network error: ${e.toString()}');
+    }
+  }
+
   /// Creates a new separation.
   static Future<Map<String, dynamic>> createSeparation({
     required String durationLabel,
@@ -280,14 +388,14 @@ class ApiService {
   static Future<Map<String, dynamic>?> getActiveSeparation() async {
     try {
       final token = await getToken();
-      print('API_DEBUG getActiveSeparation - Retrieved token: $token');
+      debugPrint('API_DEBUG getActiveSeparation - Retrieved token: $token');
       final headers = {
         'accept': 'application/json',
       };
       if (token != null) {
         headers['Authorization'] = 'Bearer $token';
       }
-      print('API_DEBUG getActiveSeparation - Headers: $headers');
+      debugPrint('API_DEBUG getActiveSeparation - Headers: $headers');
 
       final response = await http.get(
         Uri.parse(ApiConfig.activeSeparation),
@@ -333,6 +441,34 @@ class ApiService {
         return responseData;
       } else {
         throw Exception(responseData['message'] ?? 'Failed to end separation');
+      }
+    } catch (e) {
+      throw Exception('Network error: ${e.toString()}');
+    }
+  }
+
+  /// Secret Developer Tool: Time travels the active separation to end today
+  static Future<Map<String, dynamic>> timeTravelSeparation() async {
+    try {
+      final token = await getToken();
+      final headers = {
+        'accept': 'application/json',
+      };
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+
+      final response = await http.post(
+        Uri.parse('${ApiConfig.separations}time-travel'),
+        headers: headers,
+      );
+
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return responseData;
+      } else {
+        throw Exception(responseData['message'] ?? 'Failed to time travel');
       }
     } catch (e) {
       throw Exception('Network error: ${e.toString()}');
@@ -489,7 +625,7 @@ class ApiService {
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return responseData;
       } else {
-        throw Exception(responseData['message'] ?? 'Failed to get today question');
+        throw Exception(responseData['detail'] ?? responseData['message'] ?? 'Failed to get today question');
       }
     } catch (e) {
       throw Exception('Network error: ${e.toString()}');
@@ -550,7 +686,8 @@ class ApiService {
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return responseData;
       } else {
-        throw Exception(responseData['message'] ?? 'Failed to submit answer');
+        final errorMsg = responseData['detail'] ?? responseData['message'] ?? 'Failed to submit answer';
+        throw Exception(errorMsg);
       }
     } catch (e) {
       throw Exception('Network error: ${e.toString()}');
@@ -621,8 +758,8 @@ class ApiService {
     }
   }
 
-  /// Gets the current user's written letters.
-  static Future<List<Map<String, dynamic>>> getMyLetters() async {
+  /// Gets all letters written by the user.
+  static Future<List<Map<String, dynamic>>> getLetters() async {
     try {
       final token = await getToken();
       final headers = {
@@ -632,87 +769,20 @@ class ApiService {
         headers['Authorization'] = 'Bearer $token';
       }
       final response = await http.get(
-        Uri.parse(ApiConfig.lettersMy),
+        Uri.parse(ApiConfig.letters),
         headers: headers,
       );
+      final responseData = jsonDecode(response.body);
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        final decoded = jsonDecode(response.body);
-        if (decoded is List) {
-          return decoded.map((e) => Map<String, dynamic>.from(e)).toList();
-        } else if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
-          if (decoded['data'] is List) {
-            return (decoded['data'] as List).map((e) => Map<String, dynamic>.from(e)).toList();
-          }
-        } else if (decoded is Map<String, dynamic>) {
-          return [Map<String, dynamic>.from(decoded)];
-        }
-        return [];
+        return List<Map<String, dynamic>>.from(responseData);
       } else {
-        throw Exception('Failed to load my letters');
+        throw Exception('Failed to load letters');
       }
     } catch (e) {
       throw Exception('Network error: ${e.toString()}');
     }
   }
 
-  /// Gets the partner's revealed letters.
-  static Future<List<Map<String, dynamic>>> getPartnerRevealedLetters() async {
-    try {
-      final token = await getToken();
-      final headers = {
-        'accept': 'application/json',
-      };
-      if (token != null) {
-        headers['Authorization'] = 'Bearer $token';
-      }
-      final response = await http.get(
-        Uri.parse(ApiConfig.lettersPartnerRevealed),
-        headers: headers,
-      );
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final decoded = jsonDecode(response.body);
-        if (decoded is List) {
-          return decoded.map((e) => Map<String, dynamic>.from(e)).toList();
-        } else if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
-          if (decoded['data'] is List) {
-            return (decoded['data'] as List).map((e) => Map<String, dynamic>.from(e)).toList();
-          }
-        } else if (decoded is Map<String, dynamic>) {
-          return [Map<String, dynamic>.from(decoded)];
-        }
-        return [];
-      } else {
-        throw Exception('Failed to load partner letters');
-      }
-    } catch (e) {
-      throw Exception('Network error: ${e.toString()}');
-    }
-  }
-
-  /// Gets a specific letter by ID.
-  static Future<Map<String, dynamic>> getLetterById(int letterId) async {
-    try {
-      final token = await getToken();
-      final headers = {
-        'accept': 'application/json',
-      };
-      if (token != null) {
-        headers['Authorization'] = 'Bearer $token';
-      }
-      final response = await http.get(
-        Uri.parse('${ApiConfig.letters}$letterId'),
-        headers: headers,
-      );
-      final Map<String, dynamic> responseData = jsonDecode(response.body);
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return responseData;
-      } else {
-        throw Exception(responseData['message'] ?? 'Failed to get letter');
-      }
-    } catch (e) {
-      throw Exception('Network error: ${e.toString()}');
-    }
-  }
 
   /// Updates a specific letter by ID.
   static Future<Map<String, dynamic>> updateLetter(int letterId, {String? title, String? content, String? letterType}) async {
@@ -843,7 +913,20 @@ class ApiService {
         headers: headers,
       );
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        return jsonDecode(response.body);
+        final data = jsonDecode(response.body);
+        // Cache user_name and isPartnerConnected
+        final pd = data['data'] ?? data;
+        final rawUserName = pd['userName'] ?? pd['name'];
+        if (rawUserName != null && rawUserName.toString().trim().isNotEmpty) {
+          await setUserName(rawUserName.toString().trim());
+        }
+        
+        final isConnected = pd['isPartnerConnected'] == true || 
+                            pd['is_partner_connected'] == true || 
+                            pd['partner_connected'] == true;
+        await setIsPartnerConnected(isConnected);
+        
+        return data;
       } else {
         throw Exception('Failed to load user info');
       }
@@ -868,6 +951,11 @@ class ApiService {
       );
       final Map<String, dynamic> responseData = jsonDecode(response.body);
       if (response.statusCode >= 200 && response.statusCode < 300) {
+        final pd = responseData['data'] ?? responseData;
+        final isConnected = pd['isPartnerConnected'] == true || 
+                            pd['is_partner_connected'] == true || 
+                            pd['partner_connected'] == true;
+        await setIsPartnerConnected(isConnected);
         return responseData;
       } else {
         throw Exception(responseData['message'] ?? 'Failed to get user profile');
@@ -885,6 +973,7 @@ class ApiService {
     String? relationType,
     String? relationshipDate,
     String? dob,
+    bool? notificationsEnabled,
   }) async {
     try {
       final token = await getToken();
@@ -905,6 +994,7 @@ class ApiService {
           if (relationshipDate != null) 'relationshipDate': relationshipDate,
           if (dob != null) 'dob': dob,
           if (gender != null) 'gender': gender,
+          if (notificationsEnabled != null) 'notificationsEnabled': notificationsEnabled,
         }),
       );
       final Map<String, dynamic> responseData = jsonDecode(response.body);
@@ -937,12 +1027,29 @@ class ApiService {
         }),
       );
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        print('API_DEBUG registerFcmToken - Success');
-      } else {
-        throw Exception('Failed to register FCM token: ${response.body}');
+        debugPrint('API_DEBUG registerFcmToken - Success');
       }
     } catch (e) {
-      throw Exception('Network error: ${e.toString()}');
+      debugPrint('API_ERROR registerFcmToken: $e');
+    }
+  }
+
+  static Future<void> sendWelcomePush() async {
+    final token = await getToken();
+    if (token == null) return;
+    try {
+      final response = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/users/welcome-push'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+      if (response.statusCode != 200) {
+        debugPrint('Failed to send welcome push: ${response.body}');
+      }
+    } catch (e) {
+      debugPrint('Error sending welcome push: $e');
     }
   }
 
@@ -1039,7 +1146,7 @@ class ApiService {
         headers['Authorization'] = 'Bearer $token';
       }
       final response = await http.get(
-        Uri.parse(ApiConfig.affirmationToday),
+        Uri.parse(ApiConfig.dailyAffirmation),
         headers: headers,
       );
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -1052,6 +1159,54 @@ class ApiService {
       return null;
     } catch (e) {
       return null;
+    }
+  }
+
+  /// Gets today's insight.
+  static Future<Map<String, dynamic>?> getDailyInsight() async {
+    try {
+      final token = await getToken();
+      final headers = {
+        'accept': 'application/json',
+        'X-Timezone-Offset': DateTime.now().timeZoneOffset.inMinutes.toString(),
+      };
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+      final response = await http.get(
+        Uri.parse(ApiConfig.dailyInsight),
+        headers: headers,
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
+          return decoded['data'] as Map<String, dynamic>?;
+        }
+        return decoded as Map<String, dynamic>?;
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Marks today's insight as viewed. Idempotent — safe to call multiple times.
+  static Future<void> markInsightViewed() async {
+    try {
+      final token = await getToken();
+      final headers = {
+        'accept': 'application/json',
+        'Content-Type': 'application/json',
+      };
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+      await http.post(
+        Uri.parse(ApiConfig.dailyInsightMarkViewed),
+        headers: headers,
+      );
+    } catch (_) {
+      // Best-effort — ignore failures silently
     }
   }
   // ────────────────────────────────────────────────────────────────────────────
@@ -1077,15 +1232,71 @@ class ApiService {
         if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
           final data = decoded['data'];
           if (data is List) {
-            return data.cast<Map<String, dynamic>>();
+            return data.map((e) => Map<String, dynamic>.from(e as Map)).toList();
           }
         }
         if (decoded is List) {
-          return decoded.cast<Map<String, dynamic>>();
+          return decoded.map((e) => Map<String, dynamic>.from(e as Map)).toList();
         }
         return [];
       } else {
         throw Exception('Failed to load relationships history');
+      }
+    } catch (e) {
+      throw Exception('Network error: ${e.toString()}');
+    }
+  }
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // Home Endpoints
+  // ────────────────────────────────────────────────────────────────────────────
+
+  /// Gets the home hero data.
+  static Future<Map<String, dynamic>> getHomeHero() async {
+    try {
+      final token = await getToken();
+      final headers = {
+        'accept': 'application/json',
+      };
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+      final response = await http.get(
+        Uri.parse(ApiConfig.homeHero),
+        headers: headers,
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
+          return decoded['data'] as Map<String, dynamic>;
+        }
+        return decoded as Map<String, dynamic>;
+      } else {
+        throw Exception('Failed to load home hero data');
+      }
+    } catch (e) {
+      throw Exception('Network error: ${e.toString()}');
+    }
+  }
+
+  /// Acknowledges the completion of the journey.
+  static Future<void> acknowledgeJourneyCompletion() async {
+    try {
+      final token = await getToken();
+      final headers = {
+        'accept': 'application/json',
+      };
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+      final response = await http.post(
+        Uri.parse(ApiConfig.acknowledgeCompletion),
+        headers: headers,
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return;
+      } else {
+        throw Exception('Failed to acknowledge completion');
       }
     } catch (e) {
       throw Exception('Network error: ${e.toString()}');

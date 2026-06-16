@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+SQLAlchemy
+psycopg2-binary
+python-dotenv
+google-genai
+pydantic
+pydantic-settings
+python-jose[cryptography]
+python-multipart
+slowapi==0.1.9
+firebase-admin
+apscheduler
+alembic

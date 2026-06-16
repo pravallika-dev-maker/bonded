@@ -6,6 +6,7 @@ import 'letter_details_screen.dart';
 
 import '../services/api_service.dart';
 import 'package:intl/intl.dart';
+import 'package:flutter/foundation.dart';
 
 class LettersScreen extends StatefulWidget {
   final int? separationId;
@@ -29,7 +30,7 @@ class _LettersScreenState extends State<LettersScreen> {
     try {
       final fetched = widget.separationId != null
           ? await ApiService.getSeparationLetters(widget.separationId!)
-          : await ApiService.getMyLetters();
+          : await ApiService.getLetters();
       if (mounted) {
         setState(() {
           // Sort letters by ID descending so newest are at the top (optional but good practice)
@@ -39,7 +40,7 @@ class _LettersScreenState extends State<LettersScreen> {
         });
       }
     } catch (e) {
-      print('Error fetching letters: $e');
+      debugPrint('Error fetching letters: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -155,22 +156,6 @@ class _LettersScreenState extends State<LettersScreen> {
       }
     }
 
-    // Add write entry prompt and spacer at end
-    if (widget.separationId == null) {
-      children.add(const SizedBox(height: 8));
-      children.add(GestureDetector(
-        onTap: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const NewLetterScreen()),
-          );
-          if (result == true) {
-            _fetchLetters();
-          }
-        },
-        child: const _WriteTodayEntryPrompt(),
-      ));
-    }
     children.add(const SizedBox(height: 120));
 
     return Scaffold(
@@ -178,9 +163,31 @@ class _LettersScreenState extends State<LettersScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // --- Back Button Row ---
+            Padding(
+              padding: const EdgeInsets.only(left: 8.0, top: 8.0, right: 16.0),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back_ios_new, color: Color(0xFF7A5C67), size: 16),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                  const Text(
+                    'LETTERS',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2.0,
+                      color: Color(0xFF9E7E5A),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             // --- Header Section ---
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
+              padding: const EdgeInsets.only(left: 24.0, right: 24.0, top: 4.0, bottom: 16.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -393,35 +400,3 @@ class _LetterCard extends StatelessWidget {
   }
 }
 
-class _WriteTodayEntryPrompt extends StatelessWidget {
-  const _WriteTodayEntryPrompt();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF160A0E).withOpacity(0.5),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF26151B), width: 1.5),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: const [
-          Icon(Icons.chat_bubble_outline, color: Color(0xFF4A343D), size: 18),
-          SizedBox(width: 12),
-          Text(
-            "Write today's entry",
-            style: TextStyle(
-              fontFamily: 'Georgia',
-              fontSize: 15,
-              fontStyle: FontStyle.italic,
-              color: Color(0xFF4A343D),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'bond_selection_screen.dart';
+import '../services/api_service.dart';
 
 class GenderSelectionScreen extends StatefulWidget {
   final String userName;
@@ -46,20 +48,30 @@ class _GenderSelectionScreenState extends State<GenderSelectionScreen> {
     },
   ];
 
-  void _onNext() {
+  Future<void> _onNext() async {
     if (_selectedGender == null) return;
 
     if (widget.nextScreen != null) {
+      // This is the partner-gender step (targetName != null).
+      // The backend has no partnerGender field on the user profile,
+      // so we just navigate without an API call.
       Navigator.push(
         context,
         MaterialPageRoute(builder: (context) => widget.nextScreen!),
       );
     } else {
-      // Default onboarding flow
-      Navigator.push(
-        context,
+      // Capture navigator before async gap to satisfy use_build_context_synchronously lint.
+      final navigator = Navigator.of(context);
+      // This is the user's own gender step — persist it locally.
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('onboarding_gender', _selectedGender!);
+      if (!mounted) return;
+      navigator.push(
         MaterialPageRoute(
-          builder: (context) => BondSelectionScreen(userName: widget.userName),
+          builder: (context) => BondSelectionScreen(
+            userName: widget.userName,
+            gender: _selectedGender,
+          ),
         ),
       );
     }

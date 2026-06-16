@@ -8,11 +8,13 @@ import '../services/api_service.dart';
 class FloatingConnectionPill extends StatefulWidget {
   final String partnerName;
   final String inviteCode;
+  final VoidCallback? onJoinPressed;
 
   const FloatingConnectionPill({
     super.key,
     required this.partnerName,
     this.inviteCode = "JADE4", // Default onboarding matching mock
+    this.onJoinPressed,
   });
 
   @override
@@ -121,7 +123,8 @@ class _FloatingConnectionPillState extends State<FloatingConnectionPill>
           final expandProgress = Curves.easeOutCubic.transform(_expandController.value);
 
           // Highly compact card heights: 42px collapsed, 108px expanded
-          final pillHeight = 42.0 + (expandProgress * 66.0); 
+          // Added extra height for 'enter code' button
+          final pillHeight = 42.0 + (expandProgress * (widget.onJoinPressed != null ? 82.0 : 66.0)); 
           final pillWidth = MediaQuery.of(context).size.width * 0.76 + (expandProgress * (MediaQuery.of(context).size.width * 0.12));
 
           const double borderRadius = 24.0;
@@ -319,6 +322,23 @@ class _FloatingConnectionPillState extends State<FloatingConnectionPill>
                                             ),
                                           ],
                                         ),
+                                        
+                                        if (widget.onJoinPressed != null) ...[
+                                          const SizedBox(height: 12),
+                                          GestureDetector(
+                                            onTap: widget.onJoinPressed,
+                                            child: Text(
+                                              "Have a code instead? Enter it here",
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w500,
+                                                color: const Color(0xFFE89FB8).withValues(alpha: 0.9),
+                                                decoration: TextDecoration.underline,
+                                                decorationColor: const Color(0xFFE89FB8).withValues(alpha: 0.5),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ],
                                     ),
                                   ),
