@@ -92,6 +92,10 @@ def calculate_user_score(db: Session, user: User, active_rel, active_sep=None) -
     ).count()
     score += positive_moods_count * 5
 
+    # 7. Action: Complete a full separation (+20)
+    if active_sep.status == "completed":
+        score += 20
+
     # 8. Emotion Bonus: tone & emotion analysis (Filtered to current separation)
     answers = db.query(ReflectionAnswer).join(
         ReflectionSession, ReflectionAnswer.session_id == ReflectionSession.id
@@ -106,25 +110,17 @@ def calculate_user_score(db: Session, user: User, active_rel, active_sep=None) -
             score += 10
         elif tone == "reflective":
             score += 7
-        elif tone == "neutral":
-            score += 3
         elif tone in ["sad", "fearful"]:
             score += 4
+        elif tone == "neutral":
+            score += 3
+        elif tone in ["angry", "bitter"]:
+            score += 0
             
         # Emotion bonus
         emotion = (ans.ai_emotion_detected or "").lower()
-        if emotion == "love":
-            score += 10
-        elif emotion == "longing":
+        if emotion in ["love", "grateful", "longing"]:
             score += 8
-        elif emotion == "grateful":
-            score += 9
-        elif emotion == "hopeful":
-            score += 8
-        elif emotion == "confused":
-            score += 4
-        elif emotion == "fearful":
-            score += 3
 
     return score
 
@@ -278,14 +274,6 @@ async def get_journey_insights(
     or if both partners completed all reflection days.
     """
 
-    if not current_user.partner_id:
-        return {
-            "isUnlocked": False,
-            "daysRemaining": 99,
-            "message": "Insights are unavailable because you are no longer connected.",
-            "insights": None
-        }
-
     # 1. Fetch separation (specific ID or active or latest completed)
     if separation_id:
         sep = db.query(Separation).filter(
@@ -300,7 +288,7 @@ async def get_journey_insights(
         ).order_by(Separation.created_at.desc()).first()
 
         if not sep:
-            # Fallback check for recently completed separation to allow viewing history
+            # Fallback: most recent completed separation for this user
             sep_query = db.query(Separation).filter(
                 (Separation.creator_id == current_user.id) | (Separation.partner_id == current_user.id),
                 Separation.status == "completed"
@@ -317,22 +305,40 @@ async def get_journey_insights(
             "insights": None
         }
 
-    # 2. Retrieve partner info
-    partner = db.query(User).filter(User.id == current_user.partner_id).first()
+    # 2. Retrieve partner info — prefer current_user.partner_id, but fall back
+    # to whoever the *other person* in the separation record is. This ensures
+    # insights unlock even if the live partner relationship was dissolved.
+    partner_user_id = current_user.partner_id
+    if not partner_user_id:
+        # Derive partner from the separation record itself
+        if sep.creator_id == current_user.id:
+            partner_user_id = sep.partner_id
+        else:
+            partner_user_id = sep.creator_id
+
+    if not partner_user_id:
+        return {
+            "isUnlocked": False,
+            "daysRemaining": 99,
+            "message": "Insights are unavailable because you are no longer connected.",
+            "insights": None
+        }
+    partner = db.query(User).filter(User.id == partner_user_id).first()
     partner_name = partner.user_name if (partner and partner.user_name) else "Partner"
 
     # Count shared completed reflection days for this specific separation
-    shared_days = db.query(ReflectionSession.day_number).filter(
+    shared_days_query = db.query(ReflectionSession.day_number).filter(
         ReflectionSession.user_id == current_user.id,
         ReflectionSession.separation_id == sep.id,
         ReflectionSession.is_completed == True
     ).intersect(
         db.query(ReflectionSession.day_number).filter(
-            ReflectionSession.user_id == partner.id,
+            ReflectionSession.user_id == partner_user_id,
             ReflectionSession.separation_id == sep.id,
             ReflectionSession.is_completed == True
         )
-    ).count()
+    )
+    shared_days = shared_days_query.count()
 
     # Calculate total expected reflection days
     if sep.expected_end_date and sep.start_date:
@@ -395,7 +401,7 @@ async def get_journey_insights(
     ).join(
         ReflectionSession, ReflectionAnswer.session_id == ReflectionSession.id
     ).filter(
-        ReflectionAnswer.user_id == partner.id,
+        ReflectionAnswer.user_id == partner_user_id,
         ReflectionSession.separation_id == sep.id
     ).all()
     
@@ -414,7 +420,7 @@ async def get_journey_insights(
         func.date(Mood.created_at) >= sep.start_date
     ).order_by(Mood.created_at.desc()).limit(10).all()]
     partner_moods = [m.mood for m in db.query(Mood).filter(
-        Mood.user_id == partner.id,
+        Mood.user_id == partner_user_id,
         func.date(Mood.created_at) >= sep.start_date
     ).order_by(Mood.created_at.desc()).limit(10).all()]
 
@@ -425,7 +431,7 @@ async def get_journey_insights(
         ReflectionSession.is_completed == True
     ).count()
     partner_total_days = db.query(ReflectionSession).filter(
-        ReflectionSession.user_id == partner.id, 
+        ReflectionSession.user_id == partner_user_id, 
         ReflectionSession.separation_id == sep.id,
         ReflectionSession.is_completed == True
     ).count()
@@ -437,7 +443,7 @@ async def get_journey_insights(
         func.date(Letter.created_at) >= sep.start_date
     )
     partner_letters_query = db.query(Letter).filter(
-        Letter.author_id == partner.id,
+        Letter.author_id == partner_user_id,
         func.date(Letter.created_at) >= sep.start_date
     )
     if active_rel:

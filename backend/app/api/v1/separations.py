@@ -5,7 +5,7 @@ from ..deps import get_current_user, get_active_relationship
 from ...models.user import User
 from ...models.separation import Separation
 from ...schemas.separation import SeparationCreate, SeparationResponse, ActiveSeparationResponse
-from ...services.notification_service import create_notification, create_notification_and_push
+from ...services.notification_service import create_notification, create_notification_and_push, send_data_push
 from datetime import datetime, date, timedelta, timezone
 
 router = APIRouter(prefix="/separations", tags=["Separations"])
@@ -255,6 +255,19 @@ def time_travel_separation(current_user: User = Depends(get_current_user), db: S
         sep.status = "completed"
         sep.ended_at = datetime.now(timezone.utc)
         db.commit()
+
+        # ── Cross-device sync: silently notify the partner to refresh insights ──
+        other_user_id_final = sep.partner_id if sep.creator_id == current_user.id else sep.creator_id
+        if other_user_id_final:
+            partner_user = db.query(User).filter(User.id == other_user_id_final).first()
+            if partner_user and partner_user.fcm_token:
+                send_data_push(
+                    partner_user.fcm_token,
+                    {
+                        "type": "time_travel_completed",
+                        "separation_id": str(sep.id),
+                    }
+                )
 
         return {"success": True, "message": "Time travel successful! Separation marked complete."}
     except HTTPException:

@@ -72,6 +72,42 @@ def send_push(fcm_token: str, title: str, body: str) -> bool:
         logger.error(f"Failed to send FCM push notification: {e}")
         return False
 
+
+def send_data_push(fcm_token: str, data: dict) -> bool:
+    """Send a silent FCM data-only message (no visible notification banner).
+    Used for cross-device state sync (e.g. time travel completed)."""
+    if not fcm_token:
+        logger.info("FCM data push skipped: No FCM token provided.")
+        return False
+
+    app = get_firebase_app()
+    if app == "MOCK" or app is None:
+        logger.info(f"[FCM MOCK DATA PUSH] To Token: {fcm_token} | Data: {data}")
+        return True
+
+    try:
+        # Ensure all data values are strings (FCM requirement)
+        str_data = {k: str(v) for k, v in data.items()}
+        message = messaging.Message(
+            data=str_data,
+            android=messaging.AndroidConfig(
+                priority="high",
+            ),
+            apns=messaging.APNSConfig(
+                headers={"apns-priority": "5"},
+                payload=messaging.APNSPayload(
+                    aps=messaging.Aps(content_available=True)
+                ),
+            ),
+            token=fcm_token,
+        )
+        response = messaging.send(message)
+        logger.info(f"FCM data push sent successfully: {response}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to send FCM data push: {e}")
+        return False
+
 def create_notification_and_push(
     db: Session,
     recipient_id: int,
