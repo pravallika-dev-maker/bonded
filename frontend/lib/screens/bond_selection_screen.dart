@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'partner_name_entry_screen.dart';
+import '../services/api_service.dart';
 
 class BondSelectionScreen extends StatefulWidget {
   final String userName;
-  const BondSelectionScreen({super.key, required this.userName});
+  final String? gender;
+  const BondSelectionScreen({super.key, required this.userName, this.gender});
 
   @override
   State<BondSelectionScreen> createState() => _BondSelectionScreenState();
@@ -151,12 +154,21 @@ class _BondSelectionScreenState extends State<BondSelectionScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 24.0),
                   child: GestureDetector(
-                    onTap: () {
+                    onTap: () async {
+                      final relationType = _selectedIndex == 0
+                          ? 'partner'
+                          : (_selectedIndex == 1 ? 'friend' : 'family');
+                      // Persist relationType to local cache
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setString('onboarding_relationType', relationType);
+                      if (!context.mounted) return;
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                             builder: (context) => PartnerNameEntryScreen(
                               userName: widget.userName,
+                              gender: widget.gender,
+                              relationType: relationType,
                             )),
                       );
                     },
@@ -221,11 +233,36 @@ class _BondSelectionScreenState extends State<BondSelectionScreen> {
 
     return GestureDetector(
       onTap: () {
-        setState(() {
-          _selectedIndex = index;
-        });
+        if (index == 0) {
+          setState(() {
+            _selectedIndex = index;
+          });
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Currently, Bonding is designed specifically for romantic partnerships. Support for friends and family is coming soon!',
+                style: TextStyle(
+                  fontFamily: 'Georgia',
+                  fontSize: 14,
+                  fontStyle: FontStyle.italic,
+                  color: Color(0xFFDD8F9F),
+                ),
+              ),
+              backgroundColor: const Color(0xFF160A0E),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: Color(0xFF2E1620), width: 1),
+              ),
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
       },
-      child: AnimatedContainer(
+      child: Opacity(
+        opacity: index == 0 ? 1.0 : 0.5,
+        child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
         decoration: BoxDecoration(
@@ -304,6 +341,7 @@ class _BondSelectionScreenState extends State<BondSelectionScreen> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

@@ -2,20 +2,23 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'promise_screen.dart';
+import 'partner_invite_screen.dart';
 import '../services/api_service.dart';
+import '../services/app_event_bus.dart';
 
 enum JoinCodeState { idle, loading, error, success }
 
 class JoinWithCodeScreen extends StatefulWidget {
   final String? userName;
-  const JoinWithCodeScreen({super.key, this.userName});
+  final bool fromDashboard;
+  const JoinWithCodeScreen({super.key, this.userName, this.fromDashboard = false});
 
   @override
   State<JoinWithCodeScreen> createState() => _JoinWithCodeScreenState();
 }
 
 class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final TextEditingController _codeController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   JoinCodeState _state = JoinCodeState.idle;
@@ -23,6 +26,13 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
 
   late AnimationController _shakeController;
   late Animation<double> _shakeAnim;
+
+  late AnimationController _entranceController;
+  late Animation<double> _fadeAnim1;
+  late Animation<double> _fadeAnim2;
+  late Animation<double> _fadeAnim3;
+  late Animation<double> _slideAnim1;
+  late Animation<double> _slideAnim2;
 
   @override
   void initState() {
@@ -40,6 +50,30 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
     _shakeController.addStatusListener((status) {
       if (status == AnimationStatus.completed) _shakeController.reset();
     });
+
+    _entranceController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+
+    _fadeAnim1 = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _entranceController, curve: const Interval(0.1, 0.6, curve: Curves.easeOut)),
+    );
+    _fadeAnim2 = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _entranceController, curve: const Interval(0.3, 0.8, curve: Curves.easeOut)),
+    );
+    _fadeAnim3 = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _entranceController, curve: const Interval(0.5, 1.0, curve: Curves.easeOut)),
+    );
+
+    _slideAnim1 = Tween<double>(begin: 30, end: 0).animate(
+      CurvedAnimation(parent: _entranceController, curve: const Interval(0.1, 0.6, curve: Curves.easeOutCubic)),
+    );
+    _slideAnim2 = Tween<double>(begin: 20, end: 0).animate(
+      CurvedAnimation(parent: _entranceController, curve: const Interval(0.3, 0.8, curve: Curves.easeOutCubic)),
+    );
+
+    _entranceController.forward();
   }
 
   @override
@@ -47,6 +81,7 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
     _codeController.dispose();
     _focusNode.dispose();
     _shakeController.dispose();
+    _entranceController.dispose();
     super.dispose();
   }
 
@@ -69,6 +104,9 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
         final pName = res['partnerName'] ?? 'Partner';
         await ApiService.setPartnerName(pName);
 
+        // Broadcast so dashboard + journey screens refresh instantly
+        AppEventBus().emit(AppEvent.partnerConnected);
+
         setState(() {
           _state = JoinCodeState.success;
         });
@@ -76,17 +114,21 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
         await Future.delayed(const Duration(milliseconds: 1500));
         if (!mounted) return;
 
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            transitionDuration: const Duration(milliseconds: 600),
-            pageBuilder: (_, __, ___) => PromiseScreen(
-              userName: widget.userName ?? 'You',
-              partnerName: res['partnerName'] ?? 'Partner',
+        if (widget.fromDashboard) {
+          Navigator.of(context).pop();
+        } else {
+          Navigator.of(context).pushReplacement(
+            PageRouteBuilder(
+              transitionDuration: const Duration(milliseconds: 600),
+              pageBuilder: (_, __, ___) => PromiseScreen(
+                userName: widget.userName ?? 'You',
+                partnerName: res['partnerName'] ?? 'Partner',
+              ),
+              transitionsBuilder: (_, anim, __, child) =>
+                  FadeTransition(opacity: anim, child: child),
             ),
-            transitionsBuilder: (_, anim, __, child) =>
-                FadeTransition(opacity: anim, child: child),
-          ),
-        );
+          );
+        }
       } else {
         if (mounted) {
           setState(() {
@@ -115,7 +157,7 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
     if (_state == JoinCodeState.error) {
       borderColor = const Color(0xFF7A1B29);
     } else if (_state == JoinCodeState.success) {
-      borderColor = const Color(0xFF194D2C);
+      borderColor = const Color(0xFF8A2E55); // app rose
     } else if (_focusNode.hasFocus || _hasInput) {
       borderColor = const Color(0xFF911746);
     }
@@ -158,7 +200,7 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(Icons.arrow_back_ios_new,
-                              size: 14, color: Color(0xFF5E3A4B)),
+                              size: 14, color: Color(0xFF8C5C74)),
                           SizedBox(width: 6),
                           Text(
                             'Back',
@@ -166,7 +208,7 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
                               fontFamily: 'Georgia',
                               fontSize: 13,
                               fontStyle: FontStyle.italic,
-                              color: Color(0xFF5E3A4B),
+                              color: Color(0xFF8C5C74),
                             ),
                           ),
                         ],
@@ -180,66 +222,93 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
 
                     const Spacer(flex: 1),
 
-                    // ── Emotional Header ──
-                    const Text(
-                      'Someone\'s waiting',
-                      style: TextStyle(
-                        fontFamily: 'Georgia',
-                        fontSize: 34,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        height: 1.15,
+                    // ── Emotional Header & Subtext ──
+                    AnimatedBuilder(
+                      animation: _entranceController,
+                      builder: (context, child) => Opacity(
+                        opacity: _fadeAnim1.value,
+                        child: Transform.translate(
+                          offset: Offset(0, _slideAnim1.value),
+                          child: child,
+                        ),
                       ),
-                    ),
-                    const Text(
-                      'for you',
-                      style: TextStyle(
-                        fontFamily: 'Georgia',
-                        fontSize: 34,
-                        fontWeight: FontWeight.bold,
-                        fontStyle: FontStyle.italic,
-                        color: Color(0xFFE89FB8),
-                        height: 1.15,
-                      ),
-                    ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.fromDashboard ? 'Join their' : 'Someone\'s waiting',
+                            style: const TextStyle(
+                              fontFamily: 'Georgia',
+                              fontSize: 34,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              height: 1.15,
+                            ),
+                          ),
+                          Text(
+                            widget.fromDashboard ? 'space' : 'for you',
+                            style: const TextStyle(
+                              fontFamily: 'Georgia',
+                              fontSize: 34,
+                              fontWeight: FontWeight.bold,
+                              fontStyle: FontStyle.italic,
+                              color: Color(0xFFE89FB8),
+                              height: 1.15,
+                            ),
+                          ),
 
-                    const SizedBox(height: 14),
+                          const SizedBox(height: 14),
 
-                    // ── Subtext ──
-                    const Text(
-                      'A small code… to begin something\nmeaningful together.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF5E3A4B),
-                        height: 1.6,
+                          // ── Subtext ──
+                          Text(
+                            widget.fromDashboard 
+                                ? 'Enter the code they shared with you to connect and begin your shared journey.'
+                                : 'A small code… to begin something\nmeaningful together.',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: Color(0xFFB58A9F),
+                              height: 1.6,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
 
                     const Spacer(flex: 1),
 
                     // ── Input Label ──
-                    const Text(
-                      'THEIR CODE',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF3B1525),
-                        letterSpacing: 1.5,
+                    AnimatedBuilder(
+                      animation: _entranceController,
+                      builder: (context, child) => Opacity(
+                        opacity: _fadeAnim2.value,
+                        child: child,
+                      ),
+                      child: const Text(
+                        'THEIR CODE',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF914B68),
+                          letterSpacing: 1.5,
+                        ),
                       ),
                     ),
 
                     const SizedBox(height: 12),
 
-                    // ── Code Input Field (shake on error) ──
+                    // ── Code Input Field (shake on error & entrance slide) ──
                     AnimatedBuilder(
-                      animation: _shakeAnim,
+                      animation: Listenable.merge([_shakeAnim, _entranceController]),
                       builder: (context, child) {
                         final dx = _state == JoinCodeState.error
                             ? sin(_shakeAnim.value * pi * 4) * 8
                             : 0.0;
-                        return Transform.translate(
-                          offset: Offset(dx, 0),
-                          child: child,
+                        return Opacity(
+                          opacity: _fadeAnim2.value,
+                          child: Transform.translate(
+                            offset: Offset(dx, _slideAnim2.value),
+                            child: child,
+                          ),
                         );
                       },
                       child: Container(
@@ -251,8 +320,8 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
                           boxShadow: _state == JoinCodeState.success
                               ? [
                                   BoxShadow(
-                                    color: const Color(0xFF194D2C)
-                                        .withOpacity(0.18),
+                                    color: const Color(0xFF8A2E55)
+                                        .withOpacity(0.15),
                                     blurRadius: 20,
                                     spreadRadius: 2,
                                   )
@@ -274,17 +343,17 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 4,
                                   color: _state == JoinCodeState.success
-                                      ? const Color(0xFF5DB373)
+                                      ? const Color(0xFFDD8F9F) // rose pink on success
                                       : Colors.white,
                                 ),
-                                decoration: InputDecoration(
+                                decoration: const InputDecoration(
                                   border: InputBorder.none,
                                   hintText: 'e.g.  ROSE · 7',
-                                  hintStyle: const TextStyle(
+                                  hintStyle: TextStyle(
                                     fontFamily: 'Georgia',
                                     fontSize: 18,
                                     fontStyle: FontStyle.italic,
-                                    color: Color(0xFF452B36),
+                                    color: Color(0xFF855A6D),
                                     fontWeight: FontWeight.normal,
                                     letterSpacing: 1,
                                   ),
@@ -295,7 +364,7 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
                             ),
                             if (_state == JoinCodeState.success)
                               const Icon(Icons.check_circle_outline,
-                                  color: Color(0xFF5DB373), size: 20)
+                                  color: Color(0xFFDD8F9F), size: 20)
                             else if (_state == JoinCodeState.error)
                               const Icon(Icons.info_outline,
                                   color: Color(0xFF962335), size: 20),
@@ -319,7 +388,7 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
                                     fontFamily: 'Georgia',
                                     fontSize: 11,
                                     fontStyle: FontStyle.italic,
-                                    color: Color(0xFF3B1F2B),
+                                    color: Color(0xFF8C5C74),
                                   ),
                                 ),
                     ),
@@ -327,67 +396,74 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
                     const Spacer(flex: 1),
 
                     // ── Primary CTA Button ──
-                    GestureDetector(
-                      onTap: _hasInput && _state != JoinCodeState.success && _state != JoinCodeState.loading ? _onConnect : null,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: double.infinity,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          color: _state == JoinCodeState.success
-                              ? const Color(0xFF0C1F15)
-                              : _hasInput 
-                                  ? const Color(0xFF1A1214) 
-                                  : const Color(0xFF0D080A),
-                          borderRadius: BorderRadius.circular(28),
-                          border: Border.all(
+                    AnimatedBuilder(
+                      animation: _entranceController,
+                      builder: (context, child) => Opacity(
+                        opacity: _fadeAnim3.value,
+                        child: child,
+                      ),
+                      child: GestureDetector(
+                        onTap: _hasInput && _state != JoinCodeState.success && _state != JoinCodeState.loading ? _onConnect : null,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: double.infinity,
+                          height: 56,
+                          decoration: BoxDecoration(
                             color: _state == JoinCodeState.success
-                                ? const Color(0xFF194D2C)
+                                ? const Color(0xFF1C0A11) // app dark rose
                                 : _hasInput 
-                                    ? const Color(0xFF911746).withOpacity(0.5) 
-                                    : const Color(0xFF26151B),
-                            width: 1.2,
+                                    ? const Color(0xFF1A1214) 
+                                    : const Color(0xFF0D080A),
+                            borderRadius: BorderRadius.circular(28),
+                            border: Border.all(
+                              color: _state == JoinCodeState.success
+                                  ? const Color(0xFF8A2E55) // app rose
+                                  : _hasInput 
+                                      ? const Color(0xFF911746).withOpacity(0.5) 
+                                      : const Color(0xFF26151B),
+                              width: 1.2,
+                            ),
                           ),
-                        ),
-                        child: _state == JoinCodeState.loading
-                            ? const Center(
-                                child: SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2.0,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFDD8F9F)),
-                                  ),
-                                ),
-                              )
-                            : Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.favorite,
-                                    size: 18,
-                                    color: _state == JoinCodeState.success
-                                        ? const Color(0xFF5DB373)
-                                        : _hasInput ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Text(
-                                    _state == JoinCodeState.success
-                                        ? 'You\'re connected ✓'
-                                        : 'Connect',
-                                    style: TextStyle(
-                                      fontFamily: 'Georgia',
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      fontStyle: FontStyle.italic,
-                                      letterSpacing: 0.5,
-                                      color: _state == JoinCodeState.success
-                                          ? const Color(0xFF5DB373)
-                                          : _hasInput ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                          child: _state == JoinCodeState.loading
+                              ? const Center(
+                                  child: SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.0,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFDD8F9F)),
                                     ),
                                   ),
-                                ],
-                              ),
+                                )
+                              : Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.favorite,
+                                      size: 18,
+                                      color: _state == JoinCodeState.success
+                                          ? const Color(0xFFDD8F9F)
+                                          : _hasInput ? const Color(0xFFDD8F9F) : const Color(0xFF7A4A5D),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      _state == JoinCodeState.success
+                                          ? 'You\'re connected ✓'
+                                          : 'Connect',
+                                      style: TextStyle(
+                                        fontFamily: 'Georgia',
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w600,
+                                        fontStyle: FontStyle.italic,
+                                        letterSpacing: 0.5,
+                                        color: _state == JoinCodeState.success
+                                            ? const Color(0xFFDD8F9F)
+                                            : _hasInput ? const Color(0xFFDD8F9F) : const Color(0xFF7A4A5D),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
                       ),
                     ),
 
@@ -399,13 +475,13 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: const [
                           Icon(Icons.shield_outlined,
-                              size: 13, color: Color(0xFF3B1F2B)),
+                              size: 13, color: Color(0xFF7A4A5D)),
                           SizedBox(width: 8),
                           Text(
                             'Your connection stays private and secure',
                             style: TextStyle(
                               fontSize: 11,
-                              color: Color(0xFF3B1F2B),
+                              color: Color(0xFF7A4A5D),
                             ),
                           ),
                         ],
@@ -422,12 +498,21 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
                             "Don't have a code?",
                             style: TextStyle(
                               fontSize: 12,
-                              color: Color(0xFF5E3A4B),
+                              color: Color(0xFF9C6A81),
                             ),
                           ),
                           const SizedBox(height: 6),
                           GestureDetector(
-                            onTap: () => Navigator.of(context).pop(),
+                            onTap: () {
+                              Navigator.of(context).pushReplacement(
+                                MaterialPageRoute(
+                                  builder: (_) => PartnerInviteScreen(
+                                    userName: widget.userName ?? 'You',
+                                    partnerName: 'Your Partner',
+                                  ),
+                                ),
+                              );
+                            },
                             child: Column(
                               children: [
                                 const Text(
@@ -437,14 +522,14 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
                                     fontSize: 13,
                                     fontStyle: FontStyle.italic,
                                     fontWeight: FontWeight.bold,
-                                    color: Color(0xFF8A6530),
+                                    color: Color(0xFFC99852),
                                   ),
                                 ),
                                 const SizedBox(height: 3),
                                 Container(
                                   height: 1,
                                   width: 120,
-                                  color: const Color(0xFF5A3D1F),
+                                  color: const Color(0xFF8C6430),
                                 ),
                               ],
                             ),
@@ -459,13 +544,13 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
                     Center(
                       child: Padding(
                         padding: const EdgeInsets.only(bottom: 24.0),
-                        child: const Text(
-                          'Every connection begins with a small step',
-                          style: TextStyle(
+                        child: Text(
+                          widget.fromDashboard ? 'Ready when you are' : 'Every connection begins with a small step',
+                          style: const TextStyle(
                             fontFamily: 'Georgia',
                             fontSize: 11,
                             fontStyle: FontStyle.italic,
-                            color: Color(0xFF2E1922),
+                            color: Color(0xFF7A4A5D),
                           ),
                         ),
                       ),
@@ -525,13 +610,13 @@ class _SuccessBanner extends StatelessWidget {
       key: const ValueKey('success'),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF0C1F15),
+        color: const Color(0xFF1C0A11), // app dark rose
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF194D2C), width: 1.0),
+        border: Border.all(color: const Color(0xFF8A2E55).withOpacity(0.4), width: 1.0),
       ),
       child: const Row(
         children: [
-          Icon(Icons.check_circle_outline, color: Color(0xFF5DB373), size: 16),
+          Icon(Icons.check_circle_outline, color: Color(0xFFDD8F9F), size: 16),
           SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -540,7 +625,7 @@ class _SuccessBanner extends StatelessWidget {
                 fontFamily: 'Georgia',
                 fontSize: 12,
                 fontStyle: FontStyle.italic,
-                color: Color(0xFF5DB373),
+                color: Color(0xFFDD8F9F),
               ),
             ),
           ),

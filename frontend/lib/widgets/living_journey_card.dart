@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'premium_sheen.dart';
 
 class LivingJourneyCard extends StatefulWidget {
   final int currentDay;
@@ -8,6 +9,9 @@ class LivingJourneyCard extends StatefulWidget {
   final String moodPhrase;
   final String statusLine;
   final String? partnerName;
+  final bool isEmpty;
+  final bool isCompleted;
+  final VoidCallback? onClose;
 
   const LivingJourneyCard({
     super.key,
@@ -16,6 +20,9 @@ class LivingJourneyCard extends StatefulWidget {
     required this.moodPhrase,
     required this.statusLine,
     this.partnerName,
+    this.isEmpty = false,
+    this.isCompleted = false,
+    this.onClose,
   });
 
   @override
@@ -180,212 +187,308 @@ class _LivingJourneyCardState extends State<LivingJourneyCard>
                     ),
 
                     // ── MAIN CONTENT ──
-                    Padding(
+                    PremiumSheen(
+                      animationDuration: const Duration(milliseconds: 2000),
+                      pauseDuration: const Duration(seconds: 9),
+                      sheenOpacity: 0.25,
+                      child: Padding(
                       padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // TOP ROW — label + floating heart
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              // Label
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 10, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF8A2E55)
-                                      .withValues(alpha: 0.10),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: const Color(0xFF8A2E55)
-                                        .withValues(alpha: 0.20),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      width: 5,
-                                      height: 5,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: Color.lerp(
-                                          const Color(0xFF8A2E55),
-                                          const Color(0xFFDD8F9F),
-                                          breathe,
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: const Color(0xFFDD8F9F)
-                                                .withValues(alpha: 0.6 + breathe * 0.4),
-                                            blurRadius: 4,
-                                            spreadRadius: 1,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    const Text(
-                                      'ACTIVE · SEPARATION',
-                                      style: TextStyle(
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 1.6,
-                                        color: Color(0xFF9E7E5A),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              // Floating heart orb
-                              _FloatingHeartOrb(
-                                breathe: breathe,
-                                drift: drift,
-                                progress: (widget.totalDays > 0 ? widget.currentDay / widget.totalDays : 0.0).clamp(0.0, 1.0),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 18),
-
-                          // BIG DAY COUNTER
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.baseline,
-                            textBaseline: TextBaseline.alphabetic,
-                            children: [
-                              Text(
-                                'Day ',
-                                style: TextStyle(
-                                  fontFamily: 'Georgia',
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w300,
-                                  color: Colors.white
-                                      .withValues(alpha: 0.35 + breathe * 0.15),
-                                ),
-                              ),
-                              ShaderMask(
-                                shaderCallback: (bounds) =>
-                                    LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    const Color(0xFFECC8D4),
-                                    const Color(0xFFDD8F9F),
-                                    Color.lerp(
-                                      const Color(0xFF9E7E5A),
-                                      const Color(0xFFDD8F9F),
-                                      breathe,
-                                    )!,
-                                  ],
-                                ).createShader(bounds),
-                                child: Text(
-                                  '${widget.currentDay}',
-                                  style: const TextStyle(
-                                    fontFamily: 'Georgia',
-                                    fontSize: 60,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                    height: 1.0,
-                                    letterSpacing: -2,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-
-                          const SizedBox(height: 4),
-
-                          // PARTNER NAME — "a space with [name]"
-                          if (widget.partnerName != null &&
-                              widget.partnerName!.isNotEmpty)
+                          if (!widget.isEmpty)
                             Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                Icon(
-                                  Icons.favorite,
-                                  size: 10,
-                                  color: const Color(0xFFDD8F9F)
-                                      .withValues(alpha: 0.5 + breathe * 0.3),
+                                // Label
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF8A2E55)
+                                        .withValues(alpha: 0.10),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: const Color(0xFF8A2E55)
+                                          .withValues(alpha: 0.20),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        width: 5,
+                                        height: 5,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: Color.lerp(
+                                            const Color(0xFF8A2E55),
+                                            const Color(0xFFDD8F9F),
+                                            breathe,
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: const Color(0xFFDD8F9F)
+                                                  .withValues(alpha: 0.6 + breathe * 0.4),
+                                              blurRadius: 4,
+                                              spreadRadius: 1,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        widget.isCompleted ? 'COMPLETED · SEPARATION' : 'ACTIVE · SEPARATION',
+                                        style: const TextStyle(
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1.6,
+                                          color: Color(0xFF9E7E5A),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                const SizedBox(width: 6),
+
+                                // Floating heart orb
+                                _FloatingHeartOrb(
+                                  breathe: breathe,
+                                  drift: drift,
+                                  progress: (widget.totalDays > 0 ? widget.currentDay / widget.totalDays : 0.0).clamp(0.0, 1.0),
+                                ),
+                              ],
+                            ),
+
+                          if (widget.isCompleted) ...[
+                            const SizedBox(height: 10),
+                            const Text(
+                              'Journey Completed',
+                              style: TextStyle(
+                                fontFamily: 'Georgia',
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                height: 1.1,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              "Congratulations! You've successfully completed this space with ${widget.partnerName ?? 'your partner'}.",
+                              style: TextStyle(
+                                fontFamily: 'Georgia',
+                                fontSize: 14,
+                                fontStyle: FontStyle.italic,
+                                color: const Color(0xFFD4C4CA).withValues(alpha: 0.75 + breathe * 0.15),
+                                height: 1.45,
+                              ),
+                            ),
+                            if (widget.onClose != null) ...[
+                              const SizedBox(height: 24),
+                              GestureDetector(
+                                onTap: widget.onClose,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF8A2E55).withValues(alpha: 0.15 + breathe * 0.05),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: const Color(0xFF8A2E55).withValues(alpha: 0.4),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        'Continue',
+                                        style: TextStyle(
+                                          fontFamily: 'Georgia',
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.bold,
+                                          color: const Color(0xFFDD8F9F),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Icon(
+                                        Icons.arrow_forward,
+                                        size: 16,
+                                        color: const Color(0xFFDD8F9F),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 12),
+                          ] else if (widget.isEmpty) ...[
+                            const SizedBox(height: 10),
+                            const Text(
+                              'Your journey begins here',
+                              style: TextStyle(
+                                fontFamily: 'Georgia',
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                height: 1.1,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              "When you're ready, begin a journey of reflection, growth, and connection.",
+                              style: TextStyle(
+                                fontFamily: 'Georgia',
+                                fontSize: 14,
+                                fontStyle: FontStyle.italic,
+                                color: const Color(0xFFD4C4CA).withValues(alpha: 0.75 + breathe * 0.15),
+                                height: 1.45,
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                          ] else ...[
+                            const SizedBox(height: 18),
+
+                            // BIG DAY COUNTER
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.baseline,
+                              textBaseline: TextBaseline.alphabetic,
+                              children: [
                                 Text(
-                                  'a space with ${widget.partnerName}',
+                                  'Day ',
                                   style: TextStyle(
                                     fontFamily: 'Georgia',
-                                    fontSize: 13,
-                                    fontStyle: FontStyle.italic,
-                                    color: const Color(0xFFDD8F9F)
-                                        .withValues(alpha: 0.55 + breathe * 0.2),
-                                    letterSpacing: 0.3,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w300,
+                                    color: Colors.white
+                                        .withValues(alpha: 0.35 + breathe * 0.15),
+                                  ),
+                                ),
+                                ShaderMask(
+                                  shaderCallback: (bounds) =>
+                                      LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      const Color(0xFFECC8D4),
+                                      const Color(0xFFDD8F9F),
+                                      Color.lerp(
+                                        const Color(0xFF9E7E5A),
+                                        const Color(0xFFDD8F9F),
+                                        breathe,
+                                      )!,
+                                    ],
+                                  ).createShader(bounds),
+                                  child: Text(
+                                    '${widget.currentDay}',
+                                    style: const TextStyle(
+                                      fontFamily: 'Georgia',
+                                      fontSize: 60,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                      height: 1.0,
+                                      letterSpacing: -2,
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
 
-                          const SizedBox(height: 10),
+                            const SizedBox(height: 4),
 
-                          // MOOD PHRASE
-                          Text(
-                            widget.moodPhrase,
-                            style: TextStyle(
-                              fontFamily: 'Georgia',
-                              fontSize: 14,
-                              fontStyle: FontStyle.italic,
-                              color: const Color(0xFFD4C4CA)
-                                  .withValues(alpha: 0.75 + breathe * 0.15),
-                              height: 1.45,
-                            ),
-                          ),
-
-                          const SizedBox(height: 18),
-
-                          // PROGRESS LINE
-                          _ProgressLine(
-                            progress: (widget.totalDays > 0 ? widget.currentDay / widget.totalDays : 0.0).clamp(0.0, 1.0),
-                            breathe: breathe,
-                          ),
-
-                          const SizedBox(height: 10),
-
-                          // BOTTOM STATUS ROW
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.auto_awesome,
-                                size: 11,
-                                color: const Color(0xFF9E7E5A)
-                                    .withValues(alpha: 0.6 + breathe * 0.3),
-                              ),
-                              const SizedBox(width: 7),
-                              Expanded(
-                                child: Text(
-                                  widget.statusLine,
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: const Color(0xFF866571)
-                                        .withValues(alpha: 0.8 + breathe * 0.1),
-                                    letterSpacing: 0.2,
+                            // PARTNER NAME — "a space with [name]"
+                            if (widget.partnerName != null &&
+                                widget.partnerName!.isNotEmpty)
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.favorite,
+                                    size: 10,
+                                    color: const Color(0xFFDD8F9F)
+                                        .withValues(alpha: 0.5 + breathe * 0.3),
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'a space with ${widget.partnerName}',
+                                    style: TextStyle(
+                                      fontFamily: 'Georgia',
+                                      fontSize: 13,
+                                      fontStyle: FontStyle.italic,
+                                      color: const Color(0xFFDD8F9F)
+                                          .withValues(alpha: 0.55 + breathe * 0.2),
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ],
                               ),
+
+                            const SizedBox(height: 10),
+
+                            // MOOD PHRASE
+                            if (widget.moodPhrase.isNotEmpty)
                               Text(
-                                'of ${widget.totalDays}',
+                                widget.moodPhrase,
                                 style: TextStyle(
                                   fontFamily: 'Georgia',
-                                  fontSize: 10,
+                                  fontSize: 14,
                                   fontStyle: FontStyle.italic,
-                                  color: const Color(0xFF9E7E5A)
-                                      .withValues(alpha: 0.5 + breathe * 0.2),
+                                  color: const Color(0xFFD4C4CA)
+                                      .withValues(alpha: 0.75 + breathe * 0.15),
+                                  height: 1.45,
                                 ),
                               ),
-                            ],
-                          ),
+
+                            const SizedBox(height: 18),
+
+                            // PROGRESS LINE
+                            _ProgressLine(
+                              progress: (widget.totalDays > 0 ? widget.currentDay / widget.totalDays : 0.0).clamp(0.0, 1.0),
+                              breathe: breathe,
+                            ),
+
+                            const SizedBox(height: 10),
+
+                            // BOTTOM STATUS ROW
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.auto_awesome,
+                                  size: 11,
+                                  color: const Color(0xFF9E7E5A)
+                                      .withValues(alpha: 0.6 + breathe * 0.3),
+                                ),
+                                const SizedBox(width: 7),
+                                Expanded(
+                                  child: Text(
+                                    widget.statusLine,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: const Color(0xFF866571)
+                                          .withValues(alpha: 0.8 + breathe * 0.1),
+                                      letterSpacing: 0.2,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Text(
+                                  'of ${widget.totalDays}',
+                                  style: TextStyle(
+                                    fontFamily: 'Georgia',
+                                    fontSize: 10,
+                                    fontStyle: FontStyle.italic,
+                                    color: const Color(0xFF9E7E5A)
+                                        .withValues(alpha: 0.5 + breathe * 0.2),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ],
+                      ),
                       ),
                     ),
 

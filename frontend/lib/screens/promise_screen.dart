@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../widgets/app_heart_icon.dart';
-import 'transition_screen.dart';
+import '../widgets/premium_sheen.dart';
+import 'home_screen.dart';
 
 class PromiseScreen extends StatefulWidget {
   final String userName;
@@ -83,74 +84,84 @@ class _PromiseScreenState extends State<PromiseScreen> {
                     const SizedBox(height: 12),
                     
                     // Main Quote
-                    RichText(
-                      textAlign: TextAlign.center,
-                      text: const TextSpan(
-                        style: TextStyle(
-                          fontFamily: 'Georgia',
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          height: 1.2,
-                        ),
-                        children: [
-                          TextSpan(text: '" A little distance can\nbring\na lot of clarity...\n'),
-                          TextSpan(
-                            text: 'if you allow it. "',
-                            style: TextStyle(
-                              fontStyle: FontStyle.italic,
-                              color: Color(0xFFE89FB8),
-                            ),
+                    PremiumSheen(
+                      animationDuration: const Duration(milliseconds: 2000),
+                      pauseDuration: const Duration(seconds: 10),
+                      sheenOpacity: 0.25,
+                      child: RichText(
+                        textAlign: TextAlign.center,
+                        text: const TextSpan(
+                          style: TextStyle(
+                            fontFamily: 'Georgia',
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            height: 1.2,
                           ),
-                        ],
+                          children: [
+                            TextSpan(text: '" A little distance can\nbring\na lot of clarity...\n'),
+                            TextSpan(
+                              text: 'if you allow it. "',
+                              style: TextStyle(
+                                fontStyle: FontStyle.italic,
+                                color: Color(0xFFE89FB8),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     
                     const SizedBox(height: 28),
                     
                     // The Promise Card
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF3D1524),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          // Watermark Heart
-                          Positioned(
-                            bottom: -10,
-                            right: -10,
-                            child: Icon(
-                              Icons.favorite,
-                              size: 60,
-                              color: const Color(0xFF4D1C2D),
-                            ),
-                          ),
-                          
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'MY DAILY PROMISE',
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.5,
-                                  color: const Color(0xFFAC7827).withOpacity(0.9),
-                                ),
+                    PremiumSheen(
+                      animationDuration: const Duration(milliseconds: 2500),
+                      pauseDuration: const Duration(seconds: 12),
+                      sheenOpacity: 0.15,
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(24),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF3D1524),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            // Watermark Heart
+                            Positioned(
+                              bottom: -10,
+                              right: -10,
+                              child: Icon(
+                                Icons.favorite,
+                                size: 60,
+                                color: const Color(0xFF4D1C2D),
                               ),
-                              const SizedBox(height: 16),
-                              _buildPromiseLine("I will respect this space."),
-                              const SizedBox(height: 8),
-                              _buildPromiseLine("I will take this time to reflect,\nnot react."),
-                              const SizedBox(height: 8),
-                              _buildPromiseLine("I will allow distance to help me\nunderstand, not avoid."),
-                            ],
-                          ),
-                        ],
+                            ),
+                            
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'MY DAILY PROMISE',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.5,
+                                    color: const Color(0xFFAC7827).withOpacity(0.9),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                _buildPromiseLine("I will respect this space."),
+                                const SizedBox(height: 8),
+                                _buildPromiseLine("I will take this time to reflect,\nnot react."),
+                                const SizedBox(height: 8),
+                                _buildPromiseLine("I will allow distance to help me\nunderstand, not avoid."),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                     
@@ -229,43 +240,48 @@ class _PromiseScreenState extends State<PromiseScreen> {
                     // Step into the space Button
                     GestureDetector(
                       onTap: _isChecked ? _proceedToTransition : null,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: double.infinity,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          color: _isChecked 
-                              ? const Color(0xFF1A1214) 
-                              : const Color(0xFF0D080A),
-                          borderRadius: BorderRadius.circular(26),
-                          border: Border.all(
+                      child: PremiumSheen(
+                        animationDuration: const Duration(milliseconds: 1500),
+                        pauseDuration: const Duration(seconds: 8),
+                        sheenOpacity: 0.15,
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          width: double.infinity,
+                          height: 52,
+                          decoration: BoxDecoration(
                             color: _isChecked 
-                                ? const Color(0xFF911746).withOpacity(0.5) 
-                                : const Color(0xFF26151B),
-                            width: 1.2,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.favorite,
-                              size: 18,
-                              color: _isChecked ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                                ? const Color(0xFF1A1214) 
+                                : const Color(0xFF0D080A),
+                            borderRadius: BorderRadius.circular(26),
+                            border: Border.all(
+                              color: _isChecked 
+                                  ? const Color(0xFF911746).withOpacity(0.5) 
+                                  : const Color(0xFF26151B),
+                              width: 1.2,
                             ),
-                            const SizedBox(width: 12),
-                            Text(
-                              "Step into the space",
-                              style: TextStyle(
-                                fontFamily: 'Georgia',
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                fontStyle: FontStyle.italic,
-                                letterSpacing: 0.5,
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.favorite,
+                                size: 18,
                                 color: _isChecked ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
                               ),
-                            ),
-                          ],
+                              const SizedBox(width: 12),
+                              Text(
+                                "Step into the space",
+                                style: TextStyle(
+                                  fontFamily: 'Georgia',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  fontStyle: FontStyle.italic,
+                                  letterSpacing: 0.5,
+                                  color: _isChecked ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -338,13 +354,15 @@ class _PromiseScreenState extends State<PromiseScreen> {
   }
 
   void _proceedToTransition() {
-    Navigator.of(context).push(
+    // Instead of showing the TransitionScreen, we go straight to HomeScreen
+    Navigator.of(context).pushAndRemoveUntil(
       MaterialPageRoute(
-        builder: (_) => TransitionScreen(
+        builder: (_) => HomeScreen(
           userName: widget.userName,
           partnerName: widget.partnerName,
         ),
       ),
+      (route) => false,
     );
   }
 }

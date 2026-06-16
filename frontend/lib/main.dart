@@ -6,45 +6,42 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'screens/onboarding_flow_screen.dart';
 import 'screens/splash_screen.dart';
 import 'services/api_service.dart';
+import 'services/local_notification_service.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  debugPrint("Handling a background message: ${message.messageId}");
+  debugPrint("🔥 [FCM BACKGROUND] onBackgroundMessage fired: ${message.messageId}");
+  debugPrint("🔥 [FCM BACKGROUND] Notification: title=${message.notification?.title}, body=${message.notification?.body}");
+  debugPrint("🔥 [FCM BACKGROUND] Data: ${message.data}");
 }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   try {
-    // If you ever configure Firebase for Web using flutterfire, you'll pass options here.
-    // For now, this try-catch prevents the app from crashing on Chrome.
-    await Firebase.initializeApp();
-    
     if (!kIsWeb) {
+      await Firebase.initializeApp();
       FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-      
-      // Request permission for push notifications
-      FirebaseMessaging messaging = FirebaseMessaging.instance;
-      await messaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
 
-      // Get the token each time the application loads
-      String? token = await messaging.getToken();
-      if (token != null) {
-        ApiService.registerFcmToken(token).catchError((_) {});
-      }
+      // ── Init local notification channel + iOS foreground options ──
+      await LocalNotificationService.instance.init();
 
-      // Any time the token refreshes, store this in the database too.
-      messaging.onTokenRefresh.listen((newToken) {
-        ApiService.registerFcmToken(newToken).catchError((_) {});
+      // ── Show a pop-up banner when a push arrives while the app is OPEN ──
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        debugPrint("🔥 [FCM FOREGROUND] onMessage fired: ${message.messageId}");
+        debugPrint("🔥 [FCM FOREGROUND] Notification: title=${message.notification?.title}, body=${message.notification?.body}");
+        debugPrint("🔥 [FCM FOREGROUND] Data: ${message.data}");
+        LocalNotificationService.instance.showFromRemoteMessage(message);
+      });
+
+      // ── Handle when user taps notification from tray ──
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        debugPrint("🔥 [FCM TAP] onMessageOpenedApp fired: ${message.messageId}");
       });
     }
   } catch (e) {
-    debugPrint("Firebase initialization failed (expected on Chrome without Web config): $e");
+    debugPrint("Firebase initialization failed: $e");
   }
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -54,6 +51,7 @@ Future<void> main() async {
   );
   runApp(const BondedApp());
 }
+
 
 class BondedApp extends StatelessWidget {
   const BondedApp({super.key});

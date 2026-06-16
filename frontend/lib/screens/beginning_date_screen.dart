@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'partner_invite_screen.dart';
+import '../services/api_service.dart';
 
 enum BeginningState { calendar, dateSelected, notSure }
 
@@ -10,11 +12,15 @@ enum NotSureReason { feeling, gradually, letMeTry }
 class BeginningDateScreen extends StatefulWidget {
   final String userName;
   final String partnerName;
+  final String? gender;
+  final String? relationType;
 
   const BeginningDateScreen({
     super.key,
     required this.userName,
     required this.partnerName,
+    this.gender,
+    this.relationType,
   });
 
   @override
@@ -736,16 +742,70 @@ class _BeginningDateScreenState extends State<BeginningDateScreen>
     );
   }
 
-  void _onSaveAndContinue() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PartnerInviteScreen(
-          userName: widget.userName,
-          partnerName: widget.partnerName,
+  bool _isSaving = false;
+
+  Future<void> _onSaveAndContinue() async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+
+    try {
+      String? formattedDate;
+      if (_currentState == BeginningState.dateSelected && _selectedDate != null) {
+        formattedDate = DateFormat('yyyy-MM-dd').format(_selectedDate!);
+      }
+
+      // Retrieve cached values
+      final prefs = await SharedPreferences.getInstance();
+      final cachedUserName = prefs.getString('onboarding_userName') ?? widget.userName;
+      final cachedGender = prefs.getString('onboarding_gender') ?? widget.gender;
+      final cachedRelationType = prefs.getString('onboarding_relationType') ?? widget.relationType;
+      final cachedPartnerName = prefs.getString('onboarding_partnerName') ?? widget.partnerName;
+
+      final nameToSave = cachedUserName.trim().isNotEmpty ? cachedUserName.trim() : null;
+      final partnerNameToSave = cachedPartnerName.trim().isNotEmpty ? cachedPartnerName.trim() : null;
+
+      await ApiService.updateUserProfile(
+        name: nameToSave,
+        gender: cachedGender,
+        relationType: cachedRelationType,
+        partnerName: partnerNameToSave,
+        relationshipDate: formattedDate,
+      );
+
+      // Clean up cache
+      await prefs.remove('onboarding_userName');
+      await prefs.remove('onboarding_gender');
+      await prefs.remove('onboarding_relationType');
+      await prefs.remove('onboarding_partnerName');
+
+      // Also cache partnerName locally as fallback for offline reads
+      if (partnerNameToSave != null) {
+        await ApiService.setPartnerName(partnerNameToSave);
+      }
+
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PartnerInviteScreen(
+            userName: widget.userName,
+            partnerName: widget.partnerName,
+          ),
         ),
-      ),
-    );
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(e.toString()),
+          backgroundColor: const Color(0xFF911746),
+        ));
+      }
+
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 }
 

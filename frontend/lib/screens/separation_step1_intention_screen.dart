@@ -15,6 +15,8 @@ class _SeparationStep1IntentionScreenState extends State<SeparationStep1Intentio
   int _selectedOption = 1;
   String? _partnerName;
   bool _isLoading = true;
+  bool _isSubmitting = false;
+  bool _isPartnerConnected = false;
 
   @override
   void initState() {
@@ -25,10 +27,25 @@ class _SeparationStep1IntentionScreenState extends State<SeparationStep1Intentio
   Future<void> _fetchPartnerName() async {
     try {
       final cachedPartnerName = await ApiService.getPartnerName();
+      bool isConnected = false;
+      String? backendPartnerName;
+      try {
+        final profile = await ApiService.getUserProfile();
+        if (profile['success'] == true && profile['data'] != null) {
+          isConnected = profile['data']['isPartnerConnected'] == true;
+          backendPartnerName = profile['data']['partnerName'];
+        }
+      } catch (e) {
+        // Silently ignore profile fetch errors if any
+      }
+      
       if (mounted) {
         setState(() {
+          _isPartnerConnected = isConnected;
           if (cachedPartnerName != null && cachedPartnerName.isNotEmpty) {
             _partnerName = cachedPartnerName;
+          } else if (backendPartnerName != null && backendPartnerName.isNotEmpty) {
+            _partnerName = backendPartnerName;
           }
           _isLoading = false;
           if (_partnerName == null || _partnerName!.isEmpty) {
@@ -46,7 +63,7 @@ class _SeparationStep1IntentionScreenState extends State<SeparationStep1Intentio
     }
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (_selectedOption == 1 && _partnerName != null && _partnerName!.isNotEmpty) {
       Navigator.push(
         context,
@@ -55,11 +72,96 @@ class _SeparationStep1IntentionScreenState extends State<SeparationStep1Intentio
         ),
       );
     } else if (_selectedOption == 2) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const SeparationStep2AddPersonScreen()),
-      );
+      if (_isPartnerConnected) {
+        _showDisconnectWarning();
+      } else {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const SeparationStep2AddPersonScreen()),
+        );
+      }
     }
+  }
+
+  void _showDisconnectWarning() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF160A0E),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: const BorderSide(color: Color(0xFF3D1627), width: 1.5),
+          ),
+          title: const Text(
+            'Disconnect Required',
+            style: TextStyle(
+              fontFamily: 'Georgia',
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+          content: Text(
+            'You are currently connected to ${_partnerName ?? 'your partner'}. You must disconnect your current bond before inviting someone else.',
+            style: const TextStyle(
+              fontSize: 15,
+              color: Color(0xFFD4C4CA),
+              height: 1.5,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: Color(0xFF7A5C67), fontSize: 16),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context); // close dialog
+                setState(() {
+                  _isSubmitting = true;
+                });
+                try {
+                  await ApiService.disconnectPartner();
+                  setState(() {
+                    _isPartnerConnected = false;
+                  });
+                  if (mounted) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const SeparationStep2AddPersonScreen()),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Failed to disconnect: ${e.toString()}'),
+                        backgroundColor: const Color(0xFF8A2E55),
+                      ),
+                    );
+                  }
+                } finally {
+                  if (mounted) {
+                    setState(() {
+                      _isSubmitting = false;
+                    });
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF8A2E55),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              child: const Text('Disconnect & Continue', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -236,19 +338,19 @@ class _SeparationStep1IntentionScreenState extends State<SeparationStep1Intentio
                                       ),
                                     ),
                                     const SizedBox(height: 4),
-                                    Row(
-                                      children: const [
-                                        Icon(Icons.circle, size: 8, color: Color(0xFF4CAF50)),
-                                        SizedBox(width: 6),
-                                        Text(
-                                          'Connected · Your partner',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Color(0xFF7A5C67),
+                                      Row(
+                                        children: [
+                                          Icon(Icons.circle, size: 8, color: _isPartnerConnected ? const Color(0xFF4CAF50) : const Color(0xFF7A5C67)),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            _isPartnerConnected ? 'Connected · Your partner' : 'Not connected yet · Your partner',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Color(0xFF7A5C67),
+                                            ),
                                           ),
-                                        ),
-                                      ],
-                                    ),
+                                        ],
+                                      ),
                                   ],
                                 ),
                               ),
@@ -383,7 +485,7 @@ class _SeparationStep1IntentionScreenState extends State<SeparationStep1Intentio
 
                       // ── Submit Button ──
                       GestureDetector(
-                        onTap: _selectedOption != 0 ? _submit : null,
+                        onTap: (_selectedOption != 0 && !_isSubmitting) ? _submit : null,
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           width: double.infinity,
@@ -400,7 +502,18 @@ class _SeparationStep1IntentionScreenState extends State<SeparationStep1Intentio
                               width: 1.2,
                             ),
                           ),
-                          child: Row(
+                          child: _isSubmitting 
+                            ? const Center(
+                                child: SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    color: Color(0xFFDD8F9F),
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              )
+                            : Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(

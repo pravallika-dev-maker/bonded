@@ -1,15 +1,21 @@
+import 'dart:math' as math;
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/api_service.dart';
+import '../services/app_event_bus.dart';
 import 'reflections_history_screen.dart';
-import 'relationship_insights_screen.dart';
 import 'history_screen.dart';
 import 'onboarding_flow_screen.dart';
+import 'main_dashboard_screen.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String userName;
   final String? partnerName;
-  const ProfileScreen({super.key, required this.userName, this.partnerName});
+  final VoidCallback? onProfileUpdated;
+  const ProfileScreen({super.key, required this.userName, this.partnerName, this.onProfileUpdated});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -22,10 +28,12 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   late String _currentUserName;
   String? _gender;
   String? _relationshipDate;
+  String? _phoneNumber;
 
   // Toggle states
   bool _notificationsEnabled = true;
   bool _locationAwarenessEnabled = false;
+  bool _isPartnerConnected = false;
 
   // Pulse animation for connection
   late AnimationController _pulseController;
@@ -61,23 +69,43 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
         profile = await ApiService.getUserProfile();
       } catch (_) {}
 
+      bool isConnectedCached = false;
+      if (profile == null) {
+        isConnectedCached = await ApiService.getIsPartnerConnected();
+      }
+
       if (mounted) {
         setState(() {
           _activeSeparation = sep;
           
           if (profile != null) {
-            _currentUserName = profile['name'] ?? _currentUserName;
-            _gender = profile['gender'];
-            _relationshipDate = profile['relationshipDate'];
+            final pd = profile['data'] ?? profile;
+            _currentUserName = pd['userName'] ?? pd['name'] ?? _currentUserName;
+            _gender = pd['gender'];
+            _relationshipDate = pd['relationshipDate'] ?? pd['activeRelationship']?['relationshipDate'];
+            _phoneNumber = pd['phoneNumber'];
+            
+            // Prefer partner name from profile if available
+            _partnerName = pd['partnerName'] ?? sep?['partnerName'] ?? cachedPartnerName ?? widget.partnerName;
+            _isPartnerConnected = pd['isPartnerConnected'] == true;
+            _notificationsEnabled = pd['notificationsEnabled'] ?? true;
+          } else {
+            _partnerName = sep?['partnerName'] ?? cachedPartnerName ?? widget.partnerName;
+            _isPartnerConnected = isConnectedCached;
           }
-          
-          _partnerName = sep?['partnerName'] ?? profile?['partnerName'] ?? cachedPartnerName ?? widget.partnerName;
           _isLoading = false;
         });
       }
     } catch (_) {
+      final cachedPartnerName = await ApiService.getPartnerName();
+      final isConnectedCached = await ApiService.getIsPartnerConnected();
+      
       if (mounted) {
         setState(() {
+          _partnerName ??= cachedPartnerName ?? widget.partnerName;
+          if (!_isPartnerConnected) {
+            _isPartnerConnected = isConnectedCached;
+          }
           _isLoading = false;
         });
       }
@@ -91,6 +119,16 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
       return 'Began on ${DateFormat('MMM d, yyyy').format(dt)}';
     } catch (_) {
       return 'Began: $startDateStr';
+    }
+  }
+
+  String _formatRelationshipDate(dynamic dateStr) {
+    if (dateStr == null) return 'Journey begun';
+    try {
+      final dt = DateTime.parse(dateStr.toString());
+      return 'Since ${DateFormat('MMM yyyy').format(dt)}';
+    } catch (_) {
+      return 'Since $dateStr';
     }
   }
 
@@ -249,9 +287,9 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   // --- Show Account Settings Dialog ---
   void _showAccountSettings(BuildContext context) {
     final nameCtrl = TextEditingController(text: _currentUserName);
-    final partnerCtrl = TextEditingController(text: _partnerName ?? '');
     final genderCtrl = TextEditingController(text: _gender ?? '');
     final relDateCtrl = TextEditingController(text: _relationshipDate ?? '');
+    final phoneCtrl = TextEditingController(text: _phoneNumber ?? '');
 
     showDialog(
       context: context,
@@ -289,6 +327,30 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 ),
                 const SizedBox(height: 20),
                 const Text(
+                  'PHONE NUMBER',
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF5A3C47), letterSpacing: 1.5),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF090204),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF26151B)),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: TextField(
+                    controller: phoneCtrl,
+                    enabled: false,
+                    style: const TextStyle(fontSize: 15, color: Color(0xFF866571)),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      hintText: 'No phone number',
+                      hintStyle: TextStyle(color: Color(0xFF5A3C47)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
                   'YOUR NAME',
                   style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF5A3C47), letterSpacing: 1.5),
                 ),
@@ -311,29 +373,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                   ),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'PARTNER NAME',
-                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF5A3C47), letterSpacing: 1.5),
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF090204),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF26151B)),
-                  ),
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  child: TextField(
-                    controller: partnerCtrl,
-                    style: const TextStyle(fontSize: 15, color: Colors.white),
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      hintText: 'Enter partner name',
-                      hintStyle: TextStyle(color: Color(0xFF5A3C47)),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
+
                 const Text(
                   'GENDER',
                   style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF5A3C47), letterSpacing: 1.5),
@@ -391,7 +431,6 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
           ElevatedButton(
             onPressed: () async {
               final newName = nameCtrl.text.trim();
-              final newPartner = partnerCtrl.text.trim();
               final newGender = genderCtrl.text.trim();
               final newRelDate = relDateCtrl.text.trim();
               
@@ -399,22 +438,16 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 try {
                   await ApiService.updateUserProfile(
                     name: newName,
-                    partnerName: newPartner.isNotEmpty ? newPartner : null,
                     gender: newGender.isNotEmpty ? newGender : null,
                     relationshipDate: newRelDate.isNotEmpty ? newRelDate : null,
                   );
                   
-                  if (newPartner.isNotEmpty) {
-                    await ApiService.setPartnerName(newPartner);
-                  }
                   setState(() {
                     _currentUserName = newName;
-                    if (newPartner.isNotEmpty) {
-                      _partnerName = newPartner;
-                    }
                     _gender = newGender.isNotEmpty ? newGender : null;
                     _relationshipDate = newRelDate.isNotEmpty ? newRelDate : null;
                   });
+                  widget.onProfileUpdated?.call();
                 } catch (_) {}
                 if (context.mounted) Navigator.pop(context);
               }
@@ -478,7 +511,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   }
 
   // --- Confirm Disconnect Space Dialog ---
-  void _confirmDisconnect(BuildContext context) {
+  void _confirmDisconnectPartner(BuildContext context) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -488,7 +521,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
           side: const BorderSide(color: Color(0xFF3E1F2C), width: 1.5),
         ),
         title: const Text(
-          'Disconnect Space?',
+          'Disconnect Partner?',
           style: TextStyle(
             fontFamily: 'Georgia',
             fontSize: 20,
@@ -497,7 +530,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
           ),
         ),
         content: const Text(
-          'Are you sure you want to pause or end the current separation flow? This will stop current journey progress.',
+          'Are you sure you want to completely unlink from your partner? This will disconnect your shared spaces.',
           style: TextStyle(fontSize: 14, color: Color(0xFFD4C4CA)),
         ),
         actions: [
@@ -507,30 +540,27 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
           ),
           ElevatedButton(
             onPressed: () async {
-              if (_activeSeparation != null && _activeSeparation!['id'] != null) {
-                try {
-                  await ApiService.endSeparation(_activeSeparation!['id']);
-                  if (context.mounted) {
-                    Navigator.pop(context); // Close dialog
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Space disconnected successfully.')),
-                    );
-                    // Force a reload of the profile to reflect the changes
-                    _fetchActiveSeparation();
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    Navigator.pop(context); // Close dialog
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to disconnect: $e')),
-                    );
-                  }
-                }
-              } else {
+              try {
+                await ApiService.disconnectPartner();
                 if (context.mounted) {
-                  Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('No active separation found to disconnect.')),
+                    const SnackBar(content: Text('Partner disconnected successfully.')),
+                  );
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (_) => MainDashboardScreen(
+                        userName: _currentUserName,
+                        isWaitingForPartner: false,
+                      ),
+                    ),
+                    (route) => false,
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  Navigator.pop(context); // Close dialog
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to disconnect: $e')),
                   );
                 }
               }
@@ -575,12 +605,38 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
           ),
           ElevatedButton(
             onPressed: () async {
-              await ApiService.clearToken();
-              if (context.mounted) {
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const OnboardingFlowScreen()),
-                  (route) => false,
+              try {
+                // Show a loading indicator in the dialog
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => const Center(
+                    child: CircularProgressIndicator(color: Color(0xFFDD8F9F)),
+                  ),
                 );
+
+                await ApiService.deleteAccount();
+                
+                if (context.mounted) {
+                  // Pop the loading dialog
+                  Navigator.of(context).pop();
+                  
+                  // Navigate to Onboarding
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (_) => const OnboardingFlowScreen()),
+                    (route) => false,
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  // Pop the loading dialog
+                  Navigator.of(context).pop();
+                  
+                  // Show error
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Failed to delete account: $e')),
+                  );
+                }
               }
             },
             style: ElevatedButton.styleFrom(
@@ -595,7 +651,16 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    final finalPartner = _partnerName ?? widget.partnerName ?? 'Partner';
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF090204),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFFDD8F9F)),
+        ),
+      );
+    }
+
+    final bool hasPartner = _isPartnerConnected;
     final isSeparated = _activeSeparation != null;
 
     return Scaffold(
@@ -608,72 +673,36 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             children: [
               // --- 1. HEADER (IDENTITY) ---
               const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'YOUR SPACE',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 2.0,
-                          color: Color(0xFF9E7E5A),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _currentUserName,
-                        style: const TextStyle(
-                          fontFamily: 'Georgia',
-                          fontSize: 34,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        'Your journey, your pace',
-                        style: TextStyle(
-                          fontFamily: 'Georgia',
-                          fontSize: 15,
-                          fontStyle: FontStyle.italic,
-                          color: Color(0xFF6E4555),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    width: 58,
-                    height: 58,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFF260D1A),
-                      border: Border.all(
-                        color: const Color(0xFF3D1627),
-                        width: 1.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF911746).withOpacity(0.12),
-                          blurRadius: 16,
-                          spreadRadius: 2,
-                        ),
-                      ],
+                  const Text(
+                    'YOUR SPACE',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2.0,
+                      color: Color(0xFF9E7E5A),
                     ),
-                    child: Center(
-                      child: Text(
-                        _getInitials(_currentUserName),
-                        style: const TextStyle(
-                          fontFamily: 'Georgia',
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFFDD8F9F),
-                        ),
-                      ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _currentUserName,
+                    style: const TextStyle(
+                      fontFamily: 'Georgia',
+                      fontSize: 34,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Your journey, your pace',
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      fontSize: 15,
+                      fontStyle: FontStyle.italic,
+                      color: Color(0xFF6E4555),
                     ),
                   ),
                 ],
@@ -703,13 +732,9 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
-                    Positioned(
-                      bottom: -15,
-                      right: -15,
-                      child: Icon(
-                        Icons.favorite,
-                        size: 110,
-                        color: Colors.white.withOpacity(0.015),
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _ConstellationBackgroundPainter(animation: _pulseAnimation),
                       ),
                     ),
                     Column(
@@ -735,48 +760,21 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                             
                             // Connected bridge line
                             Expanded(
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  Container(
-                                    height: 1.5,
-                                    margin: const EdgeInsets.symmetric(horizontal: 8),
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          const Color(0xFFDD8F9F).withOpacity(0.6),
-                                          const Color(0xFF9E7E5A).withOpacity(0.6),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  // Pulsing Heart in the middle
-                                  AnimatedBuilder(
-                                    animation: _pulseAnimation,
-                                    builder: (context, child) {
-                                      return Transform.scale(
-                                        scale: _pulseAnimation.value,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(6),
-                                          decoration: const BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: Color(0xFF1F0A13),
-                                          ),
-                                          child: const Icon(
-                                            Icons.favorite,
-                                            size: 14,
-                                            color: Color(0xFFDD8F9F),
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ],
+                              child: CustomPaint(
+                                size: const Size(double.infinity, 30),
+                                painter: _AliveConnectionLinePainter(
+                                  animation: _pulseAnimation,
+                                  isConnected: hasPartner,
+                                ),
                               ),
                             ),
                             
                             // Partner Avatar
-                            _buildAvatarCircle(_getInitials(finalPartner), finalPartner),
+                            _buildAvatarCircle(
+                              hasPartner ? _getInitials(_partnerName?.isNotEmpty == true ? _partnerName! : 'Partner') : '', 
+                              hasPartner ? (_partnerName?.isNotEmpty == true ? _partnerName! : 'Partner') : 'Waiting...', 
+                              isWaiting: !hasPartner
+                            ),
                           ],
                         ),
                         
@@ -803,12 +801,14 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                                         height: 8,
                                         decoration: BoxDecoration(
                                           shape: BoxShape.circle,
-                                          color: isSeparated
+                                          color: !hasPartner
                                               ? const Color(0xFFDD8F9F).withOpacity(_pulseAnimation.value * 0.7 + 0.3)
-                                              : const Color(0xFF4CAF50).withOpacity(_pulseAnimation.value * 0.7 + 0.3),
+                                              : isSeparated
+                                                  ? const Color(0xFFDD8F9F).withOpacity(_pulseAnimation.value * 0.7 + 0.3)
+                                                  : const Color(0xFF4CAF50).withOpacity(_pulseAnimation.value * 0.7 + 0.3),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: isSeparated ? const Color(0xFFDD8F9F) : const Color(0xFF4CAF50),
+                                              color: !hasPartner ? const Color(0xFFDD8F9F) : isSeparated ? const Color(0xFFDD8F9F) : const Color(0xFF4CAF50),
                                               blurRadius: 6,
                                               spreadRadius: 1,
                                             ),
@@ -819,10 +819,10 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                                   ),
                                   const SizedBox(width: 8),
                                   Text(
-                                    isSeparated ? 'In Separate Spaces' : 'Connected',
+                                    !hasPartner ? 'Shared Space Preparing' : isSeparated ? 'In Separate Spaces' : 'Connected',
                                     style: TextStyle(
                                       fontSize: 13,
-                                      color: isSeparated ? const Color(0xFFDD8F9F) : const Color(0xFF4CAF50),
+                                      color: !hasPartner ? const Color(0xFFDD8F9F) : isSeparated ? const Color(0xFFDD8F9F) : const Color(0xFF4CAF50),
                                       fontWeight: FontWeight.w600,
                                       letterSpacing: 0.5,
                                     ),
@@ -833,16 +833,19 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                         Text(
                           _isLoading
                               ? "Checking connection status..."
-                              : isSeparated
-                                  ? (_activeSeparation!['reason']?.isNotEmpty == true
-                                      ? '“${_activeSeparation!['reason']}”'
-                                      : "Taking space to reflect and grow...")
-                                  : "You're both here, sharing the sanctuary",
-                          style: const TextStyle(
+                              : !hasPartner 
+                                  ? "Your shared space is being created.\nInvite someone meaningful to begin the journey."
+                                  : isSeparated
+                                      ? (_activeSeparation!['reason']?.isNotEmpty == true
+                                          ? '“${_activeSeparation!['reason']}”'
+                                          : "Taking space to reflect and grow...")
+                                      : "You're both here, sharing the sanctuary",
+                          style: TextStyle(
                             fontFamily: 'Georgia',
                             fontSize: 14,
                             fontStyle: FontStyle.italic,
-                            color: Color(0xFFDD8F9F),
+                            color: !hasPartner ? const Color(0xFFD4C4CA) : const Color(0xFFDD8F9F),
+                            height: 1.5,
                           ),
                           textAlign: TextAlign.center,
                         ),
@@ -854,9 +857,11 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
               const SizedBox(height: 16),
 
               // --- 3. TWO COLUMN CARDS (STYLIZED GLASS EFFECTS) ---
-              Row(
-                children: [
-                  // Story Card
+              IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Story Card
                   Expanded(
                     child: Container(
                       padding: const EdgeInsets.all(20),
@@ -883,14 +888,18 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                             ],
                           ),
                           const SizedBox(height: 16),
-                          const Text(
-                            'Since Jun 2023',
-                            style: TextStyle(fontFamily: 'Georgia', fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                          Text(
+                            hasPartner 
+                                ? _formatRelationshipDate(_relationshipDate)
+                                : 'Awaiting Connection',
+                            style: const TextStyle(fontFamily: 'Georgia', fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
                           ),
                           const SizedBox(height: 6),
-                          const Text(
-                            'Growing together since then',
-                            style: TextStyle(fontFamily: 'Georgia', fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF866571)),
+                          Text(
+                            hasPartner 
+                                ? 'Growing together since then'
+                                : 'Ready to begin your story',
+                            style: const TextStyle(fontFamily: 'Georgia', fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF866571)),
                           ),
                         ],
                       ),
@@ -940,9 +949,11 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                           Text(
                             _isLoading
                                 ? 'Checking...'
-                                : isSeparated
-                                    ? (_activeSeparation!['durationLabel'] ?? 'In a space')
-                                    : 'Connected',
+                                : !hasPartner
+                                    ? 'Available'
+                                    : isSeparated
+                                        ? (_activeSeparation!['durationLabel'] ?? 'In a space')
+                                        : 'Connected',
                             style: TextStyle(
                               fontFamily: 'Georgia',
                               fontSize: 16,
@@ -954,9 +965,11 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                           Text(
                             _isLoading
                                 ? 'Checking space status'
-                                : isSeparated
-                                    ? _formatStartDate(_activeSeparation!['startDate'])
-                                    : 'No active separation',
+                                : !hasPartner
+                                    ? 'Waiting for partner'
+                                    : isSeparated
+                                        ? _formatStartDate(_activeSeparation!['startDate'])
+                                        : 'No active separation',
                             style: TextStyle(
                               fontFamily: 'Georgia',
                               fontSize: 12,
@@ -969,6 +982,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                     ),
                   ),
                 ],
+              ),
               ),
               const SizedBox(height: 32),
 
@@ -1011,45 +1025,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
               ),
               const SizedBox(height: 32),
 
-              // --- 5. SOMETHING WE'VE NOTICED ---
-              _ProfileSection(
-                title: "Something we've noticed",
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(28),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1F0A13),
-                    borderRadius: BorderRadius.circular(32),
-                  ),
-                  child: Stack(
-                    children: [
-                      Positioned(
-                        top: -10,
-                        right: -10,
-                        child: Icon(
-                          Icons.favorite,
-                          size: 80,
-                          color: Colors.white.withOpacity(0.02),
-                        ),
-                      ),
-                      Column(
-                        children: const [
-                          _InsightBullet(
-                            text: "You've been showing up, even on difficult days",
-                            dotColor: Color(0xFFDD8F9F),
-                          ),
-                          SizedBox(height: 16),
-                          _InsightBullet(
-                            text: "You're learning to pause before reacting",
-                            dotColor: Color(0xFF9E7E5A),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 40),
+
 
               // --- 7. PREFERENCES (TOGGLES WORKING, PRIVACY SHEET & ACCOUNT SETTINGS OPEN) ---
               _ProfileSection(
@@ -1068,10 +1044,39 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                         title: 'Notifications',
                         trailing: _CustomToggle(
                           value: _notificationsEnabled,
-                          onChanged: (v) {
+                          onChanged: (v) async {
+                            // Optimistically update UI
                             setState(() {
                               _notificationsEnabled = v;
                             });
+                            
+                            try {
+                              await ApiService.updateUserProfile(notificationsEnabled: v);
+                              
+                              if (v && !kIsWeb) {
+                                // They just turned it on, so request permission and generate token!
+                                FirebaseMessaging messaging = FirebaseMessaging.instance;
+                                await messaging.requestPermission(
+                                  alert: true,
+                                  badge: true,
+                                  sound: true,
+                                );
+                                String? token = await messaging.getToken();
+                                if (token != null) {
+                                  await ApiService.registerFcmToken(token);
+                                }
+                              }
+                            } catch (e) {
+                              // Revert on error
+                              if (mounted) {
+                                setState(() {
+                                  _notificationsEnabled = !v;
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Failed to update notification settings.')),
+                                );
+                              }
+                            }
                           },
                         ),
                       ),
@@ -1083,14 +1088,15 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                       _SettingItem(
                         icon: Icons.location_on_outlined,
                         title: 'Location awareness',
-                        subtext: 'Gentle nudge only',
-                        trailing: _CustomToggle(
-                          value: _locationAwarenessEnabled,
-                          onChanged: (v) {
-                            setState(() {
-                              _locationAwarenessEnabled = v;
-                            });
-                          },
+                        subtext: 'Coming soon',
+                        trailing: const Text(
+                          'Coming soon',
+                          style: TextStyle(
+                            fontFamily: 'Georgia',
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                            color: Color(0xFF6E4555),
+                          ),
                         ),
                       ),
                       _SettingItem(
@@ -1123,12 +1129,13 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                         subtext: 'You can come back anytime',
                         onTap: () => _confirmLogout(context),
                       ),
-                      _SettingItem(
-                        icon: Icons.link_off,
-                        title: 'Disconnect space',
-                        subtext: 'End or pause the separation flow',
-                        onTap: () => _confirmDisconnect(context),
-                      ),
+                      if (hasPartner || _partnerName != null)
+                        _SettingItem(
+                          icon: Icons.link_off,
+                          title: 'Disconnect partner',
+                          subtext: 'Unlink from your current partner',
+                          onTap: () => _confirmDisconnectPartner(context),
+                        ),
                       _SettingItem(
                         icon: Icons.delete_outline,
                         title: 'Delete account',
@@ -1140,9 +1147,84 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                   ),
                 ),
               ),
-              const SizedBox(height: 64),
+              const SizedBox(height: 40),
 
-              // --- 9. CLOSING LINE ---
+              // --- 9. DEVELOPER TOOLS ---
+              if (isSeparated)
+                _ProfileSection(
+                  title: 'Developer Tools (Testing)',
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF140A10),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: const Color(0xFF4A6572), width: 1.2),
+                    ),
+                    child: Column(
+                      children: [
+                        _SettingItem(
+                          icon: Icons.fast_forward,
+                          title: 'Time Travel to End',
+                          subtext: 'Instantly ends active separation today for testing',
+                          isLast: true,
+                          onTap: () async {
+  if (!_isPartnerConnected) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('❗ You must be connected with a partner to use Time Travel. Connect first.'),
+          backgroundColor: Color(0xFF2A0D18),
+          duration: Duration(seconds: 4),
+        ),
+      );
+    }
+    return;
+  }
+  try {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => const Center(
+        child: CircularProgressIndicator(valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFDD8F9F))),
+      ),
+    );
+    await ApiService.timeTravelSeparation();
+    // Broadcast so dashboard + journey screen instantly refresh
+    AppEventBus().emit(AppEvent.timeTravelCompleted);
+    if (context.mounted) {
+      Navigator.pop(context); // Close loading dialog
+      // Navigate to dashboard home tab — this triggers _fetchDashboardData()
+      // which will detect has_completed_separation == true and immediately
+      // set _isCheckedIn = true, unlocking final insights for this user.
+      // The partner's insights unlock the next time their app polls /home-hero.
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => MainDashboardScreen(
+            userName: _currentUserName,
+            partnerName: _partnerName,
+            initialIndex: 0,
+          ),
+        ),
+        (route) => false,
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      Navigator.pop(context); // Close loading
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+},
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              if (isSeparated) const SizedBox(height: 64),
+
+              // --- 10. CLOSING LINE ---
               const Center(
                 child: Text(
                   '“This space will be here when you need it”',
@@ -1162,7 +1244,7 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
     );
   }
 
-  Widget _buildAvatarCircle(String initial, String label) {
+  Widget _buildAvatarCircle(String initial, String label, {bool isWaiting = false}) {
     return Column(
       children: [
         Container(
@@ -1170,9 +1252,18 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
           height: 52,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: const Color(0xFF160A0E),
-            border: Border.all(color: const Color(0xFF3D1627), width: 1.5),
-            boxShadow: [
+            color: isWaiting ? const Color(0xFF1A0A11) : const Color(0xFF160A0E), // Slightly brighter background
+            border: Border.all(
+              color: isWaiting ? const Color(0xFF5A2C40).withOpacity(0.8) : const Color(0xFF3D1627), // Brighter border
+              width: isWaiting ? 1.5 : 1.5
+            ),
+            boxShadow: isWaiting ? [
+              BoxShadow(
+                color: const Color(0xFFE0BFB8).withOpacity(0.05), // Subtle outer glow
+                blurRadius: 10,
+                spreadRadius: 1,
+              )
+            ] : [
               BoxShadow(
                 color: const Color(0xFFDD8F9F).withOpacity(0.05),
                 blurRadius: 8,
@@ -1181,23 +1272,45 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
             ],
           ),
           child: Center(
-            child: Text(
-              initial,
-              style: const TextStyle(
-                fontFamily: 'Georgia',
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
+            child: isWaiting
+                ? AnimatedBuilder(
+                    animation: _pulseAnimation,
+                    builder: (context, child) {
+                      final size = 16.0 + (4.0 * _pulseAnimation.value);
+                      return Container(
+                        width: size,
+                        height: size,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFFE0BFB8).withOpacity(0.5 + 0.3 * _pulseAnimation.value), // Rose gold orb
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFE0BFB8).withOpacity(0.4 * _pulseAnimation.value),
+                              blurRadius: 12 * _pulseAnimation.value,
+                              spreadRadius: 3 * _pulseAnimation.value,
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  )
+                : Text(
+                    initial,
+                    style: const TextStyle(
+                      fontFamily: 'Georgia',
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
           ),
         ),
         const SizedBox(height: 6),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
-            color: Color(0xFF866571),
+            color: isWaiting ? const Color(0xFF866571) : const Color(0xFF866571), // Brighter text color
           ),
         ),
       ],
@@ -1231,44 +1344,6 @@ class _ProfileSection extends StatelessWidget {
   }
 }
 
-class _InsightBullet extends StatelessWidget {
-  final String text;
-  final Color dotColor;
-  const _InsightBullet({required this.text, required this.dotColor});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 6.0),
-          child: Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: dotColor,
-            ),
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontFamily: 'Georgia',
-              fontSize: 16,
-              fontStyle: FontStyle.italic,
-              color: Color(0xFFD4C4CA),
-              height: 1.3,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 class _SettingItem extends StatelessWidget {
   final IconData icon;
@@ -1405,4 +1480,154 @@ class _CustomToggle extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ConstellationBackgroundPainter extends CustomPainter {
+  final Animation<double> animation;
+  _ConstellationBackgroundPainter({required this.animation}) : super(repaint: animation);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rand = math.Random(42); // Fixed seed for stable constellation
+    final paint = Paint()
+      ..color = const Color(0xFFDD8F9F).withOpacity(0.15)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.0);
+
+    for (int i = 0; i < 15; i++) {
+      final x = rand.nextDouble() * size.width;
+      final y = rand.nextDouble() * size.height;
+      final radius = rand.nextDouble() * 2.0 + 1.0;
+      
+      // Twinkle effect based on animation and random offset
+      final twinkle = (math.sin(animation.value * math.pi * 2 + rand.nextDouble() * 10) + 1) / 2;
+      
+      paint.color = const Color(0xFFDD8F9F).withOpacity(0.05 + 0.15 * twinkle);
+      canvas.drawCircle(Offset(x, y), radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ConstellationBackgroundPainter oldDelegate) => true;
+}
+
+class _AliveConnectionLinePainter extends CustomPainter {
+  final Animation<double> animation;
+  final bool isConnected;
+  
+  _AliveConnectionLinePainter({required this.animation, required this.isConnected}) : super(repaint: animation);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final cy = size.height / 2;
+
+    // Base subtle line
+    final baseLinePaint = Paint()
+      ..color = const Color(0xFF3D1627)
+      ..strokeWidth = 1.0
+      ..style = PaintingStyle.stroke;
+    
+    canvas.drawLine(Offset(0, cy), Offset(w, cy), baseLinePaint);
+
+    if (isConnected) {
+      // Flowing energy line when connected
+      final pulse = (math.sin(animation.value * math.pi * 2) + 1) / 2;
+      final activeLinePaint = Paint()
+        ..shader = LinearGradient(
+          colors: [
+            const Color(0xFF911746).withOpacity(0.0),
+            const Color(0xFFDD8F9F).withOpacity(0.8 * pulse + 0.2),
+            const Color(0xFF911746).withOpacity(0.0),
+          ],
+          stops: const [0.0, 0.5, 1.0],
+        ).createShader(Rect.fromLTRB(0, 0, w, size.height))
+        ..strokeWidth = 2.0
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5)
+        ..style = PaintingStyle.stroke;
+
+      canvas.drawLine(Offset(0, cy), Offset(w, cy), activeLinePaint);
+      
+      // Pulsing heart in center
+      final heartIcon = Icons.favorite;
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: String.fromCharCode(heartIcon.codePoint),
+          style: TextStyle(
+            fontSize: 22 + (4 * pulse), // Increased size
+            fontFamily: heartIcon.fontFamily,
+            package: heartIcon.fontPackage,
+            color: const Color(0xFFE0BFB8), // Rose gold
+          ),
+        ),
+        textDirection: ui.TextDirection.ltr,
+      );
+      textPainter.layout();
+      
+      // Heart glow
+      canvas.drawCircle(
+        Offset(w/2, cy), 
+        16, 
+        Paint()
+          ..color = const Color(0xFFE0BFB8).withOpacity(0.3 * pulse)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0)
+      );
+      
+      textPainter.paint(canvas, Offset(w / 2 - textPainter.width / 2, cy - textPainter.height / 2));
+    } else {
+      // Anticipation energy reaching out when not connected
+      final progress = animation.value;
+      
+      // Draw a breathing glowing path
+      final glowPaint = Paint()
+        ..shader = LinearGradient(
+          colors: [
+            const Color(0xFF911746).withOpacity(0.0),
+            const Color(0xFFE0BFB8).withOpacity(0.3 * progress), // Rose gold glow
+            const Color(0xFF911746).withOpacity(0.0),
+          ],
+          stops: const [0.0, 0.5, 1.0],
+        ).createShader(Rect.fromLTRB(0, 0, w, size.height))
+        ..strokeWidth = 2.0
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0)
+        ..style = PaintingStyle.stroke;
+        
+      canvas.drawLine(Offset(0, cy), Offset(w, cy), glowPaint);
+
+      // Draw a tiny traveler particle showing anticipation
+      final travelerX = w * progress;
+      final travelerPaint = Paint()
+        ..color = const Color(0xFFE0BFB8).withOpacity(1.0 - progress)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.0);
+      canvas.drawCircle(Offset(travelerX, cy), 2.5, travelerPaint);
+      
+      // Soft breathing center orb/heart
+      final orbPulse = (math.sin(animation.value * math.pi * 2) + 1) / 2;
+      
+      final heartIcon = Icons.favorite; // Changed to solid heart
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: String.fromCharCode(heartIcon.codePoint),
+          style: TextStyle(
+            fontSize: 22 + (2 * orbPulse), // Larger solid heart
+            fontFamily: heartIcon.fontFamily,
+            package: heartIcon.fontPackage,
+            color: const Color(0xFFE0BFB8), // Solid Rose gold
+            shadows: [
+              Shadow(
+                color: const Color(0xFFE0BFB8).withOpacity(0.6 * orbPulse),
+                blurRadius: 10.0,
+              ),
+            ],
+          ),
+        ),
+        textDirection: ui.TextDirection.ltr,
+      );
+      textPainter.layout();
+      
+      textPainter.paint(canvas, Offset(w / 2 - textPainter.width / 2, cy - textPainter.height / 2));
+    }
+  }
+
+  @override
+  bool shouldRepaint(_AliveConnectionLinePainter oldDelegate) => true;
 }

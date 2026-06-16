@@ -35,6 +35,7 @@ class SeparationDetailScreen extends StatefulWidget {
 class _SeparationDetailScreenState extends State<SeparationDetailScreen> {
   String _partnerName = 'your connection';
   Map<String, dynamic>? _summary;
+  int? _fetchedLettersCount;
   bool _isLoading = true;
 
   @override
@@ -60,8 +61,18 @@ class _SeparationDetailScreenState extends State<SeparationDetailScreen> {
             'relationship_id=${widget.relationshipId}: $e');
       }
     }
+
+    int? fetchedLettersCount;
+    if (widget.relationshipId != null) {
+      try {
+        final letters = await ApiService.getRelationshipLetters(widget.relationshipId!);
+        fetchedLettersCount = letters.length;
+      } catch (e) {
+        debugPrint('SeparationDetailScreen: failed to fetch letters count: $e');
+      }
+    }
     // For active separations we show only the data already in separationData —
-    // no additional network calls are made here.
+    // no additional network calls are made here, except letters count.
 
     if (mounted) {
       setState(() {
@@ -70,6 +81,7 @@ class _SeparationDetailScreenState extends State<SeparationDetailScreen> {
             widget.separationData?['partnerName'] ??
             'your connection';
         _summary = summary;
+        _fetchedLettersCount = fetchedLettersCount;
         _isLoading = false;
       });
     }
@@ -113,8 +125,8 @@ class _SeparationDetailScreenState extends State<SeparationDetailScreen> {
     final String reason = data['reason'] ?? '';
     final String reflection = data['reflection'] ?? '';
 
-    // letters_count comes from the history item itself (part of the history response)
-    final int lettersCount =
+    // letters_count comes from the fetched API call, fallback to history item itself
+    final int lettersCount = _fetchedLettersCount ??
         data['letters_count'] ?? data['lettersCount'] ?? data['letter_count'] ?? 0;
 
     // Bond Resonance score — sourced ONLY from /relationships/{id}/summary.

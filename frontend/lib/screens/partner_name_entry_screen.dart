@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'gender_selection_screen.dart';
-import 'partner_invite_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'beginning_date_screen.dart';
 import '../services/api_service.dart';
 
 class PartnerNameEntryScreen extends StatefulWidget {
   final String userName;
-  const PartnerNameEntryScreen({super.key, required this.userName});
+  final String? gender;
+  final String? relationType;
+  const PartnerNameEntryScreen({super.key, required this.userName, this.gender, this.relationType});
 
   @override
   State<PartnerNameEntryScreen> createState() => _PartnerNameEntryScreenState();
@@ -187,6 +189,9 @@ class _PartnerNameEntryScreenState extends State<PartnerNameEntryScreen> {
                                 ),
                                 keyboardType: TextInputType.name,
                                 textCapitalization: TextCapitalization.words,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z\s]')),
+                                ],
                               ),
                             ),
                             
@@ -253,24 +258,28 @@ class _PartnerNameEntryScreenState extends State<PartnerNameEntryScreen> {
                         onTap: _partnerNameController.text.trim().isNotEmpty
                             ? () async {
                                 final pName = _partnerNameController.text.trim();
+                                // Persist to SharedPreferences (local cache)
                                 await ApiService.setPartnerName(pName);
-                                if (mounted) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => GenderSelectionScreen(
+                                final prefs = await SharedPreferences.getInstance();
+                                await prefs.setString('onboarding_partnerName', pName);
+                                if (!context.mounted) return;
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => GenderSelectionScreen(
+                                      userName: widget.userName,
+                                      targetName: pName,
+                                      currentStep: 5,
+                                      totalSteps: 7,
+                                      nextScreen: BeginningDateScreen(
                                         userName: widget.userName,
-                                        targetName: pName,
-                                        currentStep: 5,
-                                        totalSteps: 7,
-                                        nextScreen: BeginningDateScreen(
-                                          userName: widget.userName,
-                                          partnerName: pName,
-                                        ),
+                                        gender: widget.gender,
+                                        relationType: widget.relationType,
+                                        partnerName: pName,
                                       ),
                                     ),
-                                  );
-                                }
+                                  ),
+                                );
                               }
                             : null,
                         child: AnimatedContainer(

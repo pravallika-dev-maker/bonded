@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'new_letter_screen.dart';
 import '../services/api_service.dart';
+import '../utils/letter_share_service.dart';
 
 class LetterDetailsScreen extends StatefulWidget {
   final int id;
@@ -36,6 +36,8 @@ class _LetterDetailsScreenState extends State<LetterDetailsScreen> {
   late String currentBody;
   late String currentTag;
   bool isDeleting = false;
+  bool _isSharing = false;
+  final GlobalKey _cardRepaintKey = GlobalKey();
 
   @override
   void initState() {
@@ -43,21 +45,6 @@ class _LetterDetailsScreenState extends State<LetterDetailsScreen> {
     currentBody = widget.body;
     currentTag = widget.tag;
   }
-
-  void _shareToWhatsApp() async {
-    final text = 'Read my letter: \n\n"$currentBody"';
-    final url = Uri.parse('whatsapp://send?text=${Uri.encodeComponent(text)}');
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('WhatsApp is not installed.')),
-        );
-      }
-    }
-  }
-
   void _editLetter() async {
     final result = await Navigator.push(
       context,
@@ -113,6 +100,20 @@ class _LetterDetailsScreenState extends State<LetterDetailsScreen> {
     }
   }
 
+  void _shareToWhatsApp() async {
+    setState(() => _isSharing = true);
+
+    // Wait one frame so the offstage card is fully laid out before capturing
+    await Future.delayed(const Duration(milliseconds: 150));
+
+    if (!mounted) return;
+    await LetterShareService.shareLetterAsCard(
+      repaintKey: _cardRepaintKey,
+      context: context,
+    );
+    if (mounted) setState(() => _isSharing = false);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isDeleting) {
@@ -129,8 +130,11 @@ class _LetterDetailsScreenState extends State<LetterDetailsScreen> {
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
       ),
-      child: Scaffold(
-        backgroundColor: const Color(0xFF090204),
+      child: Stack(
+        children: [
+          // ── MAIN SCAFFOLD ──
+          Scaffold(
+            backgroundColor: const Color(0xFF090204),
         body: SafeArea(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -163,8 +167,8 @@ class _LetterDetailsScreenState extends State<LetterDetailsScreen> {
                       color: const Color(0xFF160A0E),
                       onSelected: (value) {
                         if (value == 'edit') _editLetter();
-                        if (value == 'share') _shareToWhatsApp();
                         if (value == 'delete') _deleteLetter();
+                        if (value == 'share') _shareToWhatsApp();
                       },
                       itemBuilder: (BuildContext context) => [
                         const PopupMenuItem<String>(
@@ -172,12 +176,18 @@ class _LetterDetailsScreenState extends State<LetterDetailsScreen> {
                           child: Text('Edit', style: TextStyle(color: Colors.white)),
                         ),
                         const PopupMenuItem<String>(
-                          value: 'share',
-                          child: Text('Share to WhatsApp', style: TextStyle(color: Colors.white)),
-                        ),
-                        const PopupMenuItem<String>(
                           value: 'delete',
                           child: Text('Delete', style: TextStyle(color: Color(0xFFDD8F9F))),
+                        ),
+                        const PopupMenuItem<String>(
+                          value: 'share',
+                          child: Row(
+                            children: [
+                              Icon(Icons.share_outlined, color: Color(0xFF9E7E5A), size: 18),
+                              SizedBox(width: 10),
+                              Text('Share to WhatsApp', style: TextStyle(color: Color(0xFF9E7E5A))),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -301,6 +311,57 @@ class _LetterDetailsScreenState extends State<LetterDetailsScreen> {
             ],
           ),
         ),
+          ),
+
+          // ── OFFSCREEN GREETING CARD (for image capture) ──
+          Transform.translate(
+            offset: const Offset(-9999, -9999),
+            child: RepaintBoundary(
+              key: _cardRepaintKey,
+              child: MediaQuery(
+                // Fix text scale so card renders consistently
+                data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
+                child: Directionality(
+                  textDirection: TextDirection.ltr,
+                  child: LetterGreetingCard(
+                    date: widget.date,
+                    day: widget.day,
+                    tag: currentTag,
+                    accentColor: widget.accentColor,
+                    prompt: widget.prompt,
+                    body: currentBody,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+
+          // ── SHARING LOADER OVERLAY ──
+          if (_isSharing)
+            Container(
+              color: Colors.black.withAlpha(140),
+              child: const Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFDD8F9F)),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Creating your card…',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

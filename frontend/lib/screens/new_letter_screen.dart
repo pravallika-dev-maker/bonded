@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'dart:async';
 import '../services/api_service.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:flutter/foundation.dart';
+import 'dart:math' as math;
 
 class NewLetterScreen extends StatefulWidget {
   final int? letterId;
@@ -45,6 +47,8 @@ class _NewLetterScreenState extends State<NewLetterScreen> {
   
   late stt.SpeechToText _speech;
   bool _isListening = false;
+  bool _isProcessing = false;
+  String _previousText = '';
 
   @override
   void initState() {
@@ -69,23 +73,64 @@ class _NewLetterScreenState extends State<NewLetterScreen> {
     });
   }
 
+  void _startSpeechListen() {
+    if (!mounted) return;
+    _previousText = _controller.text;
+    if (_previousText.isNotEmpty && !_previousText.endsWith(' ') && !_previousText.endsWith('\n')) {
+      _previousText += ' ';
+    }
+    setState(() => _isListening = true);
+    _speech.listen(
+      onResult: (val) {
+        if (mounted) {
+          setState(() {
+            final currentText = _previousText + val.recognizedWords;
+            _controller.value = TextEditingValue(
+              text: currentText,
+              selection: TextSelection.collapsed(offset: currentText.length),
+            );
+          });
+        }
+      },
+      listenMode: stt.ListenMode.dictation,
+      cancelOnError: true,
+      partialResults: true,
+    );
+  }
+
   void _listen() async {
     if (!_isListening) {
       bool available = await _speech.initialize(
-        onStatus: (val) => print('onStatus: $val'),
-        onError: (val) => print('onError: $val'),
+        onStatus: (val) {
+          debugPrint('onStatus: $val');
+          if (val == 'done' || val == 'notListening') {
+             if (mounted) {
+               setState(() { _isListening = false; _isProcessing = true; });
+               Future.delayed(const Duration(milliseconds: 800), () {
+                 if (mounted) setState(() => _isProcessing = false);
+               });
+             }
+          }
+        },
+        onError: (val) {
+          debugPrint('onError: $val');
+          if (mounted) {
+            setState(() => _isListening = false);
+          }
+        },
       );
       if (available) {
-        setState(() => _isListening = true);
-        _speech.listen(
-          onResult: (val) => setState(() {
-            _controller.text = val.recognizedWords;
-          }),
-        );
+        _startSpeechListen();
       }
     } else {
-      setState(() => _isListening = false);
+      setState(() {
+        _isListening = false;
+        _isProcessing = true;
+      });
       _speech.stop();
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted) setState(() => _isProcessing = false);
+      });
     }
   }
 
@@ -240,7 +285,7 @@ class _NewLetterScreenState extends State<NewLetterScreen> {
 
                 // --- Type Selector ---
                 AnimatedOpacity(
-                  opacity: _isTyping ? 0.5 : 1.0,
+                  opacity: _isTyping ? 0.0 : 1.0,
                   duration: const Duration(milliseconds: 500),
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
@@ -253,7 +298,7 @@ class _NewLetterScreenState extends State<NewLetterScreen> {
                             margin: const EdgeInsets.only(right: 8),
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                             decoration: BoxDecoration(
-                              color: isSelected ? const Color(0xFFDD8F9F).withOpacity(0.2) : Colors.transparent,
+                              color: isSelected ? const Color(0xFFDD8F9F).withValues(alpha: 0.2) : Colors.transparent,
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
                                 color: isSelected ? const Color(0xFFDD8F9F) : const Color(0xFF26151B),
@@ -304,19 +349,22 @@ class _NewLetterScreenState extends State<NewLetterScreen> {
                           focusNode: _focusNode,
                           maxLines: null,
                           autofocus: widget.letterId == null,
+                          cursorColor: const Color(0xFF9E7E5A),
+                          cursorWidth: 1.2,
                           style: const TextStyle(
                             fontFamily: 'Georgia',
-                            fontSize: 18,
-                            color: Colors.white,
-                            height: 1.6,
+                            fontSize: 20,
+                            fontStyle: FontStyle.italic,
+                            color: Color(0xFFDD8F9F),
+                            height: 1.5,
                           ),
                           decoration: InputDecoration(
                             hintText: _placeholder,
                             hintStyle: const TextStyle(
                               fontFamily: 'Georgia',
-                              fontSize: 18,
+                              fontSize: 20,
                               fontStyle: FontStyle.italic,
-                              color: Color(0xFF4A343D),
+                              color: Color(0xFF3D1B28),
                             ),
                             border: InputBorder.none,
                           ),
@@ -339,6 +387,7 @@ class _NewLetterScreenState extends State<NewLetterScreen> {
                             ),
                           ),
                         ),
+                        const SizedBox(height: 100), // extra padding for scrolling
                       ],
                     ),
                   ),
@@ -355,19 +404,73 @@ class _NewLetterScreenState extends State<NewLetterScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            _isListening ? 'Listening...' : 'Prefer speaking instead?',
-                            style: TextStyle(
-                              fontSize: 13, 
-                              color: _isListening ? const Color(0xFFDD8F9F) : const Color(0xFF866571)
-                            ),
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 400),
+                            child: _isListening
+                                ? Row(
+                                    key: const ValueKey('listening'),
+                                    children: [
+                                      const Text(
+                                        'Listening...',
+                                        style: TextStyle(
+                                          fontSize: 13, 
+                                          color: Color(0xFFDD8F9F),
+                                          fontStyle: FontStyle.italic,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      _WaveformIndicator(),
+                                    ],
+                                  )
+                                : _isProcessing
+                                    ? const Text(
+                                        'Processing...',
+                                        key: ValueKey('processing'),
+                                        style: TextStyle(
+                                          fontSize: 13, 
+                                          color: Color(0xFFDD8F9F),
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      )
+                                    : const Text(
+                                        'Prefer speaking instead?',
+                                        key: ValueKey('idle'),
+                                        style: TextStyle(
+                                          fontSize: 13, 
+                                          color: Color(0xFF866571),
+                                        ),
+                                      ),
                           ),
                           GestureDetector(
-                            onTap: _listen,
-                            child: Icon(
-                              _isListening ? Icons.mic : Icons.mic_none, 
-                              color: _isListening ? const Color(0xFFDD8F9F) : const Color(0xFF866571), 
-                              size: 24,
+                            onTap: () {
+                              HapticFeedback.mediumImpact();
+                              _listen();
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              width: _isListening ? 64 : 56,
+                              height: _isListening ? 64 : 56,
+                              decoration: BoxDecoration(
+                                color: _isListening ? const Color(0xFF911746).withValues(alpha: 0.2) : const Color(0xFF1B0711),
+                                borderRadius: BorderRadius.circular(32),
+                                border: Border.all(
+                                  color: _isListening ? const Color(0xFFDD8F9F).withValues(alpha: 0.8) : const Color(0xFF3D1627), 
+                                  width: _isListening ? 1.5 : 1.0,
+                                ),
+                                boxShadow: _isListening ? [
+                                  BoxShadow(
+                                    color: const Color(0xFFDD8F9F).withValues(alpha: 0.3),
+                                    blurRadius: 20,
+                                    spreadRadius: 2,
+                                  )
+                                ] : [],
+                              ),
+                              child: Icon(
+                                _isListening ? Icons.mic : Icons.mic_none_rounded, 
+                                color: _isListening ? const Color(0xFFDD8F9F) : const Color(0xFF9E7E5A), 
+                                size: _isListening ? 28 : 24,
+                              ),
                             ),
                           ),
                         ],
@@ -405,6 +508,64 @@ class _NewLetterScreenState extends State<NewLetterScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _WaveformIndicator extends StatefulWidget {
+  @override
+  State<_WaveformIndicator> createState() => _WaveformIndicatorState();
+}
+
+class _WaveformIndicatorState extends State<_WaveformIndicator> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(4, (index) {
+            final delay = index * 0.2;
+            final value = math.sin((_controller.value * 2 * math.pi) + (delay * math.pi));
+            final height = 12.0 + (value * 8.0).abs();
+            
+            return Container(
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              width: 3,
+              height: height,
+              decoration: BoxDecoration(
+                color: const Color(0xFFDD8F9F),
+                borderRadius: BorderRadius.circular(2),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFDD8F9F).withValues(alpha: 0.5),
+                    blurRadius: 4,
+                    spreadRadius: 1,
+                  ),
+                ],
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }
