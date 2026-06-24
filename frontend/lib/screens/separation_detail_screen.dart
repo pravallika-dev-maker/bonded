@@ -505,7 +505,7 @@ class _SeparationDetailScreenState extends State<SeparationDetailScreen> {
                                   builder: (_) => LettersScreen(
                                     // Pass relationship_id so LettersScreen calls
                                     // GET /api/v1/relationships/{id}/letters
-                                    separationId: widget.relationshipId,
+                                    relationshipId: widget.relationshipId,
                                   ),
                                 ),
                               );

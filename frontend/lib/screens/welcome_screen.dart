@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../widgets/app_heart_icon.dart';
+import '../widgets/primary_cta_button.dart';
 import 'name_entry_screen.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -192,7 +193,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                       const Spacer(flex: 1),
 
                       // ── CTA Button ──
-                      GestureDetector(
+                      PrimaryCtaButton(
+                        text: 'Begin your journey',
                         onTap: () {
                           Navigator.of(context).pushReplacement(
                             MaterialPageRoute(
@@ -200,41 +202,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             ),
                           );
                         },
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: double.infinity,
-                          height: 58,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1A1214),
-                            borderRadius: BorderRadius.circular(29),
-                            border: Border.all(
-                              color: const Color(0xFF911746).withOpacity(0.5),
-                              width: 1.2,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(
-                                Icons.favorite,
-                                size: 18,
-                                color: Color(0xFFDD8F9F),
-                              ),
-                              SizedBox(width: 12),
-                              Text(
-                                'Begin your journey',
-                                style: TextStyle(
-                                  fontFamily: 'Georgia',
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  fontStyle: FontStyle.italic,
-                                  letterSpacing: 0.5,
-                                  color: Color(0xFFDD8F9F),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
                       
 

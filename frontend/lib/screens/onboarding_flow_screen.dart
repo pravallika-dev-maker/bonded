@@ -5,6 +5,7 @@ import 'splash_screen.dart';
 import 'onboarding1_screen.dart';
 import 'onboarding2_screen.dart';
 import 'login_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
 import 'home_screen.dart';
 import 'main_dashboard_screen.dart';
@@ -33,8 +34,8 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
   }
 
   Future<void> _checkAuthAndRoute() async {
-    // 1. Wait a minimum time for the splash to be visible (e.g., 2.5s)
-    final splashTimer = Future.delayed(const Duration(milliseconds: 2500));
+    // 1. Wait a minimum time for the splash to be visible (e.g., 2.0s)
+    final splashTimer = Future.delayed(const Duration(milliseconds: 2000));
     
     // 2. Perform network/auth check
     bool isLoggedInAndOnboarded = false;
@@ -143,7 +144,21 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
         );
       }
     } else {
-      // Hide splash and show onboarding
+      final prefs = await SharedPreferences.getInstance();
+      final hasSeen = prefs.getBool('has_seen_onboarding') ?? false;
+      
+      if (hasSeen) {
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(2);
+        }
+        setState(() {
+          _currentPage = 2;
+        });
+      } else {
+        await prefs.setBool('has_seen_onboarding', true);
+      }
+
+      // Hide splash and show onboarding/login
       setState(() {
         _splashOpacity = 0.0;
         _splashScale = 1.05; // Expands outward smoothly as it fades

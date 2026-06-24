@@ -87,7 +87,7 @@ def create_separation(
     if current_user.partner_id:
         partner = db.query(User).filter(User.id == current_user.partner_id).first()
         if partner:
-            partner_name = partner.user_name or current_user.partner_name
+            partner_name = current_user.partner_name or partner.user_name
             
     # Convert to response — day 1 is the start date itself (1-based, same as reflections)
     new_sep.days_elapsed = (date.today() - new_sep.start_date).days + 1
@@ -123,7 +123,7 @@ def get_active_separation(
     other_user_id = sep.partner_id if sep.creator_id == current_user.id else sep.creator_id
     if other_user_id:
         other_user = db.query(User).filter(User.id == other_user_id).first()
-        if other_user and other_user.user_name:
+        if other_user and other_user.user_name and not partner_name:
             partner_name = other_user.user_name
             
     return ActiveSeparationResponse(
@@ -159,10 +159,35 @@ def end_separation(id: int, current_user: User = Depends(get_current_user), db: 
             db,
             recipient_id=partner_to_notify,
             notification_type="separation_ended",
-            title="🌅 Space has ended",
-            body=f"{current_user.user_name or 'Your partner'} ended the separation.",
+            title="Separation Completed",
+            body="🌅 Your separation journey has reached its final chapter.",
             fcm_token=partner.fcm_token if partner else None
         )
+        create_notification_and_push(
+            db,
+            recipient_id=partner_to_notify,
+            notification_type="insight_unlocked",
+            title="Insight Ready",
+            body="🔓 Your shared journey insight is ready.",
+            fcm_token=partner.fcm_token if partner else None
+        )
+        
+    create_notification_and_push(
+        db,
+        recipient_id=current_user.id,
+        notification_type="separation_ended",
+        title="Separation Completed",
+        body="🌅 Your separation journey has reached its final chapter.",
+        fcm_token=current_user.fcm_token
+    )
+    create_notification_and_push(
+        db,
+        recipient_id=current_user.id,
+        notification_type="insight_unlocked",
+        title="Insight Ready",
+        body="🔓 Your shared journey insight is ready.",
+        fcm_token=current_user.fcm_token
+    )
 
     return {"success": True, "message": "Separation ended successfully"}
 
@@ -258,6 +283,28 @@ def time_travel_separation(current_user: User = Depends(get_current_user), db: S
 
         # ── Cross-device sync: silently notify the partner to refresh insights ──
         other_user_id_final = sep.partner_id if sep.creator_id == current_user.id else sep.creator_id
+        
+        for uid in [current_user.id, other_user_id_final]:
+            if uid:
+                u = db.query(User).filter(User.id == uid).first()
+                if u and u.fcm_token:
+                    create_notification_and_push(
+                        db,
+                        recipient_id=u.id,
+                        notification_type="separation_ended",
+                        title="Separation Completed",
+                        body="🌅 Your separation journey has reached its final chapter.",
+                        fcm_token=u.fcm_token
+                    )
+                    create_notification_and_push(
+                        db,
+                        recipient_id=u.id,
+                        notification_type="insight_unlocked",
+                        title="Insight Ready",
+                        body="🔓 Your shared journey insight is ready.",
+                        fcm_token=u.fcm_token
+                    )
+                    
         if other_user_id_final:
             partner_user = db.query(User).filter(User.id == other_user_id_final).first()
             if partner_user and partner_user.fcm_token:

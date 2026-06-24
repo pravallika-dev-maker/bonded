@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../widgets/primary_cta_button.dart';
 import 'separation_step2_add_person_screen.dart';
 import 'new_separation_screen.dart';
 import '../services/api_service.dart';
@@ -483,59 +484,10 @@ class _SeparationStep1IntentionScreenState extends State<SeparationStep1Intentio
 
                       const Spacer(),
 
-                      // ── Submit Button ──
-                      GestureDetector(
+                      PrimaryCtaButton(
+                        text: _selectedOption == 1 ? 'Continue with $_partnerName' : 'Continue',
                         onTap: (_selectedOption != 0 && !_isSubmitting) ? _submit : null,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: double.infinity,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: _selectedOption != 0
-                                ? const Color(0xFF1A1214)
-                                : const Color(0xFF0D080A),
-                            borderRadius: BorderRadius.circular(28),
-                            border: Border.all(
-                              color: _selectedOption != 0
-                                  ? const Color(0xFF911746).withOpacity(0.5)
-                                  : const Color(0xFF26151B),
-                              width: 1.2,
-                            ),
-                          ),
-                          child: _isSubmitting 
-                            ? const Center(
-                                child: SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    color: Color(0xFFDD8F9F),
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              )
-                            : Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.favorite_border,
-                                size: 18,
-                                color: _selectedOption != 0 ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                _selectedOption == 1 ? 'Continue with $_partnerName' : 'Continue',
-                                style: TextStyle(
-                                  fontFamily: 'Georgia',
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  fontStyle: FontStyle.italic,
-                                  letterSpacing: 0.5,
-                                  color: _selectedOption != 0 ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                        isLoading: _isSubmitting,
                       ),
                       const SizedBox(height: 16),
                     ],

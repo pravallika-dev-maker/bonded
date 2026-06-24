@@ -11,7 +11,7 @@ class LocalNotificationService {
   final FlutterLocalNotificationsPlugin _plugin =
       FlutterLocalNotificationsPlugin();
 
-  static const _androidChannel = AndroidNotificationChannel(
+  static final _androidChannel = AndroidNotificationChannel(
     'bonded_urgent_alerts', // must match channel_id sent from backend
     'Bonded Notifications',
     description: 'Bonded partner activity and relationship updates',
@@ -48,9 +48,9 @@ class LocalNotificationService {
     );
 
     // ── Init plugin ──
-    const initSettings = InitializationSettings(
-      android: AndroidInitializationSettings('@mipmap/launcher_icon'),
-      iOS: DarwinInitializationSettings(
+    final initSettings = InitializationSettings(
+      android: const AndroidInitializationSettings('@mipmap/launcher_icon'),
+      iOS: const DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
         requestSoundPermission: true,
@@ -81,7 +81,7 @@ class LocalNotificationService {
             enableVibration: true,
             fullScreenIntent: true,
           ),
-          iOS: const DarwinNotificationDetails(
+          iOS: DarwinNotificationDetails(
             presentAlert: true,
             presentBadge: true,
             presentSound: true,

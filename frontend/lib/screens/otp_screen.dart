@@ -25,7 +25,7 @@ class OTPScreen extends StatefulWidget {
 
 class _OTPScreenState extends State<OTPScreen> {
   final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
+  late final List<FocusNode> _focusNodes;
   
   OtpState _state = OtpState.entering;
   String _errorMessage = '';
@@ -33,6 +33,18 @@ class _OTPScreenState extends State<OTPScreen> {
   @override
   void initState() {
     super.initState();
+    _focusNodes = List.generate(6, (i) => FocusNode(
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.backspace) {
+          if (_controllers[i].text.isEmpty && i > 0) {
+            _focusNodes[i - 1].requestFocus();
+            _controllers[i - 1].clear();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+    ));
     for (int i = 0; i < 6; i++) {
       _controllers[i].addListener(_onTextChanged);
     }
@@ -473,6 +485,33 @@ class _OTPScreenState extends State<OTPScreen> {
           textAlign: TextAlign.center,
           keyboardType: TextInputType.number,
           maxLength: 1,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            TextInputFormatter.withFunction((oldValue, newValue) {
+              if (newValue.text.length > 1) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  String value = newValue.text;
+                  for (int i = 0; i < value.length; i++) {
+                    if (index + i < 6) {
+                      _controllers[index + i].text = value[i];
+                    }
+                  }
+                  int nextFocus = index + value.length;
+                  if (nextFocus < 6) {
+                    _focusNodes[nextFocus].requestFocus();
+                  } else {
+                    _focusNodes[5].unfocus();
+                  }
+                  _onTextChanged();
+                });
+                return TextEditingValue(
+                  text: newValue.text[0],
+                  selection: const TextSelection.collapsed(offset: 1),
+                );
+              }
+              return newValue;
+            }),
+          ],
           style: const TextStyle(
             fontFamily: 'Georgia',
             fontSize: 22,
@@ -487,7 +526,7 @@ class _OTPScreenState extends State<OTPScreen> {
             if (value.isNotEmpty && index < 5) {
               _focusNodes[index + 1].requestFocus();
             } else if (value.isEmpty && index > 0) {
-              _focusNodes[index - 1].requestFocus();
+              // Handled by the RawKeyboardListener backspace event
             }
             // Trigger state check
             _onTextChanged();

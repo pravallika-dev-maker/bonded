@@ -846,6 +846,7 @@ class _LockedInsightsVaultState extends State<_LockedInsightsVault> with TickerP
                 Opacity(
                   opacity: lockOpacity,
                   child: Container(
+                    width: double.infinity,
                     padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(28),
@@ -927,6 +928,7 @@ class _LockedInsightsVaultState extends State<_LockedInsightsVault> with TickerP
                               : (widget.daysRemaining == 99 
                                   ? "Your insights unlock at the end of your space" 
                                   : "Your insights unlock in ${widget.daysRemaining} ${widget.daysRemaining == 1 ? 'day' : 'days'}"),
+                          textAlign: TextAlign.center,
                           style: TextStyle(
                             fontFamily: 'Georgia',
                             fontSize: 16,

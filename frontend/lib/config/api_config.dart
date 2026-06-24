@@ -1,8 +1,9 @@
 class ApiConfig {
-  static const String baseUrl = 'https://bonded-ul4n.onrender.com/api/v1';
+  static const String baseUrl = 'http://3.110.252.52:8001/api/v1';
 
   // Home Endpoints
   static const String homeHero = '$baseUrl/home/hero';
+  static const String homeOffline = '$baseUrl/home/offline';
   static const String acknowledgeCompletion = '$baseUrl/home/acknowledge-completion';
 
   // Auth Endpoints
@@ -51,4 +52,9 @@ class ApiConfig {
   // Relationships Endpoints
   static const String relationshipsBase = '$baseUrl/relationships/';
   static const String relationshipsHistory = '$baseUrl/relationships/history';
+
+  // Drift Bottle Endpoints
+  static const String driftBottleStatus = '$baseUrl/drift-bottle/status';
+  static const String driftBottleRewards = '$baseUrl/drift-bottle/rewards';
+  static const String driftBottleOpen = '$baseUrl/drift-bottle/open';
 }

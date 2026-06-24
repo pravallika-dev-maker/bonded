@@ -199,7 +199,7 @@ class _FloatingConnectionPillState extends State<FloatingConnectionPill>
                                         child: _OrbitingHearts(animationValue: breathe),
                                       ),
                                       Text(
-                                        "Waiting for ${widget.partnerName}",
+                                        (widget.partnerName == null || widget.partnerName!.trim().isEmpty) ? "Waiting for partner" : "Waiting for ${widget.partnerName}",
                                         style: const TextStyle(
                                           fontFamily: 'Georgia',
                                           fontSize: 12,

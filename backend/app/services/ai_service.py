@@ -248,7 +248,7 @@ You MUST return ONLY valid JSON in exactly this format, mapping to the 11 steps 
         text = response.text.strip().strip("```json").strip("```").strip()
         return json.loads(text)
     except Exception as e:
-        logger.error(f"Gemini generate_journey_insights failed: {{e}}")
+        logger.error(f"Gemini generate_journey_insights failed: {e}")
         return {
             "bondScore": {"score": 85, "explanation": "You both showed quiet courage and honesty."},
             "holdsTogether": {"strengths": ["Deep emotional care", "Willingness to try"], "explanation": "Your foundation remains strong."},
@@ -348,52 +348,43 @@ async def generate_daily_affirmation(
 ) -> str:
     client = _get_client()
     
-    sep_context = """
-- Active Separation: YES. Remind them that distance is temporary. Focus on patience, trust, connection, emotional resilience, understanding, and hope.
-""" if in_separation else """
-- Active Separation: NO. Help them appreciate their partner. Focus on love, appreciation, gratitude, connection, emotional bonding, and relationship growth.
-"""
-    
-    prompt = f"""You are Bonded AI — a supportive third-person guide, relationship coach, and mentor. You are deeply emotionally intelligent, warm, and comforting.
-Generate exactly one short, powerful, elegant daily affirmation for a user named {user_name}.
+    prompt = f"""Generate a short daily affirmation for a person in a long-distance relationship.
 
-CONTEXT: {sep_context}
+The affirmation should:
+* Encourage emotional connection, patience, trust, hope, and resilience.
+* Remind the user that meaningful relationships can grow even across distance.
+* Inspire them to think warmly about their partner without directly addressing or describing the partner.
+* Focus on personal growth, gratitude, emotional well-being, love, and connection.
+* Sound like a motivational quote or affirmation, not advice.
+* Be uplifting, comforting, and emotionally intelligent.
+* Be concise (1-2 sentences, maximum 30 words).
+* Use positive and gentle language.
+* Avoid clichés, generic relationship tips, and references to breakups, loneliness, sadness, conflict, or insecurity.
+* Avoid phrases like "your partner misses you" or assumptions about the partner's feelings.
+
+Examples of the desired style:
+* "Distance measures miles, not the strength of a connection. Every shared memory and hopeful thought keeps love moving forward."
+* "Some bonds grow strongest in the spaces between moments. Trust the journey and cherish what continues to connect you."
+* "Love is not defined by proximity but by presence in the heart. Today's small thoughts can become tomorrow's cherished memories."
 
 AVOID THESE RECENT AFFIRMATIONS (do not generate anything substantially similar):
 {json.dumps(recent_affirmations)}
 
-CRITICAL RULES:
-- MUST act as a supportive third-person guide/coach. 
-- NEVER act like the partner. NEVER use first-person relationship language ("I", "my", "our", "I miss you", "My love", etc.).
-- Encourage love, patience, trust, communication, and emotional resilience.
-- Keep it short (1-2 sentences) and use warm, simple, beautiful language.
-- Do NOT generate generic motivational quotes (e.g. "seize the day").
-- Feel profound and poetic, yet grounding and inspiring.
-
-Examples of correct tone:
-- "Distance is not a measure of love; it is often a test of patience, trust, and connection."
-- "The strongest relationships are built not only in togetherness, but also in how two hearts remain connected through distance."
-- "Love grows when it is supported by patience, understanding, and gentle communication."
-
-Return ONLY a JSON object with a single key "affirmation":
-{{
-  "affirmation": "Your beautiful affirmation here"
-}}"""
+Return ONLY the affirmation text. Do not include quotes around it. Do not return JSON.
+"""
 
     try:
         response = await client.aio.models.generate_content(
             model='gemini-2.5-flash',
             contents=prompt,
         )
-        text = response.text.strip().strip("```json").strip("```").strip()
-        data = json.loads(text)
-        affirmation = data.get("affirmation", "")
+        affirmation = response.text.strip().strip('"').strip()
         if affirmation:
             return affirmation
         raise ValueError("Empty affirmation in response")
     except Exception as e:
         logger.error(f"Gemini generate_daily_affirmation failed: {e}")
-        return "Every quiet step you take toward understanding is a step toward deeper love."
+        return "Distance measures miles, not the strength of a connection."
 
 async def generate_daily_insight(
     user_name: str,
@@ -443,5 +434,18 @@ Return ONLY a JSON object with a single key "insight":
         raise ValueError("Empty insight in response")
     except Exception as e:
         logger.error(f"Gemini generate_daily_insight failed: {e}")
+        
+        # Smart fallback if AI fails, based on recent mood
+        if mood_history and len(mood_history) > 0:
+            latest = mood_history[0]
+            mood_val = latest.get("mood", "reflective").lower() if isinstance(latest, dict) else str(latest).lower()
+            
+            if mood_val in ["sad", "longing", "lonely", "hurt", "angry", "overwhelmed", "anxious"]:
+                return f"We notice you've been feeling {mood_val} lately. Allowing yourself to sit with these emotions is a crucial part of the healing process."
+            elif mood_val in ["hopeful", "peaceful", "calm", "happy", "relieved", "growing"]:
+                return f"Your recent feelings of being {mood_val} show your resilience. You're finding your footing in this space."
+            else:
+                return f"You've been feeling {mood_val} recently. Checking in with yourself daily builds emotional clarity over time."
+                
         return "Your emotional awareness continues to grow as you process your feelings openly. Checking in with yourself daily builds resilience over time."
 

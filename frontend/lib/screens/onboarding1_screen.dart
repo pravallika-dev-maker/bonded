@@ -107,10 +107,11 @@ class Onboarding1Content extends StatelessWidget {
                           height: 140, // Fixed height for consistent CTA placement across screens
                           child: Column(
                             children: [
-                              SizedBox(
-                                width: double.infinity,
-                                height: 58,
-                                child: ElevatedButton.icon(
+                              Align(
+                                alignment: Alignment.center,
+                                child: SizedBox(
+                                  height: 58,
+                                  child: ElevatedButton.icon(
                                   onPressed: onNext ?? () {},
                                   icon: const Icon(
                                     Icons.favorite,
@@ -130,11 +131,13 @@ class Onboarding1Content extends StatelessWidget {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF8A2E55),
                                     elevation: 0,
+                                    padding: const EdgeInsets.symmetric(horizontal: 16),
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(14),
                                     ),
                                   ),
                                 ),
+                              ),
                               ),
                               const SizedBox(height: 16),
                               GestureDetector(

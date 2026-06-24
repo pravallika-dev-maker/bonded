@@ -26,6 +26,7 @@ class _HomeScreenState extends State<HomeScreen>
   late String _userName;
   late String _partnerName;
   late AnimationController _entryController;
+  bool _isLoading = true;
   
   late Animation<double> _bgFade;
   late Animation<double> _glowScale;
@@ -45,7 +46,7 @@ class _HomeScreenState extends State<HomeScreen>
     
     _entryController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2800),
+      duration: const Duration(milliseconds: 800),
     );
 
     _bgFade = Tween<double>(begin: 0.0, end: 1.0).animate(
@@ -96,10 +97,6 @@ class _HomeScreenState extends State<HomeScreen>
         curve: const Interval(0.65, 1.0, curve: Curves.easeOut),
       ),
     );
-
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted) _entryController.forward();
-    });
   }
 
   @override
@@ -180,15 +177,45 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
           );
+        } else {
+          setState(() {
+            _isLoading = false;
+          });
+          _entryController.forward();
         }
       }
     } catch (e) {
       // Ignore API errors and remain on the waiting screen
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _entryController.forward();
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const AnnotatedRegion<SystemUiOverlayStyle>(
+        value: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+          systemNavigationBarColor: Color(0xFF090204),
+          systemNavigationBarIconBrightness: Brightness.light,
+        ),
+        child: Scaffold(
+          backgroundColor: Color(0xFF090204),
+          body: Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFCA366C)),
+            ),
+          ),
+        ),
+      );
+    }
+
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -894,7 +921,7 @@ class _WaitingCardState extends State<_WaitingCard>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Waiting for ${widget.partnerName}',
+                    (widget.partnerName == null || widget.partnerName!.trim().isEmpty) ? 'Waiting for partner' : 'Waiting for ${widget.partnerName}',
                     style: const TextStyle(
                       fontFamily: 'Georgia',
                       fontSize: 15,
@@ -1381,24 +1408,27 @@ class _OnboardingStyleCTAButtonState extends State<_OnboardingStyleCTAButton> {
       child: AnimatedScale(
         scale: _scale,
         duration: const Duration(milliseconds: 100),
-        child: PremiumSheen(
-          animationDuration: const Duration(milliseconds: 1500),
-          pauseDuration: const Duration(seconds: 8),
-          sheenOpacity: 0.15,
-          child: Container(
-            width: double.infinity,
-          height: 54,
-          decoration: BoxDecoration(
-            color: const Color(0xFF1A1214),
-            borderRadius: BorderRadius.circular(27),
-            border: Border.all(
-              color: const Color(0xFF911746).withOpacity(0.5),
-              width: 1.2,
+        child: Align(
+          alignment: Alignment.center,
+          child: PremiumSheen(
+            animationDuration: const Duration(milliseconds: 1500),
+            pauseDuration: const Duration(seconds: 8),
+            sheenOpacity: 0.15,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+            height: 54,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1214),
+              borderRadius: BorderRadius.circular(27),
+              border: Border.all(
+                color: const Color(0xFF911746).withOpacity(0.5),
+                width: 1.2,
+              ),
             ),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
             children: const [
               Icon(
                 Icons.spa_outlined,
@@ -1418,6 +1448,7 @@ class _OnboardingStyleCTAButtonState extends State<_OnboardingStyleCTAButton> {
               ),
             ],
           ),
+        ),
         ),
         ),
       ),

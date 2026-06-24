@@ -5,14 +5,10 @@ import 'package:flutter/material.dart';
 /// Scenario 3 — Separation journey completed. Peaceful, reflective sanctuary.
 class PostJourneySanctuaryCard extends StatefulWidget {
   final String partnerName;
-  final VoidCallback? onBeginNewJourney;
-  final VoidCallback? onSharedMemories;
 
   const PostJourneySanctuaryCard({
     super.key,
     required this.partnerName,
-    this.onBeginNewJourney,
-    this.onSharedMemories,
   });
 
   @override
@@ -310,25 +306,7 @@ class _PostJourneySanctuaryCardState extends State<PostJourneySanctuaryCard>
                             ],
                           ),
 
-                          const SizedBox(height: 28),
 
-                          // ── CTA buttons ──
-                          _SanctuaryButton(
-                            label: 'Begin a New Journey',
-                            isPrimary: true,
-                            breathe: breathe,
-                            onTap: widget.onBeginNewJourney ?? () {},
-                          ),
-
-                          if (widget.onSharedMemories != null) ...[
-                            const SizedBox(height: 12),
-                            _SanctuaryButton(
-                              label: 'Shared Memories',
-                              isPrimary: false,
-                              breathe: breathe,
-                              onTap: widget.onSharedMemories!,
-                            ),
-                          ],
                         ],
                       ),
                     ),
@@ -530,97 +508,4 @@ class _FallingSparklesPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _FallingSparklesPainter old) =>
       old.drift != drift || old.breathe != breathe || old.pulse != pulse;
-}
-
-// ── Sanctuary button ──────────────────────────────────────────────────────────
-class _SanctuaryButton extends StatefulWidget {
-  final String label;
-  final bool isPrimary;
-  final double breathe;
-  final VoidCallback onTap;
-
-  const _SanctuaryButton({
-    required this.label,
-    required this.isPrimary,
-    required this.breathe,
-    required this.onTap,
-  });
-
-  @override
-  State<_SanctuaryButton> createState() => _SanctuaryButtonState();
-}
-
-class _SanctuaryButtonState extends State<_SanctuaryButton>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _tap;
-  late Animation<double> _scale;
-
-  @override
-  void initState() {
-    super.initState();
-    _tap = AnimationController(vsync: this, duration: const Duration(milliseconds: 160));
-    _scale = Tween<double>(begin: 1.0, end: 0.95)
-        .animate(CurvedAnimation(parent: _tap, curve: Curves.easeOutCubic));
-  }
-
-  @override
-  void dispose() {
-    _tap.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => _tap.forward(),
-      onTapUp: (_) { _tap.reverse(); widget.onTap(); },
-      onTapCancel: () => _tap.reverse(),
-      child: AnimatedBuilder(
-        animation: _tap,
-        builder: (context, child) => Transform.scale(scale: _scale.value, child: child),
-        child: Container(
-          width: double.infinity,
-          height: 50,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(25),
-            gradient: widget.isPrimary
-                ? LinearGradient(
-                    colors: [
-                      const Color(0xFF8A1C4A).withValues(alpha: 0.70 + widget.breathe * 0.15),
-                      const Color(0xFF5A0E2E).withValues(alpha: 0.85),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  )
-                : null,
-            border: Border.all(
-              color: widget.isPrimary
-                  ? const Color(0xFFDD8F9F).withValues(alpha: 0.28 + widget.breathe * 0.10)
-                  : const Color(0xFFDD8F9F).withValues(alpha: 0.12 + widget.breathe * 0.05),
-              width: 1,
-            ),
-            boxShadow: widget.isPrimary
-                ? [
-                    BoxShadow(
-                      color: const Color(0xFF8A1C4A).withValues(alpha: 0.30 + widget.breathe * 0.15),
-                      blurRadius: 18,
-                      offset: const Offset(0, 5),
-                    ),
-                  ]
-                : null,
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            widget.label,
-            style: TextStyle(
-              fontSize: 13.5,
-              fontWeight: FontWeight.w600,
-              color: widget.isPrimary ? Colors.white : const Color(0xFFD4B8C2),
-              letterSpacing: 0.3,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }

@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from datetime import date, datetime, timezone, timedelta
 
@@ -52,6 +52,9 @@ def _get_logical_date(dt: datetime = None) -> date:
     """
     if dt is None:
         dt = datetime.now(timezone.utc)
+    if isinstance(dt, date) and not isinstance(dt, datetime):
+        # If it's already a date object (like from a Date column), just return it
+        return dt
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     ist_offset = timedelta(hours=5, minutes=30)
@@ -61,27 +64,29 @@ def _get_logical_date(dt: datetime = None) -> date:
 
 def _day_number(user_id: int, sep: Separation, db: Session) -> int:
     today_logical = _get_logical_date()
+    start_logical = _get_logical_date(sep.start_date) if sep.start_date else today_logical
     
-    # 1. Unique dates with a mood BEFORE today
-    from ...models.mood import Mood
-    moods = db.query(Mood.created_at).filter(
-        Mood.user_id == user_id,
-        Mood.created_at >= datetime.combine(sep.start_date, datetime.min.time()).replace(tzinfo=timezone.utc)
-    ).all()
-    mood_dates_before_today = {_get_logical_date(m[0]) for m in moods if m[0] and _get_logical_date(m[0]) < today_logical}
-    
-    # 2. Unique dates with a completed reflection BEFORE today
+    # Calendar days elapsed since separation start
+    calendar_day = (today_logical - start_logical).days + 1
+    if calendar_day < 1:
+        calendar_day = 1
+        
     from ...models.reflection_session import ReflectionSession
-    sessions = db.query(ReflectionSession.completed_at).filter(
+    
+    # Get the highest completed day number
+    latest_session = db.query(ReflectionSession).filter(
         ReflectionSession.user_id == user_id,
         ReflectionSession.separation_id == sep.id,
         ReflectionSession.is_completed == True,
-    ).all()
-    reflection_dates_before_today = {_get_logical_date(s[0]) for s in sessions if s[0] and _get_logical_date(s[0]) < today_logical}
+    ).order_by(ReflectionSession.day_number.desc()).first()
     
-    completed_steps = min(len(mood_dates_before_today), len(reflection_dates_before_today))
-    
-    journey_day = completed_steps + 1
+    if latest_session:
+        journey_day = latest_session.day_number + 1
+    else:
+        journey_day = 1
+        
+    # User cannot progress beyond the actual calendar days elapsed
+    journey_day = min(journey_day, calendar_day)
     
     # Cap days active between 1 and 55 (max questions)
     return max(1, min(journey_day, 55))
@@ -165,9 +170,74 @@ async def get_today_question(
     )
 
 
+async def _trigger_reflection_notifications(user_id: int, sep_id: int, db: Session):
+    try:
+        from ...services.notification_service import create_notification_and_push
+        user = db.query(User).filter(User.id == user_id).first()
+        sep = db.query(Separation).filter(Separation.id == sep_id).first()
+        if not user or not sep: return
+        
+        partner_id = sep.partner_id if sep.creator_id == user.id else sep.creator_id
+        if partner_id:
+            partner = db.query(User).filter(User.id == partner_id).first()
+            if partner and partner.fcm_token:
+                create_notification_and_push(
+                    db=db,
+                    recipient_id=partner.id,
+                    notification_type="partner_reflection",
+                    title="Journey Reflection",
+                    body="💭 Someone spent a moment reflecting on your relationship today.",
+                    fcm_token=partner.fcm_token
+                )
+        
+        # Love Word Change Check
+        try:
+            from ...models.relationship import Relationship
+            from .journey import calculate_user_score, get_love_word, get_expected_days_for_sep
+            
+            active_rel = db.query(Relationship).filter(
+                ((Relationship.user1_id == user.id) & (Relationship.user2_id == partner_id)) |
+                ((Relationship.user1_id == partner_id) & (Relationship.user2_id == user.id)),
+                Relationship.status == "active"
+            ).first() if partner_id else None
+            
+            if active_rel and sep:
+                expected_days = get_expected_days_for_sep(sep)
+                old_user_score = user.relationship_score or 0
+                partner = db.query(User).filter(User.id == partner_id).first() if partner_id else None
+                old_partner_score = partner.relationship_score or 0 if partner_id and partner else 0
+                old_total = old_user_score + old_partner_score
+                
+                new_user_score = calculate_user_score(db, user, active_rel, sep)
+                new_partner_score = calculate_user_score(db, partner, active_rel, sep) if partner_id and partner else 0
+                new_total = new_user_score + new_partner_score
+                
+                old_word = get_love_word(old_total, expected_days)["loveWord"]
+                new_word_info = get_love_word(new_total, expected_days)
+                new_word = new_word_info["loveWord"]
+                
+                if old_word != new_word:
+                    msg = f"{new_word_info['emoji']} Your relationship has entered a new phase: {new_word}."
+                    for u in [user, partner] if partner_id and partner else [user]:
+                        if u and u.fcm_token:
+                            create_notification_and_push(
+                                db=db,
+                                recipient_id=u.id,
+                                notification_type="love_word_change",
+                                title="Journey Milestone",
+                                body=msg,
+                                fcm_token=u.fcm_token
+                            )
+        except Exception as lw_e:
+            logger.error(f"Error checking love word change: {lw_e}")
+            
+    except Exception as e:
+        logger.error(f"Error in _trigger_reflection_notifications: {e}")
+
 @router.post("/answer", response_model=AnswerResponse)
 async def submit_answer(
     request: AnswerRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -235,6 +305,13 @@ async def submit_answer(
     db.commit()
     logger.info(f"User {current_user.id} completed reflection session {session.id} for day {session.day_number}")
 
+    background_tasks.add_task(
+        _trigger_reflection_notifications,
+        current_user.id,
+        session.separation_id,
+        db
+    )
+
     return AnswerResponse(
         answer_id=answer.id,
         ai_reaction=AIReaction(
@@ -267,11 +344,31 @@ async def get_today_status(
         ReflectionSession.is_completed == True,
     ).order_by(ReflectionSession.completed_at.desc()).first()
     
+    start_logical = _get_logical_date(sep.start_date) if sep.start_date else current_logical_date
+    calendar_day = (current_logical_date - start_logical).days + 1
+    if calendar_day < 1:
+        calendar_day = 1
+
+    highest_session = db.query(ReflectionSession).filter(
+        ReflectionSession.user_id == current_user.id,
+        ReflectionSession.separation_id == sep.id,
+        ReflectionSession.is_completed == True,
+    ).order_by(ReflectionSession.day_number.desc()).first()
+    highest_day = highest_session.day_number if highest_session else 0
+
     user_completed = False
-    if latest_user_session and latest_user_session.completed_at:
-        completed_logical_date = _get_logical_date(latest_user_session.completed_at)
-        if completed_logical_date == current_logical_date:
-            user_completed = True
+    
+    # If they've reached the calendar day limit, they cannot progress further today.
+    if highest_day >= calendar_day:
+        user_completed = True
+    elif latest_user_session and latest_user_session.completed_at:
+        # They haven't reached calendar day limit (catching up).
+        # We allow multiple catch-up sessions per day, so we DO NOT block them
+        # simply because they completed one today.
+        # Wait, the previous logic: if they completed one today, it ONLY blocked them IF they caught up.
+        # Since we already check `if highest_day >= calendar_day:` above,
+        # we don't need to block them here at all! They can just keep going.
+        pass
 
     # Total completed days for current user in this separation
     # Calculate based on day_number to avoid exposing time-travel test records
@@ -291,9 +388,8 @@ async def get_today_status(
         ).order_by(ReflectionSession.completed_at.desc()).first()
         
         if latest_partner_session and latest_partner_session.completed_at:
-            utc_dt = latest_partner_session.completed_at.replace(tzinfo=timezone.utc)
-            completed_ist_date = (utc_dt + ist_offset).date()
-            if completed_ist_date == current_ist_date:
+            completed_logical_date = _get_logical_date(latest_partner_session.completed_at)
+            if completed_logical_date == current_logical_date:
                 partner_completed = True
 
         # Partner total completed days based on their progress to hide test records

@@ -25,12 +25,9 @@ async def get_my_profile(
     if is_connected:
         partner = db.query(User).filter(User.id == current_user.partner_id).first()
 
-    partner_name = None
-    if is_connected and partner:
-        partner_name = partner.user_name if partner.user_name else current_user.partner_name
-    elif not is_connected:
-        # Return the onboarding-collected partner name even before/after a connection
-        partner_name = current_user.partner_name
+    partner_name = current_user.partner_name
+    if not partner_name and is_connected and partner:
+        partner_name = partner.user_name
 
     # Merge logic for missing fields
     if is_connected and partner:

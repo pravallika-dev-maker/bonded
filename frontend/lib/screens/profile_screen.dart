@@ -1211,8 +1211,17 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
   } catch (e) {
     if (context.mounted) {
       Navigator.pop(context); // Close loading
+      
+      String message = 'Error: $e';
+      if (e.toString().contains('No active separation found')) {
+        message = 'Time travel already done - no active separation found.';
+      }
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+        SnackBar(
+          content: Text(message),
+          backgroundColor: const Color(0xFF2A0D18),
+        ),
       );
     }
   }

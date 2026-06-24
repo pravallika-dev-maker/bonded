@@ -44,6 +44,7 @@ dependencies:
   url_launcher: ^6.3.2
   speech_to_text: ^7.4.0
   path_provider: ^2.1.4
+  flutter_animate: ^4.5.2
 
 dev_dependencies:
   flutter_test:
@@ -71,6 +72,7 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - assets/drift_bottle/
 
   # To add assets to your application, add an assets section, like this:
   # assets:
@@ -106,5 +108,5 @@ flutter:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/icons/app_icon.png"
+  image_path: "assets/icons/app_icon.jpeg"
   min_sdk_android: 21

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../widgets/primary_cta_button.dart';
 import 'partner_invite_screen.dart';
 import '../services/api_service.dart';
 
@@ -370,51 +371,10 @@ class _BeginningDateScreenState extends State<BeginningDateScreen>
         const Spacer(flex: 2),
 
         // Save button
-        GestureDetector(
+        PrimaryCtaButton(
+          text: 'Save and continue',
           onTap: isSelected ? _onSaveAndContinue : null,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: double.infinity,
-            height: 52,
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? const Color(0xFF1A1214)
-                  : const Color(0xFF0D080A),
-              borderRadius: BorderRadius.circular(26),
-              border: Border.all(
-                color: isSelected
-                    ? const Color(0xFF911746).withValues(alpha: 0.5)
-                    : const Color(0xFF26151B),
-                width: 1.2,
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.favorite_outline,
-                  size: 18,
-                  color: isSelected
-                      ? const Color(0xFFDD8F9F)
-                      : const Color(0xFF5A3C47),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'Save and continue',
-                  style: TextStyle(
-                    fontFamily: 'Georgia',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    fontStyle: FontStyle.italic,
-                    letterSpacing: 0.5,
-                    color: isSelected
-                        ? const Color(0xFFDD8F9F)
-                        : const Color(0xFF5A3C47),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          isLoading: _isSaving,
         ),
 
         const SizedBox(height: 16),
@@ -608,51 +568,10 @@ class _BeginningDateScreenState extends State<BeginningDateScreen>
 
         const Spacer(flex: 3),
 
-        GestureDetector(
+        PrimaryCtaButton(
+          text: 'Continue without a date',
           onTap: _selectedReason != null ? _onSaveAndContinue : null,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: double.infinity,
-            height: 52,
-            decoration: BoxDecoration(
-              color: _selectedReason != null
-                  ? const Color(0xFF1A1214)
-                  : const Color(0xFF0D080A),
-              borderRadius: BorderRadius.circular(26),
-              border: Border.all(
-                color: _selectedReason != null
-                    ? const Color(0xFF911746).withValues(alpha: 0.5)
-                    : const Color(0xFF26151B),
-                width: 1.2,
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.favorite_outline,
-                  size: 18,
-                  color: _selectedReason != null
-                      ? const Color(0xFFDD8F9F)
-                      : const Color(0xFF5A3C47),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'Continue without a date',
-                  style: TextStyle(
-                    fontFamily: 'Georgia',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    fontStyle: FontStyle.italic,
-                    letterSpacing: 0.5,
-                    color: _selectedReason != null
-                        ? const Color(0xFFDD8F9F)
-                        : const Color(0xFF5A3C47),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          isLoading: _isSaving,
         ),
 
         const SizedBox(height: 16),

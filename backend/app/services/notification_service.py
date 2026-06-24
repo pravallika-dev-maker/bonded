@@ -116,6 +116,8 @@ def create_notification_and_push(
     body: str = None,
     fcm_token: str = None
 ):
+    logger.info(f"🔔 [CREATE_NOTIF] type='{notification_type}', recipient={recipient_id}, has_token={bool(fcm_token)}")
+    
     # 1. Create DB notification first
     notif = None
     try:
@@ -135,7 +137,9 @@ def create_notification_and_push(
         
     # 2. Try sending push notification if fcm_token is available
     if fcm_token and notif:
+        logger.info(f"🔔 [CREATE_NOTIF] Calling send_push for token ending in {fcm_token[-5:] if len(fcm_token) > 5 else '...'}...")
         success = send_push(fcm_token, title, body or "")
+        logger.info(f"🔔 [CREATE_NOTIF] send_push returned: {success}")
         if success:
             try:
                 notif.push_sent = True
@@ -143,5 +147,10 @@ def create_notification_and_push(
             except Exception as e:
                 logger.error(f"Failed to update push_sent status in DB: {e}")
                 db.rollback()
+    else:
+        if not fcm_token:
+            logger.warning(f"⚠️ [CREATE_NOTIF] Skipped sending push: No fcm_token provided to create_notification_and_push.")
+        if not notif:
+            logger.warning(f"⚠️ [CREATE_NOTIF] Skipped sending push: Failed to create DB entry.")
                 
     return notif

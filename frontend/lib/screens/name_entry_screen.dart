@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../widgets/primary_cta_button.dart';
 import 'gender_selection_screen.dart';
 import '../services/api_service.dart';
 
@@ -238,7 +239,8 @@ class _NameEntryScreenState extends State<NameEntryScreen> {
                     // ── Bottom Button ──
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 24.0),
-                      child: GestureDetector(
+                      child: PrimaryCtaButton(
+                        text: "Yes, that's me",
                         onTap: _nameController.text.trim().isNotEmpty
                             ? () async {
                                 final name = _nameController.text.trim();
@@ -255,49 +257,6 @@ class _NameEntryScreenState extends State<NameEntryScreen> {
                                 );
                               }
                             : null,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: double.infinity,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: _nameController.text.trim().isNotEmpty 
-                                ? const Color(0xFF1A1214) 
-                                : const Color(0xFF0D080A),
-                            borderRadius: BorderRadius.circular(28),
-                            border: Border.all(
-                              color: _nameController.text.trim().isNotEmpty 
-                                  ? const Color(0xFF911746).withOpacity(0.5) 
-                                  : const Color(0xFF26151B),
-                              width: 1.2,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.favorite,
-                                size: 18,
-                                color: _nameController.text.trim().isNotEmpty
-                                    ? const Color(0xFFDD8F9F)
-                                    : const Color(0xFF5A3C47),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                "Yes, that's me",
-                                style: TextStyle(
-                                  fontFamily: 'Georgia',
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  fontStyle: FontStyle.italic,
-                                  letterSpacing: 0.5,
-                                  color: _nameController.text.trim().isNotEmpty
-                                      ? const Color(0xFFDD8F9F)
-                                      : const Color(0xFF5A3C47),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
                     ),
                   ],

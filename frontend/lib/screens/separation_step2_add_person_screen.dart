@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
+import '../widgets/primary_cta_button.dart';
 import 'separation_step3_invite_code_screen.dart';
 import '../services/api_service.dart';
 
@@ -688,64 +689,10 @@ class _SeparationStep2AddPersonScreenState extends State<SeparationStep2AddPerso
                               const SizedBox(height: 16),
                             ],
 
-                            // Submit
-                            GestureDetector(
+                            PrimaryCtaButton(
+                              text: 'Begin this space',
                               onTap: (isFormValid && !_isLoading) ? _submit : null,
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                width: double.infinity,
-                                height: 56,
-                                decoration: BoxDecoration(
-                                  color: isFormValid ? const Color(0xFF1A1214) : const Color(0xFF0D080A),
-                                  borderRadius: BorderRadius.circular(28),
-                                  border: Border.all(
-                                    color: isFormValid ? const Color(0xFF911746).withOpacity(0.5) : const Color(0xFF26151B),
-                                    width: 1.2,
-                                  ),
-                                  boxShadow: isFormValid
-                                      ? [
-                                          BoxShadow(
-                                            color: const Color(0xFF911746).withOpacity(0.12),
-                                            blurRadius: 20,
-                                            spreadRadius: 2,
-                                          ),
-                                        ]
-                                      : [],
-                                ),
-                                child: _isLoading
-                                    ? const Center(
-                                        child: SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2.0,
-                                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFDD8F9F)),
-                                          ),
-                                        ),
-                                      )
-                                    : Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.favorite,
-                                            size: 18,
-                                            color: isFormValid ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Text(
-                                            'Begin this space',
-                                            style: TextStyle(
-                                              fontFamily: 'Georgia',
-                                              fontSize: 16,
-                                              fontWeight: FontWeight.w600,
-                                              fontStyle: FontStyle.italic,
-                                              letterSpacing: 0.5,
-                                              color: isFormValid ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                              ),
+                              isLoading: _isLoading,
                             ),
                             const SizedBox(height: 48),
 

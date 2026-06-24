@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import '../widgets/primary_cta_button.dart';
 import 'join_with_code_screen.dart';
 import 'promise_screen.dart';
 import 'home_screen.dart';
@@ -323,44 +324,10 @@ class _PartnerInviteScreenState extends State<PartnerInviteScreen> with TickerPr
                       opacity: _fadeAnim3.value,
                       child: child,
                     ),
-                    child: GestureDetector(
+                    child: PrimaryCtaButton(
+                      text: _shared ? 'Sent… waiting for them' : 'Share this code',
+                      icon: _shared ? Icons.check : Icons.ios_share_outlined,
                       onTap: (_isLoading || _bondCode == null) ? null : _shareCode,
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: double.infinity,
-                        height: 54,
-                        decoration: BoxDecoration(
-                          color: _shared ? const Color(0xFF0C1F15) : const Color(0xFF1A1214).withOpacity((_isLoading || _bondCode == null) ? 0.5 : 1.0),
-                          borderRadius: BorderRadius.circular(27),
-                          border: Border.all(
-                            color: _shared 
-                                ? const Color(0xFF194D2C) 
-                                : const Color(0xFF911746).withOpacity(0.5),
-                            width: 1.2,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              _shared ? Icons.check : Icons.ios_share_outlined,
-                              size: 18,
-                              color: _shared ? const Color(0xFF5DB373) : const Color(0xFFDD8F9F),
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              _shared ? 'Sent… waiting for them' : 'Share this code',
-                              style: TextStyle(
-                                fontFamily: 'Georgia',
-                                fontSize: 15,
-                                fontStyle: FontStyle.italic,
-                                letterSpacing: 0.5,
-                                color: _shared ? const Color(0xFF5DB373) : const Color(0xFFDD8F9F),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
                     ),
                   ),
 

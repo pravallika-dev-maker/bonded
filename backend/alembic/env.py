@@ -16,11 +16,14 @@ from app.models import (
     question_category, reflection_question, reflection_session,
     reflection_answer, reflection_comparison, letter,
     user_daily_affirmation, user_daily_insight, user_daily_comfort,
-    relationship
+    relationship, drift_bottle
 )
 
 config = context.config
-config.set_main_option("sqlalchemy.url", os.getenv("DATABASE_URL", ""))
+db_url = os.getenv("DATABASE_URL", "")
+# Escape % signs for configparser
+db_url = db_url.replace("%", "%%")
+config.set_main_option("sqlalchemy.url", db_url)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

@@ -63,9 +63,9 @@ async def get_home_hero(
 
         if active_rel:
             partner_id = active_rel.user2_id if active_rel.user1_id == current_user.id else active_rel.user1_id
-            if partner_id:
+            if partner_id and partner_id != current_user.id:
                 partner = db.query(User).filter(User.id == partner_id).first()
-                if partner and partner.user_name:
+                if partner and not partner_name and partner.user_name:
                     partner_name = partner.user_name
 
             # ── Detect shared presence (both active within 90 seconds) ──
@@ -75,7 +75,9 @@ async def get_home_hero(
                 # Make timezone-aware if naive
                 if partner_active_at.tzinfo is None:
                     partner_active_at = partner_active_at.replace(tzinfo=timezone.utc)
-                shared_presence = (now_utc - partner_active_at) <= PRESENCE_WINDOW
+                
+                time_diff = now_utc - partner_active_at
+                shared_presence = timedelta(seconds=0) <= time_diff <= PRESENCE_WINDOW
 
         # Check for completed separation
         completed_sep = db.query(Separation).filter(
@@ -185,7 +187,17 @@ async def get_home_hero(
             except Exception:
                 db.rollback()
 
-        is_missed_day_flow = False
+        from ...api.v1.reflections import _get_logical_date
+        today_logical = _get_logical_date()
+        start_logical = _get_logical_date(active_sep.start_date) if active_sep.start_date else today_logical
+        calendar_day = (today_logical - start_logical).days + 1
+        if calendar_day < 1:
+            calendar_day = 1
+            
+        is_missed_day_flow = current_day < calendar_day
+
+        if is_missed_day_flow:
+            comfort_message = "It's okay to take a break. Take your time catching up, one step at a time."
 
         return HomeHeroResponse(
             partner_connected=partner_connected,
@@ -220,3 +232,18 @@ async def acknowledge_completion(
         db.rollback()
         logger.error(f"Error acknowledging completion: {e}")
         raise HTTPException(status_code=500, detail="Could not acknowledge completion")
+
+@router.post("/offline")
+async def set_offline(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    try:
+        # Clear the last_active_at timestamp to immediately remove the presence signal
+        current_user.last_active_at = None
+        db.commit()
+        return {"success": True}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error setting offline status: {e}")
+        raise HTTPException(status_code=500, detail="Could not set offline status")

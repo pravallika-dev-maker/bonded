@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'sending_code_screen.dart';
+import '../widgets/primary_cta_button.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -317,9 +318,9 @@ class _LoginContentState extends State<LoginContent> {
                 SizedBox(height: screenH * 0.035),
 
                 
-                _SheenButton(
-                  isFilled: _isFilled,
-                  onTap: _onSendCode,
+                PrimaryCtaButton(
+                  text: 'Send the code',
+                  onTap: _isFilled ? _onSendCode : null,
                 ),
 
 
@@ -448,138 +449,6 @@ class _SmallGlowingHeartState extends State<_SmallGlowingHeart> with SingleTicke
           ),
         );
       }
-    );
-  }
-}
-
-class _SheenButton extends StatefulWidget {
-  final bool isFilled;
-  final VoidCallback onTap;
-
-  const _SheenButton({required this.isFilled, required this.onTap});
-
-  @override
-  State<_SheenButton> createState() => _SheenButtonState();
-}
-
-class _SheenButtonState extends State<_SheenButton> with SingleTickerProviderStateMixin {
-  late AnimationController _sheenController;
-
-  @override
-  void initState() {
-    super.initState();
-    _sheenController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2500),
-    );
-    if (widget.isFilled) {
-      _sheenController.repeat();
-    }
-  }
-
-  @override
-  void didUpdateWidget(covariant _SheenButton oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.isFilled && !oldWidget.isFilled) {
-      _sheenController.repeat();
-    } else if (!widget.isFilled && oldWidget.isFilled) {
-      _sheenController.stop();
-      _sheenController.reset();
-    }
-  }
-
-  @override
-  void dispose() {
-    _sheenController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: widget.isFilled ? widget.onTap : null,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        width: double.infinity,
-        height: 56,
-        decoration: BoxDecoration(
-          color: widget.isFilled 
-              ? const Color(0xFF911746) 
-              : const Color(0xFF1B0F14), // slightly stronger disabled bg
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(
-            color: widget.isFilled 
-                ? const Color(0xFFB5235B) 
-                : const Color(0xFF3B1525),
-            width: 1.2,
-          ),
-          boxShadow: widget.isFilled ? [
-            BoxShadow(
-              color: const Color(0xFF911746).withOpacity(0.4),
-              blurRadius: 15,
-              spreadRadius: 2,
-              offset: const Offset(0, 4),
-            )
-          ] : [],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.favorite,
-                    size: 18,
-                    color: widget.isFilled ? Colors.white : const Color(0xFF5A3C47),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Send the code',
-                    style: TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      fontStyle: FontStyle.italic,
-                      letterSpacing: 0.5,
-                      color: widget.isFilled ? Colors.white : const Color(0xFF7A4B5C),
-                    ),
-                  ),
-                ],
-              ),
-              if (widget.isFilled)
-                AnimatedBuilder(
-                  animation: _sheenController,
-                  builder: (context, child) {
-                    return Positioned(
-                      left: -100 + (_sheenController.value * 500),
-                      top: 0,
-                      bottom: 0,
-                      child: Transform.rotate(
-                        angle: 0.3,
-                        child: Container(
-                          width: 40,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.white.withOpacity(0.0),
-                                Colors.white.withOpacity(0.3),
-                                Colors.white.withOpacity(0.0),
-                              ],
-                              stops: const [0.0, 0.5, 1.0],
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }

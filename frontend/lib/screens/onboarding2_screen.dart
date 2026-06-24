@@ -81,32 +81,37 @@ class Onboarding2Content extends StatelessWidget {
                       child: Column(
                         children: [
                           // Primary Button
-                          ElevatedButton(
-                            onPressed: onNext,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF8E6E24), // Gold/Olive
-                              foregroundColor: const Color(0xFF30240E),
-                              elevation: 0,
-                              minimumSize: const Size(double.infinity, 58),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(Icons.star, color: Color(0xFFDCD2AE), size: 18),
-                                const SizedBox(width: 12),
-                                const Text(
-                                  'That resonates with me',
-                                  style: TextStyle(
-                                    fontFamily: 'Georgia',
-                                    fontSize: 17,
-                                    fontStyle: FontStyle.italic,
-                                    color: Color(0xFF30240E),
-                                  ),
+                          Align(
+                            alignment: Alignment.center,
+                            child: ElevatedButton(
+                              onPressed: onNext,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF8E6E24), // Gold/Olive
+                                foregroundColor: const Color(0xFF30240E),
+                                elevation: 0,
+                                minimumSize: const Size(0, 58),
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
                                 ),
-                              ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.star, color: Color(0xFFDCD2AE), size: 18),
+                                  const SizedBox(width: 12),
+                                  const Text(
+                                    'That resonates with me',
+                                    style: TextStyle(
+                                      fontFamily: 'Georgia',
+                                      fontSize: 17,
+                                      fontStyle: FontStyle.italic,
+                                      color: Color(0xFF30240E),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ],

@@ -66,6 +66,29 @@ class _ReflectionFlowScreenState extends State<ReflectionFlowScreen> with Ticker
       final response = await ApiService.getTodayQuestion();
       final data = response['data'] ?? response;
       
+      final isCompleted = data['is_completed'] ?? data['isCompleted'] ?? false;
+      if (isCompleted && mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: const Color(0xFF1A1214),
+            title: const Text("Already Completed", style: TextStyle(color: Color(0xFFFFF5F7))),
+            content: const Text("Today's reflection has already been completed. Take time to sit with your thoughts and return tomorrow.", style: TextStyle(color: Color(0xFFE5A4B2))),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  _finishDay();
+                },
+                child: const Text("OK", style: TextStyle(color: Color(0xFFDD8F9F))),
+              )
+            ],
+          )
+        );
+        return;
+      }
+
       final sessionIdRaw = data['session_id'] ?? data['sessionId'] ?? data['id'];
       
       List<dynamic> rawQuestions = [];

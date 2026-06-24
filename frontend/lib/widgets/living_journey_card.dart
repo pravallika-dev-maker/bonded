@@ -11,6 +11,7 @@ class LivingJourneyCard extends StatefulWidget {
   final String? partnerName;
   final bool isEmpty;
   final bool isCompleted;
+  final bool isMissedDayFlow;
   final VoidCallback? onClose;
 
   const LivingJourneyCard({
@@ -22,6 +23,7 @@ class LivingJourneyCard extends StatefulWidget {
     this.partnerName,
     this.isEmpty = false,
     this.isCompleted = false,
+    this.isMissedDayFlow = false,
     this.onClose,
   });
 
@@ -442,6 +444,45 @@ class _LivingJourneyCardState extends State<LivingJourneyCard>
                               ),
 
                             const SizedBox(height: 18),
+
+                            // MISSED DAY MESSAGE
+                            if (widget.isMissedDayFlow) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF8A2E55).withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: const Color(0xFFDD8F9F).withValues(alpha: 0.2),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Icon(
+                                      Icons.history,
+                                      size: 16,
+                                      color: const Color(0xFFDD8F9F).withValues(alpha: 0.8),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Text(
+                                        "You missed a few days of reflection. Take a moment to catch up on the previous check-ins to continue your journey together.",
+                                        style: TextStyle(
+                                          fontFamily: 'Georgia',
+                                          fontSize: 12,
+                                          fontStyle: FontStyle.italic,
+                                          color: const Color(0xFFD4C4CA).withValues(alpha: 0.85),
+                                          height: 1.4,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 18),
+                            ],
 
                             // PROGRESS LINE
                             _ProgressLine(

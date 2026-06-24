@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List
+from datetime import datetime, timezone
 import logging
 
 from ...database import get_db
@@ -31,8 +32,8 @@ async def _trigger_mood_notifications(user_id: int, partner_id: int, new_mood_id
             db=db,
             recipient_id=user_id,
             notification_type="self_insight",
-            title="🔍 New self-discovery insight",
-            body=insight_text,
+            title="Daily Insight",
+            body="✨ Today's reflection has revealed something new.",
             fcm_token=user.fcm_token
         )
         
@@ -40,16 +41,60 @@ async def _trigger_mood_notifications(user_id: int, partner_id: int, new_mood_id
         if partner_id:
             partner = db.query(User).filter(User.id == partner_id).first()
             if partner:
-                sender_name = user.user_name
-                title = f"🌤️ {sender_name} is feeling {new_mood.mood}" if sender_name else f"🌤️ Your partner is feeling {new_mood.mood}"
                 create_notification_and_push(
                     db=db,
                     recipient_id=partner_id,
                     notification_type="partner_mood",
-                    title=title,
-                    body="They logged how they're feeling today.",
+                    title="Mood Check-In",
+                    body="🌱 Your partner checked in with their feelings today.",
                     fcm_token=partner.fcm_token
                 )
+                
+        # 3. Love Word Change Check
+        try:
+            from ...models.relationship import Relationship
+            from ...models.separation import Separation
+            from .journey import calculate_user_score, get_love_word, get_expected_days_for_sep
+            
+            active_rel = db.query(Relationship).filter(
+                ((Relationship.user1_id == user.id) & (Relationship.user2_id == partner_id)) |
+                ((Relationship.user1_id == partner_id) & (Relationship.user2_id == user.id)),
+                Relationship.status == "active"
+            ).first() if partner_id else None
+            
+            active_sep = db.query(Separation).filter(
+                (Separation.creator_id == user.id) | (Separation.partner_id == user.id),
+                Separation.status == "active"
+            ).order_by(Separation.created_at.desc()).first()
+            
+            if active_rel and active_sep:
+                expected_days = get_expected_days_for_sep(active_sep)
+                old_user_score = user.relationship_score or 0
+                old_partner_score = partner.relationship_score or 0 if partner_id and partner else 0
+                old_total = old_user_score + old_partner_score
+                
+                new_user_score = calculate_user_score(db, user, active_rel, active_sep)
+                new_partner_score = calculate_user_score(db, partner, active_rel, active_sep) if partner_id and partner else 0
+                new_total = new_user_score + new_partner_score
+                
+                old_word = get_love_word(old_total, expected_days)["loveWord"]
+                new_word_info = get_love_word(new_total, expected_days)
+                new_word = new_word_info["loveWord"]
+                
+                if old_word != new_word:
+                    msg = f"{new_word_info['emoji']} Your relationship has entered a new phase: {new_word}."
+                    for u in [user, partner] if partner_id and partner else [user]:
+                        if u and u.fcm_token:
+                            create_notification_and_push(
+                                db=db,
+                                recipient_id=u.id,
+                                notification_type="love_word_change",
+                                title="Journey Milestone",
+                                body=msg,
+                                fcm_token=u.fcm_token
+                            )
+        except Exception as lw_e:
+            logger.error(f"Error checking love word change: {lw_e}")
     except Exception as e:
         logger.error(f"Error in _trigger_mood_notifications: {e}")
 

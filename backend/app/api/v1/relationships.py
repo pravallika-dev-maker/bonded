@@ -37,7 +37,7 @@ def get_relationship_history(current_user: User = Depends(get_current_user), db:
         if r.status == "archived":
             partner_name = r.user2_name if r.user1_id == current_user.id else r.user1_name
         else:
-            partner_name = partner.user_name if (partner and partner.user_name) else current_user.partner_name
+            partner_name = current_user.partner_name or (partner.user_name if (partner and partner.user_name) else None)
         
         sep_count = db.query(Separation).filter(Separation.relationship_id == r.id).count()
         
@@ -92,7 +92,7 @@ def get_relationship_separations(relationship_id: int, current_user: User = Depe
     else:
         partner_id = rel.user2_id if rel.user1_id == current_user.id else rel.user1_id
         partner = db.query(User).filter(User.id == partner_id).first()
-        partner_name = (partner.user_name if (partner and partner.user_name) else None) or current_user.partner_name
+        partner_name = current_user.partner_name or (partner.user_name if (partner and partner.user_name) else None)
     
     for s in seps:
         s.days_elapsed = (s.ended_at.date() - s.start_date).days if s.ended_at else (date.today() - s.start_date).days
@@ -122,7 +122,7 @@ def get_relationship_summary(relationship_id: int, current_user: User = Depends(
     if rel.status == "archived":
         partner_name = rel.user2_name if rel.user1_id == current_user.id else rel.user1_name
     else:
-        partner_name = partner.user_name if (partner and partner.user_name) else current_user.partner_name
+        partner_name = current_user.partner_name or (partner.user_name if (partner and partner.user_name) else None)
         
     return RelationshipSummaryResponse(
         relationship_id=rel.id,

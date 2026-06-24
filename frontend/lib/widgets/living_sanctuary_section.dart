@@ -7,7 +7,12 @@ import '../services/api_service.dart';
 class LivingSanctuarySection extends StatefulWidget {
   final bool isActiveSeparation;
   final bool hasPartner;
-  const LivingSanctuarySection({super.key, required this.isActiveSeparation, this.hasPartner = false});
+
+  const LivingSanctuarySection({
+    super.key,
+    required this.isActiveSeparation,
+    required this.hasPartner,
+  });
 
   @override
   State<LivingSanctuarySection> createState() => _LivingSanctuarySectionState();
@@ -74,65 +79,51 @@ class _LivingSanctuarySectionState extends State<LivingSanctuarySection>
 
             // ── TOP BUTTONS ──
             Row(
-              children: [
-                Expanded(
-                  child: _FloatingPillButton(
-                    title: "Begin a New Journey",
-                    icon: Icons.add,
-                    isPrimary: true,
-                    breathingController: _breathingController,
-                    onTap: () {
-                      if (widget.isActiveSeparation) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Text("You are already in an active separation journey."),
-                            backgroundColor: const Color(0xFF911746),
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          ),
+                children: [
+                  Expanded(
+                    child: _FloatingPillButton(
+                      title: "Begin a New Journey",
+                      icon: Icons.add,
+                      isPrimary: true,
+                      breathingController: _breathingController,
+                      onTap: () {
+                        if (widget.isActiveSeparation) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Text("You are already in an active separation journey."),
+                              backgroundColor: const Color(0xFF911746),
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          );
+                          return;
+                        }
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const SeparationStep1IntentionScreen()),
                         );
-                        return;
-                      }
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const SeparationStep1IntentionScreen()),
-                      );
-                    },
+                      },
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _FloatingPillButton(
-                    title: "Shared Memories",
-                    icon: Icons.history,
-                    isPrimary: false,
-                    breathingController: _breathingController,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const HistoryScreen()),
-                      );
-                    },
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _FloatingPillButton(
+                      title: "Shared Memories",
+                      icon: Icons.history,
+                      isPrimary: false,
+                      breathingController: _breathingController,
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const HistoryScreen()),
+                        );
+                      },
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
 
             const SizedBox(height: 16),
-
-            // ── CONNECTION PORTAL (Join) ──
-            if (!widget.hasPartner) ...[
-              _ConnectionPortalBar(
-                driftController: _ambientDriftController,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const JoinWithCodeScreen()),
-                  );
-                },
-              ),
-              const SizedBox(height: 24),
-            ],
 
             // ── THE QUOTE CARD SANCTUARY ──
             _EmotionalSanctuaryCard(
@@ -372,103 +363,5 @@ class _FloatingPillButtonState extends State<_FloatingPillButton>
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Connection Portal Bar
-// ─────────────────────────────────────────────────────────────────────────────
-class _ConnectionPortalBar extends StatefulWidget {
-  final AnimationController driftController;
-  final VoidCallback onTap;
-
-  const _ConnectionPortalBar({
-    required this.driftController,
-    required this.onTap,
-  });
-
-  @override
-  State<_ConnectionPortalBar> createState() => _ConnectionPortalBarState();
-}
-
-class _ConnectionPortalBarState extends State<_ConnectionPortalBar>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _tapController;
-  late Animation<double> _scaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _tapController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 150),
-    );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.97).animate(
-      CurvedAnimation(parent: _tapController, curve: Curves.easeOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _tapController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => _tapController.forward(),
-      onTapUp: (_) {
-        _tapController.reverse();
-        widget.onTap();
-      },
-      onTapCancel: () => _tapController.reverse(),
-      child: ScaleTransition(
-        scale: _scaleAnimation,
-        child: Container(
-          height: 44,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            color: const Color(0xFF180710).withOpacity(0.5),
-            border: Border.all(
-              color: const Color(0xFF911746).withOpacity(0.4),
-              width: 1.0,
-            ),
-          ),
-          child: Center(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Text(
-                  "✦",
-                  style: TextStyle(
-                    color: Color(0xFFDD8F9F),
-                    fontSize: 10,
-                  ),
-                ),
-                SizedBox(width: 8),
-                Text(
-                  "Enter a Shared Space",
-                  style: TextStyle(
-                    fontFamily: 'Georgia',
-                    fontSize: 13,
-                    fontStyle: FontStyle.italic,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFFDD8F9F),
-                    letterSpacing: 0.8,
-                  ),
-                ),
-                SizedBox(width: 8),
-                Text(
-                  "✦",
-                  style: TextStyle(
-                    color: Color(0xFFDD8F9F),
-                    fontSize: 10,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 

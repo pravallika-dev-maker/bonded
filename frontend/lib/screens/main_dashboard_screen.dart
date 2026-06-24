@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
@@ -29,6 +30,9 @@ import '../widgets/unconnected_hero_card.dart';
 import '../widgets/living_sanctuary_section.dart';
 import '../widgets/floating_connection_pill.dart';
 import 'partner_invite_screen.dart';
+import '../features/drift_bottle/controllers/drift_bottle_controller.dart';
+import '../features/drift_bottle/widgets/drift_bottle_widget.dart';
+import '../features/drift_bottle/widgets/drift_bottle_opening_overlay.dart';
 
 class MainDashboardScreen extends StatefulWidget {
   final String userName;
@@ -72,6 +76,8 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
   late bool _localIsWaitingForPartner;
   int _unreadCount = 0;
 
+  final DriftBottleController _driftBottleController = DriftBottleController();
+
   // Derived from active separation API — no hardcoded values
   int? _currentDay;
   int? _totalDays;
@@ -88,12 +94,11 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
     _partnerName = null; // Clear stale state initially
     _isLoadingSeparation = true;
     _setupPushNotifications();
+    _loadCachedDashboardData();
     _fetchDashboardData();
+    _driftBottleController.initialize();
     
-    // Poll for shared presence every 15 seconds to keep both users active and detect each other
-    _presenceTimer = Timer.periodic(const Duration(seconds: 15), (_) {
-      _pollSharedPresence();
-    });
+    _startPresenceTimer();
 
     // Subscribe to global app events — instantly refresh on partner connect/disconnect/time-travel
     _eventBusSubscription = AppEventBus().stream.listen((event) {
@@ -103,6 +108,58 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
       }
       _fetchDashboardData();
     });
+  }
+
+  Future<void> _loadCachedDashboardData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final cachedHeroStr = prefs.getString('cached_home_hero');
+    final cachedSepStr = prefs.getString('cached_active_separation');
+    
+    if (!mounted) return;
+    
+    if (cachedHeroStr != null || cachedSepStr != null) {
+      setState(() {
+        Map<String, dynamic>? homeHero;
+        Map<String, dynamic>? sep;
+        try { if (cachedHeroStr != null) homeHero = jsonDecode(cachedHeroStr); } catch(_) {}
+        try { if (cachedSepStr != null) sep = jsonDecode(cachedSepStr); } catch(_) {}
+        
+        if (homeHero != null) {
+          _partnerName = homeHero['partner_name'] ?? homeHero['partnerName'];
+          _moodPhrase = homeHero['comfort_message']?.toString() ?? homeHero['comfortMessage']?.toString();
+          _totalDays = homeHero['total_duration_days'] ?? homeHero['totalDurationDays'];
+          _currentDay = homeHero['current_day'] ?? homeHero['currentDay'] ?? 1;
+          _isPartnerConnected = homeHero['partner_connected'] == true || homeHero['partnerConnected'] == true;
+          _isMissedDayFlow = homeHero['is_missed_day_flow'] == true || homeHero['isMissedDayFlow'] == true;
+          _hasCompletedSeparation = homeHero['has_completed_separation'] == true || homeHero['hasCompletedSeparation'] == true;
+          _isHeroEmpty = false;
+        }
+        
+        if (sep != null) {
+          _activeSeparation = sep;
+          _partnerName ??= sep['partner_name'] ?? sep['partnerName'];
+          if (_totalDays == null) {
+            final label = sep['duration_label']?.toString() ?? '';
+            final match = RegExp(r'(\d+)').firstMatch(label.toLowerCase());
+            if (match != null) {
+               int val = int.tryParse(match.group(1)!) ?? 21;
+               if (label.toLowerCase().contains('week')) val *= 7;
+               if (label.toLowerCase().contains('month')) val *= 30;
+               _totalDays = val;
+            } else {
+               _totalDays = 21;
+            }
+          }
+          if (_currentDay == null) {
+             final rawElapsed = sep['days_elapsed'] ?? sep['day'];
+             _currentDay = rawElapsed is int ? rawElapsed : int.tryParse(rawElapsed?.toString() ?? '') ?? 1;
+          }
+          _isHeroEmpty = false;
+        }
+        
+        _isLoadingSeparation = false;
+      });
+    }
   }
 
   Future<void> _acknowledgeCompletion() async {
@@ -140,6 +197,15 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
         ApiService.registerFcmToken(newToken).catchError((_) {});
       });
     }
+  }
+
+  void _startPresenceTimer() {
+    _presenceTimer?.cancel();
+    _presenceTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      _pollSharedPresence();
+    });
+    // Immediately ping backend once to establish presence upon resume
+    _pollSharedPresence();
   }
 
   Future<void> _pollSharedPresence() async {
@@ -180,7 +246,11 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
+      _startPresenceTimer();
       _fetchDashboardData();
+    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive || state == AppLifecycleState.hidden) {
+      _presenceTimer?.cancel();
+      ApiService.setOffline();
     }
   }
 
@@ -329,9 +399,19 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
           // Backend says insight is unlocked → user has checked in, persist this across refreshes
           _isCheckedIn = true;
           
-          _todayInsightDate = dailyInsight['date']?.toString();
-          // Use backend is_viewed as source of truth (persists across devices/restarts)
-          _insightViewed = dailyInsight['is_viewed'] == true || dailyInsight['isViewed'] == true;
+          final localTodayString = DateFormat('yyyy-MM-dd').format(DateTime.now());
+          final fetchedIsViewed = dailyInsight['is_viewed'] == true || dailyInsight['isViewed'] == true;
+          
+          final localViewedDate = prefs.getString('insight_viewed_date');
+          final isLocallyViewedToday = localViewedDate == localTodayString;
+          
+          if (_todayInsightDate != localTodayString) {
+            _insightViewed = fetchedIsViewed || isLocallyViewedToday;
+            _todayInsightDate = localTodayString;
+          } else {
+            // Prevent server race conditions from reverting local true state
+            _insightViewed = _insightViewed || fetchedIsViewed || isLocallyViewedToday;
+          }
 
           if (dailyInsight['insight'] != null) {
             final text = dailyInsight['insight'].toString();
@@ -401,11 +481,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
         _hasCompletedSeparation = false;
       }
 
-      // ── When journey is completed (e.g. via Time Travel), immediately unlock final
-      // insights for both partners — don't wait for a mood check-in.
-      if (_hasCompletedSeparation) {
-        _isCheckedIn = true;
-      }
+      // (Removed: Journey completion no longer bypasses the daily mood check-in requirement)
 
       if (_isPartnerConnected) {
         final bool bannerShown = prefs.getBool('partner_connected_banner_shown') ?? false;
@@ -445,6 +521,41 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
       // ── Shared Presence: play animation every time backend says both are active ──
       final bool presence = homeHero?['shared_presence'] == true;
       _sharedPresence = presence;
+
+      // ── Final Day Completion & Final Insight Unlock Logic ──
+      bool isFinalDay = _currentDay != null && _totalDays != null && _currentDay! == _totalDays!;
+      bool isPastFinalDay = _currentDay != null && _totalDays != null && _currentDay! > _totalDays!;
+      
+      // 1. Force Completion if past final day
+      if (isPastFinalDay) {
+        _hasCompletedSeparation = true;
+        _currentDay = _totalDays; // Cap the day
+        isFinalDay = true;
+      }
+
+      // 2. Lock Final Insights until final activities are completed
+      if (isFinalDay) {
+        if (!_reflectionCompletedToday) {
+          // Keep insights locked until final reflection is done
+          _isCheckedIn = false;
+          _insightViewed = false;
+          
+          final currentStatic = _dailyInsights[_currentDay ?? 1] ?? _dailyInsights.values.first;
+          _dailyInsights[_currentDay ?? 1] = InsightData(
+            lockedTitle: "Complete your final reflection to unlock this insight.",
+            reflectionHeader: currentStatic.reflectionHeader,
+            reflectionMain: currentStatic.reflectionMain,
+            reflectionMiddle: currentStatic.reflectionMiddle,
+            awarenessTitle: currentStatic.awarenessTitle,
+            awarenessText: currentStatic.awarenessText,
+            bottomQuote: currentStatic.bottomQuote,
+            finalLine: currentStatic.finalLine,
+          );
+        } else {
+          // They finished the reflection on the final day, it is complete!
+          _hasCompletedSeparation = true;
+        }
+      }
     });
   }
 
@@ -545,13 +656,21 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
                       awarenessText: (_isCheckedIn && !_insightViewed) ? (_dailyInsights[_currentDay]?.awarenessText ?? _dailyInsights.values.first.awarenessText) : null,
                       bottomQuote: (_isCheckedIn && !_insightViewed) ? (_dailyInsights[_currentDay]?.bottomQuote ?? _dailyInsights.values.first.bottomQuote) : null,
                       finalLine: (_isCheckedIn && !_insightViewed) ? (_dailyInsights[_currentDay]?.finalLine ?? _dailyInsights.values.first.finalLine) : null,
-                      onInsightViewed: () {
+                      onInsightViewed: () async {
                         setState(() { _insightViewed = true; });
+                        final prefs = await SharedPreferences.getInstance();
+                        final localTodayString = DateFormat('yyyy-MM-dd').format(DateTime.now());
+                        await prefs.setString('insight_viewed_date', localTodayString);
                         ApiService.markInsightViewed();
                       },
                     )
                   : _currentIndex == 2
-                      ? LettersScreen(separationId: _activeSeparation?['relationship_id'] ?? _activeSeparation?['relationshipId'])
+                      ? LettersScreen(
+                          isActiveSeparation: _activeSeparation != null && 
+                            (_activeSeparation!['is_active'] == true || 
+                             _activeSeparation!['isActive'] == true || 
+                             _activeSeparation!['status'] == 'active'),
+                        )
                       : _currentIndex == 3
                           ? JourneyScreen(
                               userName: _currentUserName,
@@ -698,7 +817,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
                             );
                           },
                         )
-                      else if (_isHeroEmpty && _hasCompletedSeparation && !_hasAcknowledgedCompletion)
+                      else if (_hasCompletedSeparation && !_hasAcknowledgedCompletion)
                         LivingJourneyCard(
                           currentDay: _totalDays ?? 21,
                           totalDays: _totalDays ?? 21,
@@ -709,38 +828,14 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
                           partnerName: _partnerName,
                           onClose: () => _acknowledgeCompletion(),
                         )
-                      else if (_isHeroEmpty && _hasCompletedSeparation && _hasAcknowledgedCompletion)
+                      else if (_hasCompletedSeparation && _hasAcknowledgedCompletion)
                         PostJourneySanctuaryCard(
                           partnerName: _partnerName ?? 'your partner',
-                          onBeginNewJourney: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const SeparationStep1IntentionScreen()),
-                            );
-                          },
-                          onSharedMemories: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const HistoryScreen()),
-                            );
-                          },
                         )
                       // Scenario 2: Partner connected, no active separation yet
                       else if (_isHeroEmpty)
                         ConnectedReadyHeroCard(
                           partnerName: _partnerName ?? 'your partner',
-                          onBeginSeparation: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const SeparationStep1IntentionScreen()),
-                            );
-                          },
-                          onSharedMemories: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const HistoryScreen()),
-                            );
-                          },
                         )
                       else if (_activeSeparation != null || (_currentDay ?? 0) > 0)
                         LivingJourneyCard(
@@ -748,6 +843,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
                           totalDays: _totalDays ?? 21,
                           moodPhrase: _moodPhrase ?? '',
                           partnerName: _partnerName,
+                          isMissedDayFlow: _isMissedDayFlow,
                           statusLine: (_completedReflections ?? 0) > 0
                               ? '$_completedReflections of $_totalDays reflections done'
                               : _formatStartDate(
@@ -940,6 +1036,30 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
                 hasNewInsight: _isCheckedIn && !_insightViewed,
               ),
             ),
+
+            // ── Drift Bottle Widget ──
+            if (_currentIndex == 0)
+              Positioned(
+                bottom: 90,
+                left: 20,
+                child: AnimatedBuilder(
+                  animation: _driftBottleController,
+                  builder: (context, child) {
+                    if (_driftBottleController.canOpen) {
+                      return DriftBottleWidget(
+                        onTap: () async {
+                          final result = await _driftBottleController.openBottle();
+                          if (result != null && result.success) {
+                            if (!context.mounted) return;
+                            await DriftBottleOpeningOverlay.show(context, result);
+                          }
+                        },
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+              ),
           ],
         ),
       ),
@@ -1182,7 +1302,7 @@ class _InsightCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              '✨ Today\'s Insight Unlocked',
+              '✨ Today\'s Insight Completed',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
@@ -2566,7 +2686,7 @@ class _LiveConnectionPresenceState extends State<_LiveConnectionPresence>
                                           ),
                                           const SizedBox(width: 8),
                                           Text(
-                                            'Waiting for ${widget.partnerName} to enter',
+                                            (widget.partnerName == null || widget.partnerName!.trim().isEmpty) ? 'Waiting for partner to enter' : 'Waiting for ${widget.partnerName} to enter',
                                             style: const TextStyle(
                                               fontFamily: 'Georgia',
                                               fontSize: 14,

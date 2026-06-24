@@ -1,6 +1,9 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
+import '../widgets/primary_cta_button.dart';
+import 'main_dashboard_screen.dart';
 import 'promise_screen.dart';
 import 'partner_invite_screen.dart';
 import '../services/api_service.dart';
@@ -400,69 +403,12 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
                       animation: _entranceController,
                       builder: (context, child) => Opacity(
                         opacity: _fadeAnim3.value,
-                        child: child,
-                      ),
-                      child: GestureDetector(
-                        onTap: _hasInput && _state != JoinCodeState.success && _state != JoinCodeState.loading ? _onConnect : null,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: double.infinity,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: _state == JoinCodeState.success
-                                ? const Color(0xFF1C0A11) // app dark rose
-                                : _hasInput 
-                                    ? const Color(0xFF1A1214) 
-                                    : const Color(0xFF0D080A),
-                            borderRadius: BorderRadius.circular(28),
-                            border: Border.all(
-                              color: _state == JoinCodeState.success
-                                  ? const Color(0xFF8A2E55) // app rose
-                                  : _hasInput 
-                                      ? const Color(0xFF911746).withOpacity(0.5) 
-                                      : const Color(0xFF26151B),
-                              width: 1.2,
-                            ),
-                          ),
-                          child: _state == JoinCodeState.loading
-                              ? const Center(
-                                  child: SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2.0,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFDD8F9F)),
-                                    ),
-                                  ),
-                                )
-                              : Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.favorite,
-                                      size: 18,
-                                      color: _state == JoinCodeState.success
-                                          ? const Color(0xFFDD8F9F)
-                                          : _hasInput ? const Color(0xFFDD8F9F) : const Color(0xFF7A4A5D),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      _state == JoinCodeState.success
-                                          ? 'You\'re connected ✓'
-                                          : 'Connect',
-                                      style: TextStyle(
-                                        fontFamily: 'Georgia',
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w600,
-                                        fontStyle: FontStyle.italic,
-                                        letterSpacing: 0.5,
-                                        color: _state == JoinCodeState.success
-                                            ? const Color(0xFFDD8F9F)
-                                            : _hasInput ? const Color(0xFFDD8F9F) : const Color(0xFF7A4A5D),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                        child: PrimaryCtaButton(
+                          text: _state == JoinCodeState.success
+                              ? 'Connected successfully'
+                              : 'Connect spaces',
+                          onTap: _hasInput && _state != JoinCodeState.success && _state != JoinCodeState.loading ? _onConnect : null,
+                          isLoading: _state == JoinCodeState.loading,
                         ),
                       ),
                     ),

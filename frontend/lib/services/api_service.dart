@@ -410,7 +410,10 @@ class ApiService {
       final Map<String, dynamic> responseData = jsonDecode(response.body);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
-        return responseData['data'] ?? responseData;
+        final data = responseData['data'] ?? responseData;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cached_active_separation', jsonEncode(data));
+        return data;
       } else {
         throw Exception(responseData['message'] ?? 'Failed to check active separation status');
       }
@@ -468,7 +471,7 @@ class ApiService {
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return responseData;
       } else {
-        throw Exception(responseData['message'] ?? 'Failed to time travel');
+        throw Exception(responseData['detail'] ?? responseData['message'] ?? 'Failed to time travel');
       }
     } catch (e) {
       throw Exception('Network error: ${e.toString()}');
@@ -1267,10 +1270,15 @@ class ApiService {
       );
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final decoded = jsonDecode(response.body);
+        Map<String, dynamic> data;
         if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
-          return decoded['data'] as Map<String, dynamic>;
+          data = decoded['data'] as Map<String, dynamic>;
+        } else {
+          data = decoded as Map<String, dynamic>;
         }
-        return decoded as Map<String, dynamic>;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('cached_home_hero', jsonEncode(data));
+        return data;
       } else {
         throw Exception('Failed to load home hero data');
       }
@@ -1300,6 +1308,25 @@ class ApiService {
       }
     } catch (e) {
       throw Exception('Network error: ${e.toString()}');
+    }
+  }
+
+  /// Immediately clear the user's presence signal when the app backgrounds
+  static Future<void> setOffline() async {
+    try {
+      final token = await getToken();
+      final headers = {
+        'accept': 'application/json',
+      };
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+      await http.post(
+        Uri.parse(ApiConfig.homeOffline),
+        headers: headers,
+      );
+    } catch (_) {
+      // Best-effort
     }
   }
 }

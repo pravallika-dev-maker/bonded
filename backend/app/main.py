@@ -11,7 +11,7 @@ from slowapi.util import get_remote_address
 from sqlalchemy import text
 from dotenv import load_dotenv
 
-from .api.v1 import auth, users, moods, partners, separations, reflections, letters, journey, notifications, daily_content, relationships, home
+from .api.v1 import auth, users, moods, partners, separations, reflections, letters, journey, notifications, daily_content, relationships, home, drift_bottle
 from .database import engine, Base
 from .models import user, mood, invite_code, separation, notification, question_category, reflection_question, reflection_session, reflection_answer, reflection_comparison, letter, user_daily_affirmation, user_daily_insight  # Register models
 
@@ -27,7 +27,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from contextlib import asynccontextmanager
 
-from .services.scheduler_service import run_evening_checkin_nudge, run_halfway_mark_encouragement
+from .services.scheduler_service import run_evening_checkin_nudge, run_evening_reflection_nudge, run_journey_milestones_check, run_reengagement_nudge
 
 from apscheduler.jobstores.sqlalchemy import SQLAlchemyJobStore
 from .database import SQLALCHEMY_DATABASE_URL
@@ -47,11 +47,27 @@ async def lifespan(app: FastAPI):
         replace_existing=True
     )
     
-    # 2. Halfway Mark Encouragement at 12:00 PM
+    # 2. Evening Reflection Nudge at 20:30 (8:30 PM)
     scheduler.add_job(
-        run_halfway_mark_encouragement,
+        run_evening_reflection_nudge,
+        trigger=CronTrigger(hour=20, minute=30),
+        id="evening_reflection_nudge_job",
+        replace_existing=True
+    )
+    
+    # 3. Journey Milestones Check at 12:00 PM
+    scheduler.add_job(
+        run_journey_milestones_check,
         trigger=CronTrigger(hour=12, minute=0),
-        id="halfway_mark_encouragement_job",
+        id="journey_milestones_check_job",
+        replace_existing=True
+    )
+    
+    # 4. Re-engagement Nudge at 10:00 AM
+    scheduler.add_job(
+        run_reengagement_nudge,
+        trigger=CronTrigger(hour=10, minute=0),
+        id="reengagement_nudge_job",
         replace_existing=True
     )
     
@@ -107,6 +123,7 @@ app.include_router(notifications.router, prefix="/api/v1")
 app.include_router(daily_content.router, prefix="/api/v1")
 app.include_router(relationships.router, prefix="/api/v1")
 app.include_router(home.router, prefix="/api/v1")
+app.include_router(drift_bottle.router, prefix="/api/v1/drift-bottle", tags=["Drift Bottle"])
 
 
 @app.get("/")
