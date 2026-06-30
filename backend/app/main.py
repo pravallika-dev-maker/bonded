@@ -11,7 +11,7 @@ from slowapi.util import get_remote_address
 from sqlalchemy import text
 from dotenv import load_dotenv
 
-from .api.v1 import auth, users, moods, partners, separations, reflections, letters, journey, notifications, daily_content, relationships, home, drift_bottle
+from .api.v1 import auth, users, moods, partners, separations, reflections, letters, journey, notifications, daily_content, relationships, home, drift_bottle, skyhaven
 from .database import engine, Base
 from .models import user, mood, invite_code, separation, notification, question_category, reflection_question, reflection_session, reflection_answer, reflection_comparison, letter, user_daily_affirmation, user_daily_insight  # Register models
 
@@ -124,6 +124,7 @@ app.include_router(daily_content.router, prefix="/api/v1")
 app.include_router(relationships.router, prefix="/api/v1")
 app.include_router(home.router, prefix="/api/v1")
 app.include_router(drift_bottle.router, prefix="/api/v1/drift-bottle", tags=["Drift Bottle"])
+app.include_router(skyhaven.router, prefix="/api/v1/skyhaven", tags=["Sky Haven"])
 
 
 @app.get("/")

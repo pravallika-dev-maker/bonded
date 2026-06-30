@@ -33,6 +33,7 @@ import 'partner_invite_screen.dart';
 import '../features/drift_bottle/controllers/drift_bottle_controller.dart';
 import '../features/drift_bottle/widgets/drift_bottle_widget.dart';
 import '../features/drift_bottle/widgets/drift_bottle_opening_overlay.dart';
+import 'sky_haven/sky_haven_screen.dart';
 
 class MainDashboardScreen extends StatefulWidget {
   final String userName;
@@ -873,6 +874,61 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
                              _activeSeparation!['isActive'] == true || 
                              _activeSeparation!['status'] == 'active'),
                         hasPartner: _partnerName != null && _partnerName!.isNotEmpty,
+                      ),
+
+                      const SizedBox(height: 24),
+
+                      // ── Sky Haven Entry ──
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => const SkyHavenScreen()),
+                          );
+                        },
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(24),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFF2E1065), Color(0xFF4C1D95)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(24),
+                            border: Border.all(color: Colors.purpleAccent.withOpacity(0.5), width: 1.5),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.purple.withOpacity(0.3),
+                                blurRadius: 15,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                '✨ Enter Sky Haven',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'Inter',
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                'Visit your shared floating island',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                  fontFamily: 'Inter',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
 
                       const SizedBox(height: 36),

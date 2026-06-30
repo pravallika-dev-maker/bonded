@@ -1,4 +1,5 @@
 class ApiConfig {
+  // Use local backend for testing
   static const String baseUrl = 'http://3.110.252.52:8001/api/v1';
 
   // Home Endpoints
@@ -57,4 +58,11 @@ class ApiConfig {
   static const String driftBottleStatus = '$baseUrl/drift-bottle/status';
   static const String driftBottleRewards = '$baseUrl/drift-bottle/rewards';
   static const String driftBottleOpen = '$baseUrl/drift-bottle/open';
+
+  // Sky Haven Endpoints
+  static const String skyHavenBase = '$baseUrl/skyhaven/';
+  static const String skyHavenIsland = '$baseUrl/skyhaven/island';
+  static const String skyHavenStatus = '$baseUrl/skyhaven/status';
+  static const String skyHavenAssets = '$baseUrl/skyhaven/assets';
+  static const String skyHavenPlaceObject = '$baseUrl/skyhaven/place-object';
 }

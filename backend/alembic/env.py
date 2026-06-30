@@ -16,7 +16,7 @@ from app.models import (
     question_category, reflection_question, reflection_session,
     reflection_answer, reflection_comparison, letter,
     user_daily_affirmation, user_daily_insight, user_daily_comfort,
-    relationship, drift_bottle
+    relationship, drift_bottle, sky_haven
 )
 
 config = context.config
