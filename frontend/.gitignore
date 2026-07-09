@@ -33,6 +33,16 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Python
+__pycache__/
+*.py[cod]
+
+*.pyc
+venv/
+firebase-credentials.json
+# Firebase credentials
+firebase-credentials.json
+*.json
 # Symbolication related
 app.*.symbols
 

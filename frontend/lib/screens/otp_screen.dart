@@ -1,13 +1,23 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import '../widgets/app_heart_icon.dart';
+import '../services/api_service.dart';
 import 'welcome_screen.dart';
+import 'home_screen.dart';
 
-enum OtpState { entering, error }
+enum OtpState { entering, loading, error }
 
 class OTPScreen extends StatefulWidget {
-  const OTPScreen({super.key});
+  final String phoneNumber;
+  final String countryCode;
+
+  const OTPScreen({
+    super.key,
+    required this.phoneNumber,
+    required this.countryCode,
+  });
 
   @override
   State<OTPScreen> createState() => _OTPScreenState();
@@ -15,33 +25,120 @@ class OTPScreen extends StatefulWidget {
 
 class _OTPScreenState extends State<OTPScreen> {
   final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
-  final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
+  late final List<FocusNode> _focusNodes;
   
   OtpState _state = OtpState.entering;
+  String _errorMessage = '';
 
   @override
   void initState() {
     super.initState();
+    _focusNodes = List.generate(6, (i) => FocusNode(
+      onKeyEvent: (node, event) {
+        if (event is KeyDownEvent && event.logicalKey == LogicalKeyboardKey.backspace) {
+          if (_controllers[i].text.isEmpty && i > 0) {
+            _focusNodes[i - 1].requestFocus();
+            _controllers[i - 1].clear();
+            return KeyEventResult.handled;
+          }
+        }
+        return KeyEventResult.ignored;
+      },
+    ));
     for (int i = 0; i < 6; i++) {
       _controllers[i].addListener(_onTextChanged);
     }
     // Simulate auto-focus on 4th field for the default state representation
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _focusNodes[0].requestFocus();
+      if (mounted) {
+        _focusNodes[0].requestFocus();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Test Mode: Enter 123456 for the OTP',
+              style: TextStyle(fontFamily: 'Georgia', color: Colors.white),
+              textAlign: TextAlign.center,
+            ),
+            backgroundColor: const Color(0xFF911746),
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.only(
+              bottom: MediaQuery.of(context).size.height - 150,
+              left: 20,
+              right: 20,
+            ),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
     });
   }
 
-  void _onTextChanged() {
+  Future<void> _onTextChanged() async {
     String otp = _controllers.map((c) => c.text).join();
     
     if (otp.length == 6) {
-      if (otp == '913725') {
-        setState(() => _state = OtpState.error);
-      } else {
-        // Navigate to Welcome screen immediately
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+      if (_state == OtpState.loading) return;
+      
+      setState(() {
+        _state = OtpState.loading;
+        _errorMessage = '';
+      });
+      
+      try {
+        await ApiService.verifyCode(
+          countryCode: widget.countryCode,
+          phoneNumber: widget.phoneNumber,
+          otp: otp,
         );
+
+        // Register FCM token upon successful login
+        try {
+          final messaging = FirebaseMessaging.instance;
+          final token = await messaging.getToken();
+          if (token != null) {
+            await ApiService.registerFcmToken(token);
+            await ApiService.sendWelcomePush();
+          }
+        } catch (_) {}
+
+        // Check if user is already onboarded
+        try {
+          final profileResponse = await ApiService.getUserMe();
+          final profile = profileResponse['data'] ?? profileResponse;
+          
+          final rawUserName = profile['userName'] ?? profile['name'];
+          if (rawUserName != null && rawUserName.toString().trim().isNotEmpty) {
+            if (mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (_) => HomeScreen(
+                    userName: rawUserName.toString().trim(),
+                    partnerName: (profile['partnerName'] ?? '').toString().trim(),
+                  ),
+                ),
+                (route) => false,
+              );
+            }
+            return;
+          }
+        } catch (e) {
+          // Ignore and proceed to welcome screen
+        }
+        
+        if (mounted) {
+          // Navigate to Welcome screen immediately
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _state = OtpState.error;
+            _errorMessage = e.toString().replaceAll('Exception:', '').trim();
+          });
+        }
       }
     } else {
       if (_state != OtpState.entering) {
@@ -122,6 +219,7 @@ class _OTPScreenState extends State<OTPScreen> {
 
   Widget _buildEntryState() {
     bool isError = _state == OtpState.error;
+    bool isLoading = _state == OtpState.loading;
     
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 28.0),
@@ -188,14 +286,14 @@ class _OTPScreenState extends State<OTPScreen> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: const Color(0xFF4A151D), width: 1.0),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.info_outline, color: Color(0xFF962335), size: 16),
-                  SizedBox(width: 8),
+                  const Icon(Icons.info_outline, color: Color(0xFF962335), size: 16),
+                  const SizedBox(width: 8),
                   Text(
-                    "That didn't feel right... try again",
-                    style: TextStyle(
+                    _errorMessage.isNotEmpty ? _errorMessage : "That didn't feel right... try again",
+                    style: const TextStyle(
                       fontFamily: 'Georgia',
                       fontSize: 12,
                       fontStyle: FontStyle.italic,
@@ -228,41 +326,69 @@ class _OTPScreenState extends State<OTPScreen> {
                 _onTextChanged();
               }
             },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              width: double.infinity,
-              height: 56,
-              decoration: BoxDecoration(
-                color: isError ? const Color(0xFF1A1214) : const Color(0xFF0D080A),
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(
+            child: Center(
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOutCubic,
+                width: isLoading ? 56.0 : (MediaQuery.of(context).size.width - 56.0),
+                height: 56,
+                decoration: BoxDecoration(
                   color: isError 
-                      ? const Color(0xFF911746).withOpacity(0.5) 
-                      : const Color(0xFF26151B),
-                  width: 1.2,
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.favorite,
-                    size: 18,
-                    color: isError ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                      ? const Color(0xFF1A1214) 
+                      : (isLoading ? const Color(0xFF1F0A13) : const Color(0xFF0D080A)),
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(
+                    color: isError 
+                        ? const Color(0xFF911746).withOpacity(0.5) 
+                        : (isLoading ? const Color(0xFF8A2E55).withOpacity(0.6) : const Color(0xFF26151B)),
+                    width: 1.2,
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    isError ? "Let's try once more" : "I'm here",
-                    style: TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      fontStyle: FontStyle.italic,
-                      letterSpacing: 0.5,
-                      color: isError ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                  boxShadow: isLoading ? [
+                    BoxShadow(
+                      color: const Color(0xFF8A2E55).withOpacity(0.2),
+                      blurRadius: 12,
+                      spreadRadius: 2,
                     ),
+                  ] : null,
+                ),
+                child: Center(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: isLoading
+                        ? const SizedBox(
+                            key: ValueKey('loader'),
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.5,
+                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFDD8F9F)),
+                            ),
+                          )
+                        : Row(
+                            key: const ValueKey('text'),
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.favorite,
+                                size: 18,
+                                color: isError ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                isError ? "Let's try once more" : "I'm here",
+                                style: TextStyle(
+                                  fontFamily: 'Georgia',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  fontStyle: FontStyle.italic,
+                                  letterSpacing: 0.5,
+                                  color: isError ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
+                                ),
+                              ),
+                            ],
+                          ),
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -359,6 +485,33 @@ class _OTPScreenState extends State<OTPScreen> {
           textAlign: TextAlign.center,
           keyboardType: TextInputType.number,
           maxLength: 1,
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            TextInputFormatter.withFunction((oldValue, newValue) {
+              if (newValue.text.length > 1) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  String value = newValue.text;
+                  for (int i = 0; i < value.length; i++) {
+                    if (index + i < 6) {
+                      _controllers[index + i].text = value[i];
+                    }
+                  }
+                  int nextFocus = index + value.length;
+                  if (nextFocus < 6) {
+                    _focusNodes[nextFocus].requestFocus();
+                  } else {
+                    _focusNodes[5].unfocus();
+                  }
+                  _onTextChanged();
+                });
+                return TextEditingValue(
+                  text: newValue.text[0],
+                  selection: const TextSelection.collapsed(offset: 1),
+                );
+              }
+              return newValue;
+            }),
+          ],
           style: const TextStyle(
             fontFamily: 'Georgia',
             fontSize: 22,
@@ -373,7 +526,7 @@ class _OTPScreenState extends State<OTPScreen> {
             if (value.isNotEmpty && index < 5) {
               _focusNodes[index + 1].requestFocus();
             } else if (value.isEmpty && index > 0) {
-              _focusNodes[index - 1].requestFocus();
+              // Handled by the RawKeyboardListener backspace event
             }
             // Trigger state check
             _onTextChanged();

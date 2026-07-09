@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../widgets/app_heart_icon.dart';
+import '../services/api_service.dart';
 import 'otp_screen.dart';
 
 class SendingCodeScreen extends StatefulWidget {
@@ -13,17 +14,40 @@ class SendingCodeScreen extends StatefulWidget {
 }
 
 class _SendingCodeScreenState extends State<SendingCodeScreen> {
+  bool _hasError = false;
+  String _errorMessage = '';
+
   @override
   void initState() {
     super.initState();
-    // Simulate sending delay then push to OTP
-    Timer(const Duration(seconds: 3), () {
+    _performSendCode();
+  }
+
+  Future<void> _performSendCode() async {
+    try {
+      // Trigger the real ApiService call
+      await ApiService.sendCode(
+        countryCode: '+91',
+        phoneNumber: widget.phoneNumber,
+      );
+
+      // On successful send, push OTP screen replacement
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const OTPScreen()),
+          MaterialPageRoute(builder: (_) => OTPScreen(
+            phoneNumber: widget.phoneNumber,
+            countryCode: '+91', // Hardcoded as per the current sendCode implementation
+          )),
         );
       }
-    });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _errorMessage = e.toString().replaceAll('Exception:', '').trim();
+        });
+      }
+    }
   }
 
   @override
@@ -59,9 +83,9 @@ class _SendingCodeScreenState extends State<SendingCodeScreen> {
                 const Spacer(flex: 2),
                 
                 // ── Title ──
-                const Text(
-                  'Just a moment',
-                  style: TextStyle(
+                Text(
+                  _hasError ? 'Oops, sorry!' : 'Just a moment',
+                  style: const TextStyle(
                     fontFamily: 'Georgia',
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
@@ -72,13 +96,18 @@ class _SendingCodeScreenState extends State<SendingCodeScreen> {
                 const SizedBox(height: 12),
                 
                 // ── Subtitle ──
-                const Text(
-                  'Sending a code your way...',
-                  style: TextStyle(
-                    fontFamily: 'Georgia',
-                    fontSize: 16,
-                    fontStyle: FontStyle.italic,
-                    color: Color(0xFF8B6774),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                  child: Text(
+                    _hasError ? _errorMessage : 'Sending a code your way...',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontFamily: 'Georgia',
+                      fontSize: 15,
+                      fontStyle: FontStyle.italic,
+                      color: _hasError ? const Color(0xFFDD8F9F) : const Color(0xFF8B6774),
+                      height: 1.4,
+                    ),
                   ),
                 ),
                 
@@ -121,17 +150,52 @@ class _SendingCodeScreenState extends State<SendingCodeScreen> {
                 
                 const Spacer(flex: 3),
                 
-                // ── Animated Dots ──
-                const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _PulseDot(delay: 0),
-                    SizedBox(width: 12),
-                    _PulseDot(delay: 1),
-                    SizedBox(width: 12),
-                    _PulseDot(delay: 2),
-                  ],
-                ),
+                // ── Animated Dots / Retry ──
+                if (_hasError)
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _hasError = false;
+                        _errorMessage = '';
+                      });
+                      _performSendCode();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1B0711),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFF911746).withOpacity(0.5)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.refresh_rounded, size: 16, color: Color(0xFFDD8F9F)),
+                          SizedBox(width: 8),
+                          Text(
+                            'Tap to Retry',
+                            style: TextStyle(
+                              fontFamily: 'Georgia',
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFDD8F9F),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _PulseDot(delay: 0),
+                      SizedBox(width: 12),
+                      _PulseDot(delay: 1),
+                      SizedBox(width: 12),
+                      _PulseDot(delay: 2),
+                    ],
+                  ),
                 
                 const Spacer(flex: 2),
                 
@@ -186,7 +250,6 @@ class _SendingCodeScreenState extends State<SendingCodeScreen> {
     );
   }
 }
-
 
 class _PulseDot extends StatefulWidget {
   final int delay;

@@ -1,7 +1,38 @@
 import 'package:flutter/material.dart';
 
-class SplashContent extends StatelessWidget {
+class SplashContent extends StatefulWidget {
   const SplashContent({super.key});
+
+  @override
+  State<SplashContent> createState() => _SplashContentState();
+}
+
+class _SplashContentState extends State<SplashContent> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _glowAnimation;
+  late Animation<double> _scaleAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat(reverse: true);
+    
+    _glowAnimation = Tween<double>(begin: 2.0, end: 12.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _scaleAnimation = Tween<double>(begin: 0.98, end: 1.05).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,13 +93,23 @@ class SplashContent extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Heart Icon (Strictly Flat, No Glow, No Gradient)
-                SizedBox(
-                  width: 96,
-                  height: 96,
-                  child: CustomPaint(
-                    painter: _StrictReferenceHeartPainter(),
-                  ),
+                // Heart Icon (Breathing Glow + Gradient)
+                AnimatedBuilder(
+                  animation: _controller,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: _scaleAnimation.value,
+                      child: SizedBox(
+                        width: 96,
+                        height: 96,
+                        child: CustomPaint(
+                          painter: _StrictReferenceHeartPainter(
+                            glowRadius: _glowAnimation.value,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
 
                 const SizedBox(height: 12),
@@ -112,6 +153,10 @@ class SplashContent extends StatelessWidget {
 }
 
 class _StrictReferenceHeartPainter extends CustomPainter {
+  final double glowRadius;
+
+  _StrictReferenceHeartPainter({this.glowRadius = 0.0});
+
   @override
   void paint(Canvas canvas, Size size) {
     Path getHeartPath(double w, double h) {
@@ -166,23 +211,45 @@ class _StrictReferenceHeartPainter extends CustomPainter {
         ..strokeWidth = strokeThickness,
     );
 
-    // 3. Solid Fill Heart (Bright Pink, Flat, No Gradient)
+    // 3. Solid Fill Heart (Gradient Fill + Glow)
     final inScale = 0.60;
     final inW = size.width * inScale;
     final inH = size.height * inScale;
     final pathIn = getHeartPath(inW, inH)
         .shift(Offset((size.width - inW) / 2, (size.height - inH) / 2));
     
+    // Draw the glow
+    if (glowRadius > 0) {
+      canvas.drawPath(
+        pathIn,
+        Paint()
+          ..color = fillColor.withOpacity(0.6)
+          ..style = PaintingStyle.fill
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, glowRadius),
+      );
+    }
+
+    // Draw the gradient fill
+    final Rect heartBounds = pathIn.getBounds();
     canvas.drawPath(
       pathIn,
       Paint()
-        ..color = fillColor
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFFE85D8F), // Lighter, vibrant pink top
+            Color(0xFF8A2E55), // Base pink bottom
+          ],
+        ).createShader(heartBounds)
         ..style = PaintingStyle.fill,
     );
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _StrictReferenceHeartPainter oldDelegate) {
+    return oldDelegate.glowRadius != glowRadius;
+  }
 }
 
 class _SplashCirclesPainter extends CustomPainter {
