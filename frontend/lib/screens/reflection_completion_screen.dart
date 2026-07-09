@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/primary_cta_button.dart';
 
 class ReflectionCompletionScreen extends StatelessWidget {
   const ReflectionCompletionScreen({super.key});
@@ -53,35 +54,13 @@ class ReflectionCompletionScreen extends StatelessWidget {
                   ),
                 ),
                 const Spacer(flex: 3),
-                GestureDetector(
+                PrimaryCtaButton(
+                  text: 'Go to home',
+                  icon: null,
+                  width: double.infinity,
                   onTap: () {
                     Navigator.pop(context);
                   },
-                  child: Container(
-                    width: double.infinity,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF1A1214),
-                      borderRadius: BorderRadius.circular(28),
-                      border: Border.all(
-                        color: const Color(0xFF911746).withOpacity(0.5),
-                        width: 1.2,
-                      ),
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'Go to home',
-                        style: TextStyle(
-                          fontFamily: 'Georgia',
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          fontStyle: FontStyle.italic,
-                          letterSpacing: 0.5,
-                          color: Color(0xFFDD8F9F),
-                        ),
-                      ),
-                    ),
-                  ),
                 ),
                 const SizedBox(height: 40),
               ],

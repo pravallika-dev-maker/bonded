@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
-import '../widgets/premium_sheen.dart';
 import 'separation_transition_screen.dart';
+import '../widgets/primary_cta_button.dart';
 
 class SeparationStep3InviteCodeScreen extends StatefulWidget {
   final String personName;
@@ -248,50 +248,35 @@ class _SeparationStep3InviteCodeScreenState extends State<SeparationStep3InviteC
                       const SizedBox(height: 40),
 
                       // ── Share Button ──
-                      GestureDetector(
+                      PrimaryCtaButton(
+                        icon: _shared ? Icons.check : Icons.share_outlined,
+                        text: _shared ? 'Sent… waiting for them' : 'Share this code',
                         onTap: _shareCode,
-                        child: PremiumSheen(
-                          animationDuration: const Duration(milliseconds: 1500),
-                          pauseDuration: const Duration(seconds: 8),
-                          sheenOpacity: 0.15,
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            width: double.infinity,
-                            height: 56,
-                            decoration: BoxDecoration(
-                              color: _shared ? const Color(0xFF0C1F15) : const Color(0xFF1A1214),
-                              borderRadius: BorderRadius.circular(28),
-                              border: Border.all(
-                                color: _shared 
-                                    ? const Color(0xFF194D2C) 
-                                    : const Color(0xFF911746).withOpacity(0.5),
-                                width: 1.2,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  _shared ? Icons.check : Icons.share_outlined,
-                                  size: 18,
-                                  color: _shared ? const Color(0xFF5DB373) : const Color(0xFFDD8F9F),
+                        gradient: _shared
+                            ? const LinearGradient(
+                                colors: [
+                                  Color(0xFF0D2416),
+                                  Color(0xFF06140C),
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              )
+                            : null,
+                        borderColor: _shared
+                            ? const Color(0xFF5DB373).withValues(alpha: 0.28)
+                            : null,
+                        textColor: _shared ? const Color(0xFF5DB373) : null,
+                        iconColor: _shared ? const Color(0xFF5DB373) : null,
+                        boxShadow: _shared
+                            ? [
+                                BoxShadow(
+                                  color: const Color(0xFF5DB373).withValues(alpha: 0.08),
+                                  blurRadius: 16,
+                                  spreadRadius: 1,
+                                  offset: const Offset(0, 4),
                                 ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  _shared ? 'Sent… waiting for them' : 'Share this code',
-                                  style: TextStyle(
-                                    fontFamily: 'Georgia',
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    fontStyle: FontStyle.italic,
-                                    letterSpacing: 0.5,
-                                    color: _shared ? const Color(0xFF5DB373) : const Color(0xFFDD8F9F),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                              ]
+                            : null,
                       ),
                       const SizedBox(height: 24),
 

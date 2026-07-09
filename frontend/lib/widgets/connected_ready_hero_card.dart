@@ -1,19 +1,27 @@
 import 'dart:math' as math;
-import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'poke_menu.dart';
+import 'poke_particles.dart';
 
 /// Scenario 2 — Partner is connected but no separation has been started yet.
 class ConnectedReadyHeroCard extends StatefulWidget {
   final String partnerName;
+  final Map<String, dynamic>? latestPoke;
+  final Future<void> Function(String gesture)? onSendPoke;
+  final Future<void> Function(int pokeId)? onAcknowledgePoke;
 
   const ConnectedReadyHeroCard({
     super.key,
     required this.partnerName,
+    this.latestPoke,
+    this.onSendPoke,
+    this.onAcknowledgePoke,
   });
 
   @override
   State<ConnectedReadyHeroCard> createState() => _ConnectedReadyHeroCardState();
 }
+
 
 class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
     with TickerProviderStateMixin {
@@ -25,6 +33,9 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
   late AnimationController _entranceCtrl;
   late Animation<double> _fadeAnim;
   late Animation<double> _slideAnim;
+
+  final PokeParticlesController _particlesController = PokeParticlesController();
+  bool _forceOpenPokeMenu = false;
 
   @override
   void initState() {
@@ -58,12 +69,34 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
   }
 
   @override
+  void didUpdateWidget(covariant ConnectedReadyHeroCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final bool hasNewPoke = widget.latestPoke != null &&
+        (oldWidget.latestPoke == null ||
+         widget.latestPoke!['id'] != oldWidget.latestPoke!['id']);
+    if (hasNewPoke) {
+      _particlesController.spawn(widget.latestPoke!['gesture'] ?? 'Love');
+      setState(() {
+        _forceOpenPokeMenu = false; // Reset force open if new poke is received
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _breatheCtrl.dispose();
     _driftCtrl.dispose();
     _connectionCtrl.dispose();
     _entranceCtrl.dispose();
+    _particlesController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleSendPoke(String gesture) async {
+    _particlesController.spawn(gesture);
+    if (widget.onSendPoke != null) {
+      await widget.onSendPoke!(gesture);
+    }
   }
 
   @override
@@ -98,6 +131,12 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
                     spreadRadius: 4,
                     offset: const Offset(0, 24),
                   ),
+                  if (widget.latestPoke != null)
+                    BoxShadow(
+                      color: const Color(0xFFDD8F9F).withValues(alpha: 0.25 + 0.15 * math.sin(breathe * math.pi)),
+                      blurRadius: 24 + 12 * math.sin(breathe * math.pi),
+                      spreadRadius: 2 + 2 * math.sin(breathe * math.pi),
+                    ),
                 ],
               ),
               child: ClipRRect(
@@ -161,8 +200,16 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
                       ),
                     ),
 
+                    // ── Poke Particles ──
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: PokeParticlesWidget(controller: _particlesController),
+                      ),
+                    ),
+
                     // ── Glass border ──
                     Positioned.fill(
+
                       child: IgnorePointer(
                         child: Container(
                           decoration: BoxDecoration(
@@ -187,7 +234,7 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
 
                     // ── Main content ──
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
+                      padding: const EdgeInsets.fromLTRB(24, 18, 24, 18),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -242,12 +289,12 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
                             ],
                           ),
 
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 12),
 
                           // ── Connected hearts illustration ──
                           _ConnectedHeartsIllustration(breathe: breathe, connection: conn),
 
-                          const SizedBox(height: 24),
+                          const SizedBox(height: 12),
 
                           // ── Heading ──
                           ShaderMask(
@@ -261,32 +308,159 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
                               ],
                             ).createShader(bounds),
                             child: const Text(
-                              'Your journey\nbegins here',
+                              'Your journey begins here',
                               style: TextStyle(
                                 fontFamily: 'Georgia',
-                                fontSize: 30,
+                                fontSize: 21,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                                 height: 1.15,
-                                letterSpacing: -0.5,
+                                letterSpacing: -0.3,
                               ),
                             ),
                           ),
 
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 6),
 
                           Text(
-                            'You and your partner are connected. Start a separation phase together whenever you\'re ready.',
+                            "You are connected. Start a separation phase whenever you're ready.",
                             style: TextStyle(
                               fontFamily: 'Georgia',
-                              fontSize: 14,
+                              fontSize: 12.5,
                               fontStyle: FontStyle.italic,
                               color: const Color(0xFFD4C4CA).withValues(alpha: 0.75 + breathe * 0.10),
-                              height: 1.6,
+                              height: 1.45,
                             ),
                           ),
 
+                          const SizedBox(height: 16),
 
+                          // ── Poking interaction ──
+                          if (widget.latestPoke != null)
+                            // Received gesture view
+                            Center(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF8A2E55).withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: const Color(0xFFDD8F9F).withValues(alpha: 0.22),
+                                    width: 1,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFFDD8F9F).withValues(alpha: 0.05),
+                                      blurRadius: 10,
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Pulsing Heart / Sparkle Icon
+                                    TweenAnimationBuilder<double>(
+                                      tween: Tween(begin: 0.95, end: 1.05),
+                                      duration: const Duration(seconds: 1),
+                                      curve: Curves.easeInOutSine,
+                                      builder: (context, scale, child) {
+                                        final gesture = (widget.latestPoke!['gesture'] ?? 'Love').toString();
+                                        return Transform.scale(
+                                          scale: scale + 0.05 * math.sin(breathe * math.pi * 2),
+                                          child: GestureIcon(
+                                            gesture: gesture,
+                                            color: getGestureColor(gesture),
+                                            size: 24,
+                                            strokeWidth: 1.5,
+                                            filled: true,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          '${widget.partnerName} sent you a ${widget.latestPoke!['gesture'] ?? "Poke"}',
+                                          style: const TextStyle(
+                                            fontFamily: 'Georgia',
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFFECC8D4),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        if (PokeMenu.cooldownRemaining > 0)
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: const Color(0xFFDD8F9F).withValues(alpha: 0.08),
+                                              borderRadius: BorderRadius.circular(12),
+                                              border: Border.all(
+                                                color: const Color(0xFFDD8F9F).withValues(alpha: 0.20),
+                                                width: 0.8,
+                                              ),
+                                            ),
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(
+                                                  Icons.access_time_rounded,
+                                                  size: 11,
+                                                  color: const Color(0xFFECC8D4).withValues(alpha: 0.8),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  'Send back in ${PokeMenu.cooldownRemaining}s',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w600,
+                                                    fontFamily: 'Georgia',
+                                                    letterSpacing: 0.2,
+                                                    color: const Color(0xFFECC8D4).withValues(alpha: 0.9),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          )
+                                        else
+                                          GestureDetector(
+                                            onTap: () {
+                                              final pokeId = widget.latestPoke!['id'];
+                                              if (widget.onAcknowledgePoke != null) {
+                                                widget.onAcknowledgePoke!(pokeId);
+                                              }
+                                              setState(() {
+                                                _forceOpenPokeMenu = true;
+                                              });
+                                            },
+                                            child: Text(
+                                              'Send Back',
+                                              style: TextStyle(
+                                                fontSize: 10.5,
+                                                fontWeight: FontWeight.bold,
+                                                fontFamily: 'Georgia',
+                                                decoration: TextDecoration.underline,
+                                                color: const Color(0xFFDD8F9F).withValues(alpha: 0.95),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          else if (widget.onSendPoke != null)
+                            PokeMenu(
+                              onSendPoke: _handleSendPoke,
+                              partnerName: widget.partnerName,
+                              startExpanded: _forceOpenPokeMenu,
+                            ),
+
+                          const SizedBox(height: 16),
 
                           // ── "Connected with [name]" footer ──
                           Row(
@@ -335,50 +509,50 @@ class _ConnectedHeartsIllustration extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: SizedBox(
-        height: 68,
-        width: 200,
+        height: 50,
+        width: 160,
         child: Stack(
           alignment: Alignment.center,
           children: [
             // Pulsing connection line
             CustomPaint(
-              size: const Size(200, 2),
+              size: const Size(160, 2),
               painter: _ConnectionLinePainter(breathe: breathe, connection: connection),
             ),
 
             // Left heart — user (deep rose)
             Positioned(
-              left: 12,
+              left: 8,
               child: _GlowingHeart(
                 color: const Color(0xFFCA366C),
-                size: 30,
-                floatOffset: math.sin(connection * math.pi * 2) * 3,
+                size: 22,
+                floatOffset: math.sin(connection * math.pi * 2) * 2,
                 glowAlpha: 0.28 + breathe * 0.15,
               ),
             ),
 
             // Right heart — partner (soft pink, matching app theme)
             Positioned(
-              right: 12,
+              right: 8,
               child: _GlowingHeart(
                 color: const Color(0xFFDD8F9F),
-                size: 30,
-                floatOffset: -math.sin(connection * math.pi * 2) * 3,
+                size: 22,
+                floatOffset: -math.sin(connection * math.pi * 2) * 2,
                 glowAlpha: 0.22 + breathe * 0.12,
               ),
             ),
 
             // Center merge glow
             Container(
-              width: 16,
-              height: 16,
+              width: 12,
+              height: 12,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
                     color: const Color(0xFFDD8F9F).withValues(alpha: 0.30 + connection * 0.25),
-                    blurRadius: 16,
-                    spreadRadius: 4,
+                    blurRadius: 12,
+                    spreadRadius: 3,
                   ),
                 ],
               ),
@@ -443,7 +617,7 @@ class _ConnectionLinePainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..maskFilter = MaskFilter.blur(BlurStyle.normal, 1.5 + connection * 1.0);
 
-    canvas.drawLine(Offset(48, cy), Offset(size.width - 48, cy), paint);
+    canvas.drawLine(Offset(36, cy), Offset(size.width - 36, cy), paint);
   }
 
   @override

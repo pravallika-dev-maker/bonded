@@ -166,23 +166,37 @@ class _JourneyScreenState extends State<JourneyScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // --- Header ---
-              const Text(
-                'YOUR BOND',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2.0,
-                  color: Color(0xFF9E7E5A),
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'YOUR BOND',
+                    style: TextStyle(
+                      fontSize: 8.5,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2.5,
+                      color: Color(0xFF9E7E5A),
+                    ),
+                  ),
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFF8A2E55),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
                 '${widget.userName} & ${_partnerName ?? "Partner"}',
                 style: const TextStyle(
                   fontFamily: 'Georgia',
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFDFB991),
+                  letterSpacing: -0.2,
                 ),
               ),
               const SizedBox(height: 4),
@@ -190,9 +204,10 @@ class _JourneyScreenState extends State<JourneyScreen> {
                 '“This is where you both are right now”',
                 style: TextStyle(
                   fontFamily: 'Georgia',
-                  fontSize: 16,
+                  fontSize: 13.5,
                   fontStyle: FontStyle.italic,
                   color: Color(0xFF866571),
+                  letterSpacing: 0.1,
                 ),
               ),
               const SizedBox(height: 32),
@@ -312,37 +327,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
                 emoji: _journeyScore?['emoji'] ?? '🌸',
               ),
               
-              const SizedBox(height: 16),
-
-              // --- Bottom Quote ---
-              const Center(
-                child: Text(
-                  '“You’re not the same as when you started… even if it feels quiet.”',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontFamily: 'Georgia',
-                    fontSize: 15,
-                    fontStyle: FontStyle.italic,
-                    color: Color(0xFF866571),
-                    height: 1.5,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // --- Final Line ---
-              const Center(
-                child: Text(
-                  '“This connection still has space to grow”',
-                  style: TextStyle(
-                    fontFamily: 'Georgia',
-                    fontSize: 14,
-                    fontStyle: FontStyle.italic,
-                    color: Color(0xFF5A3C47),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 48),
+              const SizedBox(height: 140),
             ],
           ),
         ),
@@ -459,7 +444,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
 
                     // Body
                     const Text(
-                      'Your journey space has been created. Share your invite code with your partner — once they join, this space will come alive for both of you.',
+                      'Share your invite code to begin. Once they join, this space will come alive.',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontFamily: 'Georgia',
@@ -533,7 +518,7 @@ class _JourneyScreenState extends State<JourneyScreen> {
                     const SizedBox(width: 14),
                     const Expanded(
                       child: Text(
-                        'Bond progress, reflections, and insights will appear here once your partner accepts the invitation.',
+                        'Reflections, progress, and insights will appear here once connected.',
                         style: TextStyle(
                           fontSize: 13,
                           color: Color(0xFF866571),
@@ -734,18 +719,36 @@ class _LockedInsightsVaultState extends State<_LockedInsightsVault> with TickerP
           ),
           child: Column(
             children: [
-              Container(
-                margin: const EdgeInsets.only(top: 12, bottom: 24),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF3F1629),
-                  borderRadius: BorderRadius.circular(2),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 16, 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const SizedBox(width: 40), // spacer to balance close button
+                    Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF3F1629),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.close_rounded,
+                        color: Color(0xFF866571),
+                        size: 22,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                      splashRadius: 22,
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(height: 12),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                  padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
                   child: _buildUnlockedContent(isRevealing: false),
                 ),
               ),
@@ -776,28 +779,51 @@ class _LockedInsightsVaultState extends State<_LockedInsightsVault> with TickerP
               ),
             ],
           ),
-          child: Column(
-            children: [
-               const Icon(Icons.lock_open_rounded, color: Color(0xFFD4C4CA), size: 36),
-               const SizedBox(height: 16),
-               const Text(
-                 '✨ Insights Unlocked',
-                 style: TextStyle(
-                   fontFamily: 'Georgia',
-                   fontSize: 18,
-                   fontWeight: FontWeight.bold,
-                   color: Color(0xFFDD8F9F),
-                 ),
-               ),
-               const SizedBox(height: 8),
-               const Text(
-                 'Tap to view what we noticed',
-                 style: TextStyle(
-                   fontSize: 14,
-                   color: Color(0xFF866571),
-                 ),
-               ),
-            ],
+          child: SizedBox(
+            height: 260,
+            width: double.infinity,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF9E7E5A).withOpacity(0.1),
+                    border: Border.all(
+                      color: const Color(0xFF9E7E5A).withOpacity(0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.spa_rounded, // botanical lotus bloom
+                    color: Color(0xFFDFB991),
+                    size: 36,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Your Insights are Ready',
+                  style: TextStyle(
+                    fontFamily: 'Georgia',
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFDFB991),
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Tap to open and read what we noticed',
+                  style: TextStyle(
+                    fontFamily: 'Georgia',
+                    fontStyle: FontStyle.italic,
+                    fontSize: 14,
+                    color: Color(0xFF866571),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -847,7 +873,8 @@ class _LockedInsightsVaultState extends State<_LockedInsightsVault> with TickerP
                   opacity: lockOpacity,
                   child: Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
+                    height: 260,
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(28),
                       // Subtle gradient overlay for the locked state
@@ -861,7 +888,7 @@ class _LockedInsightsVaultState extends State<_LockedInsightsVault> with TickerP
                       ),
                     ),
                     child: Column(
-                      mainAxisSize: MainAxisSize.min,
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         // Elegant lock icon
                         AnimatedBuilder(
@@ -875,8 +902,8 @@ class _LockedInsightsVaultState extends State<_LockedInsightsVault> with TickerP
                             return Transform.scale(
                               scale: scale,
                               child: Container(
-                                width: 72,
-                                height: 72,
+                                width: 88,
+                                height: 88,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   boxShadow: [
@@ -895,7 +922,7 @@ class _LockedInsightsVaultState extends State<_LockedInsightsVault> with TickerP
                                   ],
                                 ),
                                 child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(36),
+                                  borderRadius: BorderRadius.circular(44),
                                   child: BackdropFilter(
                                     filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                                     child: Container(
@@ -909,9 +936,9 @@ class _LockedInsightsVaultState extends State<_LockedInsightsVault> with TickerP
                                       ),
                                       child: Center(
                                         child: Icon(
-                                          _isAnimatingUnlock ? Icons.lock_open_rounded : Icons.lock_outline_rounded,
-                                          color: const Color(0xFFD4C4CA).withOpacity(0.9),
-                                          size: 26,
+                                          _isAnimatingUnlock ? Icons.spa_rounded : Icons.eco_rounded,
+                                          color: const Color(0xFFDFB991).withOpacity(0.95),
+                                          size: 32,
                                         ),
                                       ),
                                     ),
@@ -922,21 +949,39 @@ class _LockedInsightsVaultState extends State<_LockedInsightsVault> with TickerP
                           },
                         ),
                         const SizedBox(height: 24),
-                        Text(
-                          widget.isLastDay 
-                              ? "Tap to reveal your insights" 
-                              : (widget.daysRemaining == 99 
-                                  ? "Your insights unlock at the end of your space" 
-                                  : "Your insights unlock in ${widget.daysRemaining} ${widget.daysRemaining == 1 ? 'day' : 'days'}"),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: 'Georgia',
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: widget.isLastDay ? Colors.white : const Color(0xFF866571),
+                        if (widget.isLastDay)
+                          ShaderMask(
+                            shaderCallback: (bounds) => const LinearGradient(
+                              colors: [Color(0xFFCCA060), Color(0xFFDD8F9F)],
+                            ).createShader(bounds),
+                            child: const Text(
+                              "Tap to unlock your insights",
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: 'Georgia',
+                                fontSize: 17,
+                                fontWeight: FontWeight.w600,
+                                fontStyle: FontStyle.italic,
+                                color: Colors.white,
+                                letterSpacing: 0.2,
+                              ),
+                            ),
+                          )
+                        else
+                          Text(
+                            widget.daysRemaining == 99 
+                                ? "Insights unlock at the end of your space" 
+                                : "Insights unlock in ${widget.daysRemaining} ${widget.daysRemaining == 1 ? 'day' : 'days'}",
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontFamily: 'Georgia',
+                              fontSize: 15,
+                              fontStyle: FontStyle.italic,
+                              color: Color(0xFFD4C4CA),
+                              letterSpacing: 0.1,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 20),
                         // Teaser crossfade
                         SizedBox(
                           height: 40, // Fixed height to prevent jumping
@@ -947,15 +992,27 @@ class _LockedInsightsVaultState extends State<_LockedInsightsVault> with TickerP
                               final fade = math.sin(_teaserController.value * math.pi);
                               return Opacity(
                                 opacity: fade,
-                                child: Text(
-                                  _teasers[_currentTeaserIndex],
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    fontFamily: 'Georgia',
-                                    fontSize: 14,
-                                    fontStyle: FontStyle.italic,
-                                    color: Color(0xFFDD8F9F),
-                                  ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.auto_awesome,
+                                      size: 12,
+                                      color: Color(0xFF9E7E5A),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      _teasers[_currentTeaserIndex],
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontFamily: 'Georgia',
+                                        fontSize: 13,
+                                        fontStyle: FontStyle.italic,
+                                        color: Color(0xFF866571),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               );
                             },
@@ -1008,7 +1065,7 @@ class _LockedInsightsVaultState extends State<_LockedInsightsVault> with TickerP
 
   Widget _buildTempleDivider() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.symmetric(vertical: 16.0),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -1535,49 +1592,59 @@ class _BondProgressCardState extends State<_BondProgressCard> with SingleTickerP
             sheenOpacity: 0.15,
             child: Column(
               children: [
-                // ── Arc Gauge ──
-          SizedBox(
-            height: 140,
-            child: CustomPaint(
-              size: const Size(220, 110),
-              painter: _ArcPainter(widget.coupleScore),
-            ),
-          ),
-          const SizedBox(height: 12),
-          // ── Stage Visualization (below gauge, no overlap) ──
-          AnimatedBuilder(
-            animation: _emojiPulse,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: _emojiPulse.value,
-                child: child,
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: (stageVisuals['color'] as Color).withOpacity(0.1),
-                boxShadow: [
-                  BoxShadow(
-                    color: (stageVisuals['glow'] as Color).withOpacity(0.4),
-                    blurRadius: 24,
-                    spreadRadius: 2,
+                // ── Arc Gauge & Integrated Leaf Icon ──
+                SizedBox(
+                  height: 140,
+                  width: 220,
+                  child: Stack(
+                    alignment: Alignment.topCenter,
+                    children: [
+                      Positioned(
+                        top: 0,
+                        child: CustomPaint(
+                          size: const Size(220, 110),
+                          painter: _ArcPainter(widget.coupleScore),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 8, // Moves the leaf up to sit in the center of the arc!
+                        child: AnimatedBuilder(
+                          animation: _emojiPulse,
+                          builder: (context, child) {
+                            return Transform.scale(
+                              scale: _emojiPulse.value,
+                              child: child,
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: (stageVisuals['color'] as Color).withOpacity(0.1),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: (stageVisuals['glow'] as Color).withOpacity(0.3),
+                                  blurRadius: 16,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                              border: Border.all(
+                                color: (stageVisuals['color'] as Color).withOpacity(0.2),
+                                width: 1.2,
+                              ),
+                            ),
+                            child: Icon(
+                              stageVisuals['icon'],
+                              color: stageVisuals['color'],
+                              size: 26,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-                border: Border.all(
-                  color: (stageVisuals['color'] as Color).withOpacity(0.3),
-                  width: 1.5,
                 ),
-              ),
-              child: Icon(
-                stageVisuals['icon'],
-                color: stageVisuals['color'],
-                size: 32,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
+                const SizedBox(height: 16),
           Text(
             widget.message,
             textAlign: TextAlign.center,

@@ -93,9 +93,9 @@ class _PartnerInviteScreenState extends State<PartnerInviteScreen> with TickerPr
     if (_bondCode == null) return;
     final rawCode = _bondCode!.replaceAll(' · ', '-');
     final message =
-        "I'm using this app called Bonded to take a small space and understand things better.\n\n"
-        "I'd like you to join me.\n\n"
-        "Here's my code: $rawCode";
+        "I'd love for us to share this space together. Join me on Bonded:\n"
+        "https://bonded.app\n\n"
+        "Use my code to connect: $rawCode";
 
     await Share.share(message);
 

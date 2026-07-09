@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'reflection_completion_screen.dart';
 import '../services/api_service.dart';
 import '../widgets/flying_fairy_widget.dart';
+import '../widgets/primary_cta_button.dart';
 import 'package:flutter/foundation.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
@@ -693,42 +694,15 @@ class _ReflectionTextInputState extends State<_ReflectionTextInput> {
                                     fontStyle: FontStyle.italic,
                                   ),
                                 )
-                              : GestureDetector(
+                              : PrimaryCtaButton(
                                   key: const ValueKey('next_button'),
+                                  text: 'Next',
+                                  icon: null,
+                                  height: 56,
+                                  width: double.infinity,
                                   onTap: _controller.text.trim().isNotEmpty 
                                       ? () => widget.onNext(_controller.text.trim()) 
                                       : null,
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 200),
-                                    height: 56,
-                                    decoration: BoxDecoration(
-                                      color: _controller.text.trim().isNotEmpty 
-                                          ? const Color(0xFF1A1214) 
-                                          : const Color(0xFF0D080A),
-                                      borderRadius: BorderRadius.circular(28),
-                                      border: Border.all(
-                                        color: _controller.text.trim().isNotEmpty 
-                                            ? const Color(0xFF911746).withValues(alpha: 0.5) 
-                                            : const Color(0xFF26151B),
-                                        width: 1.2,
-                                      ),
-                                    ),
-                                    child: Center(
-                                      child: Text(
-                                        'Next',
-                                        style: TextStyle(
-                                          fontFamily: 'Georgia',
-                                          fontSize: 15,
-                                          fontWeight: FontWeight.w600,
-                                          fontStyle: FontStyle.italic,
-                                          letterSpacing: 0.5,
-                                          color: _controller.text.trim().isNotEmpty
-                                              ? const Color(0xFFDD8F9F)
-                                              : const Color(0xFF5A3C47),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
                                 ),
                     ),
                   ),
@@ -833,33 +807,12 @@ class _ReflectionRatingInputState extends State<_ReflectionRatingInput> {
           ),
           Padding(
             padding: const EdgeInsets.only(bottom: 40.0),
-            child: GestureDetector(
+            child: PrimaryCtaButton(
+              text: 'Finish Reflection',
+              icon: null,
+              height: 56,
+              width: double.infinity,
               onTap: widget.onNext,
-              child: Container(
-                width: double.infinity,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1214),
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: const Color(0xFF911746).withOpacity(0.5),
-                    width: 1.2,
-                  ),
-                ),
-                child: const Center(
-                  child: Text(
-                    'Finish Reflection',
-                    style: TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      fontStyle: FontStyle.italic,
-                      letterSpacing: 0.5,
-                      color: Color(0xFFDD8F9F),
-                    ),
-                  ),
-                ),
-              ),
             ),
           ),
         ],
@@ -949,40 +902,12 @@ class _ReflectionMistakesInputState extends State<_ReflectionMistakesInput> {
           ),
           Padding(
             padding: const EdgeInsets.only(bottom: 40.0),
-            child: GestureDetector(
+            child: PrimaryCtaButton(
+              text: 'Next',
+              icon: null,
+              height: 56,
+              width: double.infinity,
               onTap: _selectedOptions.isNotEmpty ? widget.onNext : null,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: double.infinity,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: _selectedOptions.isNotEmpty 
-                      ? const Color(0xFF1A1214) 
-                      : const Color(0xFF0D080A),
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(
-                    color: _selectedOptions.isNotEmpty 
-                        ? const Color(0xFF911746).withOpacity(0.5) 
-                        : const Color(0xFF26151B),
-                    width: 1.2,
-                  ),
-                ),
-                child: Center(
-                  child: Text(
-                    'Next',
-                    style: TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      fontStyle: FontStyle.italic,
-                      letterSpacing: 0.5,
-                      color: _selectedOptions.isNotEmpty
-                          ? const Color(0xFFDD8F9F)
-                          : const Color(0xFF5A3C47),
-                    ),
-                  ),
-                ),
-              ),
             ),
           ),
         ],

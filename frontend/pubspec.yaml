@@ -45,6 +45,10 @@ dependencies:
   speech_to_text: ^7.4.0
   path_provider: ^2.1.4
   flutter_animate: ^4.5.2
+  webview_flutter: ^4.14.0
+  webview_flutter_web: ^0.2.3+4
+  visibility_detector: ^0.4.0+2
+  google_fonts: ^8.1.0
 
 dev_dependencies:
   flutter_test:
@@ -73,6 +77,9 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/drift_bottle/
+    - assets/sky_haven/
+    - assets/models/
+    - assets/web/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

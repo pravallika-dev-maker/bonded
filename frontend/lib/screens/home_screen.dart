@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import '../widgets/premium_sheen.dart';
+import '../widgets/primary_cta_button.dart';
 import '../services/api_service.dart';
 import 'main_dashboard_screen.dart';
 
@@ -243,108 +244,99 @@ class _HomeScreenState extends State<HomeScreen>
               return FadeTransition(
                 opacity: _bgFade,
                 child: SafeArea(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 16),
-
-                        // ── Top greeting ──
-                        FadeTransition(
-                          opacity: _greetingFade,
-                          child: _AnimatedGreeting(userName: _userName),
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        // ── Souls Connecting Centerpiece ──
-                        Center(
-                          child: FadeTransition(
-                            opacity: _heartsScale,
-                            child: ScaleTransition(
-                              scale: _heartsScale,
-                              child: _SoulsConnectingCenterpiece(
-                                entryProgress: _entryController.value,
-                              ),
-                            ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      return SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            minHeight: constraints.maxHeight,
                           ),
-                        ),
+                          child: IntrinsicHeight(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 20),
 
-                        const SizedBox(height: 18),
+                                  // ── Top greeting ──
+                                  FadeTransition(
+                                    opacity: _greetingFade,
+                                    child: _AnimatedGreeting(userName: _userName),
+                                  ),
 
-                        // ── Rotating Text (Title + dynamic details) ──
-                        FadeTransition(
-                          opacity: _titleFadeUp,
-                          child: Transform.translate(
-                            offset: Offset(0, (1.0 - _titleFadeUp.value) * 16.0),
-                            child: Center(
-                              child: _RotatingText(partnerName: _partnerName),
-                            ),
-                          ),
-                        ),
+                                  // ── All main content — vertically centered as one block ──
+                                  Expanded(
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment: CrossAxisAlignment.center,
+                                        children: [
 
-                        const SizedBox(height: 18),
+                                          // Orbs
+                                          FadeTransition(
+                                            opacity: _heartsScale,
+                                            child: ScaleTransition(
+                                              scale: _heartsScale,
+                                              child: _SoulsConnectingCenterpiece(
+                                                entryProgress: _entryController.value,
+                                              ),
+                                            ),
+                                          ),
 
-                        // ── Glassmorphic Waiting card ──
-                        FadeTransition(
-                          opacity: _cardSlideUp,
-                          child: Transform.translate(
-                            offset: Offset(0, (1.0 - _cardSlideUp.value) * 20.0),
-                            child: _WaitingCard(partnerName: _partnerName),
-                          ),
-                        ),
+                                          const SizedBox(height: 24),
 
-                        const SizedBox(height: 12),
+                                          // Headline
+                                          FadeTransition(
+                                            opacity: _titleFadeUp,
+                                            child: Transform.translate(
+                                              offset: Offset(0, (1.0 - _titleFadeUp.value) * 14.0),
+                                              child: _RotatingText(partnerName: _partnerName),
+                                            ),
+                                          ),
 
-                        // ── While You Wait section with Liquid Gradient CTA ──
-                        FadeTransition(
-                          opacity: _ctaFade,
-                          child: Transform.translate(
-                            offset: Offset(0, (1.0 - _ctaFade.value) * 16.0),
-                            child: _WhileYouWaitCard(
-                              onPressedCTA: () {
-                                Navigator.of(context).pushReplacement(
-                                  MaterialPageRoute(
-                                    builder: (_) => MainDashboardScreen(
-                                      userName: _userName,
-                                      isWaitingForPartner: true,
+                                          const SizedBox(height: 28),
+
+                                          // Waiting block — directly below headline, no gap
+                                          FadeTransition(
+                                            opacity: _cardSlideUp,
+                                            child: Transform.translate(
+                                              offset: Offset(0, (1.0 - _cardSlideUp.value) * 14.0),
+                                              child: SizedBox(
+                                                width: double.infinity,
+                                                child: _WaitingBlock(
+                                                  partnerName: _partnerName,
+                                                  onPressedCTA: () {
+                                                    Navigator.of(context).pushReplacement(
+                                                      MaterialPageRoute(
+                                                        builder: (_) => MainDashboardScreen(
+                                                          userName: _userName,
+                                                          isWaitingForPartner: true,
+                                                        ),
+                                                      ),
+                                                    );
+                                                  },
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
 
-                        const SizedBox(height: 12),
-
-                        // ── Bottom quote ──
-                        FadeTransition(
-                          opacity: _ctaFade,
-                          child: const Center(
-                            child: Text(
-                              'Some connections are worth pausing for.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontFamily: 'Georgia',
-                                fontSize: 11,
-                                fontStyle: FontStyle.italic,
-                                color: Color(0xFF5E3A4B),
+                                  const SizedBox(height: 24),
+                                ],
                               ),
                             ),
                           ),
                         ),
-
-                        const SizedBox(height: 12),
-                      ],
-                    ),
+                      );
+                    },
                   ),
                 ),
-              ),
-            );
+              );
           },
           ),
         ),
@@ -679,7 +671,6 @@ class _SoulsConnectingCenterpiecePainter extends CustomPainter {
   }
 }
 
-// ── Rotating Text (Headline + Subtext) ──────────────────────────────────────────
 class _RotatingText extends StatefulWidget {
   final String partnerName;
   const _RotatingText({required this.partnerName});
@@ -699,23 +690,14 @@ class _RotatingTextState extends State<_RotatingText>
     super.initState();
     _headlineController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 1000),
     );
-
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _headlineController,
-        curve: const Interval(0.0, 0.8, curve: Curves.easeOut),
-      ),
+      CurvedAnimation(parent: _headlineController, curve: const Interval(0.0, 0.8, curve: Curves.easeOut)),
     );
-
-    _slideAnimation = Tween<double>(begin: 18.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _headlineController,
-        curve: const Interval(0.0, 0.8, curve: Curves.easeOut),
-      ),
+    _slideAnimation = Tween<double>(begin: 12.0, end: 0.0).animate(
+      CurvedAnimation(parent: _headlineController, curve: const Interval(0.0, 0.8, curve: Curves.easeOut)),
     );
-
     _headlineController.forward();
   }
 
@@ -738,34 +720,44 @@ class _RotatingTextState extends State<_RotatingText>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                // Line 1 — white bold
                 const Text(
                   'Your story is',
                   style: TextStyle(
                     fontFamily: 'Georgia',
-                    fontSize: 34,
+                    fontSize: 30,
                     fontWeight: FontWeight.bold,
-                    letterSpacing: -0.5,
+                    letterSpacing: -0.3,
                     color: Colors.white,
-                    height: 1.25,
+                    height: 1.2,
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 4),
+                // Line 2 — pink italic bold
                 const Text(
                   'about to begin.',
                   style: TextStyle(
                     fontFamily: 'Georgia',
-                    fontSize: 34,
+                    fontSize: 30,
                     fontWeight: FontWeight.bold,
                     fontStyle: FontStyle.italic,
-                    color: Color(0xFFE89FB8), // Standard light pink italic accent
+                    letterSpacing: -0.3,
+                    color: Color(0xFFE89FB8),
                     height: 1.25,
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 24),
-                _StaggeredSubtext(
-                  text: 'We’ve sent ${widget.partnerName} an invitation to enter your shared space.',
+                const SizedBox(height: 10),
+                // Subtext — muted
+                const Text(
+                  'We\'ve sent an invitation to your shared space.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w400,
+                    color: Color(0xFF5E3A4B),
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
@@ -776,187 +768,156 @@ class _RotatingTextState extends State<_RotatingText>
   }
 }
 
-class _StaggeredSubtext extends StatefulWidget {
-  final String text;
-  const _StaggeredSubtext({required this.text});
+// ── Waiting Block — minimal, unified ─────────────────────────────────────────
+class _WaitingBlock extends StatefulWidget {
+  final String partnerName;
+  final VoidCallback onPressedCTA;
+  const _WaitingBlock({required this.partnerName, required this.onPressedCTA});
 
   @override
-  State<_StaggeredSubtext> createState() => _StaggeredSubtextState();
+  State<_WaitingBlock> createState() => _WaitingBlockState();
 }
 
-class _StaggeredSubtextState extends State<_StaggeredSubtext>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
+class _WaitingBlockState extends State<_WaitingBlock> with SingleTickerProviderStateMixin {
+  late AnimationController _breatheCtrl;
+  int _quoteIndex = 0;
+  late Timer _timer;
+
+  final List<String> _quotes = [
+    '"Love grows quietly before it blooms."',
+    '"You already took the first step."',
+    '"This space will soon hold two hearts."',
+    '"Some things are worth the quiet wait."',
+  ];
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
+    _breatheCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    );
-    Future.delayed(const Duration(milliseconds: 600), () {
-      if (mounted) {
-        _controller.forward();
-      }
+      duration: const Duration(seconds: 4),
+    )..repeat(reverse: true);
+    _timer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted) setState(() => _quoteIndex = (_quoteIndex + 1) % _quotes.length);
     });
   }
 
   @override
   void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final words = widget.text.split(' ');
-    return Wrap(
-      alignment: WrapAlignment.center,
-      spacing: 5.0,
-      runSpacing: 4.0,
-      children: List.generate(words.length, (index) {
-        final double start = (index * 0.05).clamp(0.0, 0.6);
-        final double end = (start + 0.35).clamp(0.0, 1.0);
-        final animation = Tween<double>(begin: 0.0, end: 1.0).animate(
-          CurvedAnimation(
-            parent: _controller,
-            curve: Interval(start, end, curve: Curves.easeOut),
-          ),
-        );
-
-        return AnimatedBuilder(
-          animation: animation,
-          builder: (context, child) {
-            return Opacity(
-              opacity: animation.value,
-              child: Transform.translate(
-                offset: Offset(0, 8.0 * (1.0 - animation.value)),
-                child: Text(
-                  words[index],
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w400,
-                    color: Color(0xFF7B5C66), // Matches onboarding1 subtext
-                    letterSpacing: 0.2,
-                    height: 1.5,
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      }),
-    );
-  }
-}
-
-// ── Waiting Card ──────────────────────────────────────────────────────────────
-class _WaitingCard extends StatefulWidget {
-  final String partnerName;
-  const _WaitingCard({required this.partnerName});
-
-  @override
-  State<_WaitingCard> createState() => _WaitingCardState();
-}
-
-class _WaitingCardState extends State<_WaitingCard>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _floatController;
-
-  @override
-  void initState() {
-    super.initState();
-    _floatController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 4),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _floatController.dispose();
+    _breatheCtrl.dispose();
+    _timer.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _floatController,
-      child: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          color: const Color(0xFF1E0E14),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: const Color(0xFF331C24),
-            width: 1.2,
-          ),
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+      animation: _breatheCtrl,
+      builder: (context, _) {
+        final b = _breatheCtrl.value;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── Quiet status pill ──
             Container(
-              width: 44,
-              height: 44,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
               decoration: BoxDecoration(
-                color: const Color(0xFF180710),
-                shape: BoxShape.circle,
+                color: const Color(0xFF1A0812).withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: const Color(0xFF3D1627),
-                  width: 1.2,
+                  color: const Color(0xFFDD8F9F).withValues(alpha: 0.12 + b * 0.06),
+                  width: 1.0,
                 ),
               ),
-              alignment: Alignment.center,
-              child: const Text(
-                '⏳',
-                style: TextStyle(fontSize: 20),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+              child: Row(
                 children: [
-                  Text(
-                    (widget.partnerName == null || widget.partnerName!.trim().isEmpty) ? 'Waiting for partner' : 'Waiting for ${widget.partnerName}',
-                    style: const TextStyle(
-                      fontFamily: 'Georgia',
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                  // Breathing dot
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFFDD8F9F).withValues(alpha: 0.45 + b * 0.45),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFDD8F9F).withValues(alpha: 0.25 + b * 0.20),
+                          blurRadius: 5,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Your shared world will unlock once they accept.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF7B5C66),
-                      height: 1.4,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      widget.partnerName.trim().isEmpty
+                          ? 'Waiting for your partner to join'
+                          : 'Waiting for ${widget.partnerName} to join',
+                      style: const TextStyle(
+                        fontFamily: 'Georgia',
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
+                        color: Color(0xFFD4B8C4),
+                      ),
                     ),
+                  ),
+                  const SizedBox(width: 6),
+                  Icon(
+                    Icons.check_circle_outline_rounded,
+                    size: 13,
+                    color: const Color(0xFF9E7E5A).withValues(alpha: 0.75),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 10),
-            const _ActivityIndicator(),
-          ],
-        ),
-      ),
-      builder: (context, child) {
-        final floatY = math.sin(_floatController.value * 2 * math.pi) * 3.0;
 
-        return Transform.translate(
-          offset: Offset(0, floatY),
-          child: child,
+            const SizedBox(height: 16),
+
+            // ── Rotating quote — plain, quiet italic ──
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 600),
+              transitionBuilder: (child, anim) => FadeTransition(
+                opacity: anim,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0, 0.05),
+                    end: Offset.zero,
+                  ).animate(CurvedAnimation(parent: anim, curve: Curves.easeOut)),
+                  child: child,
+                ),
+              ),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                key: ValueKey<int>(_quoteIndex),
+                child: Text(
+                  _quotes[_quoteIndex],
+                  style: const TextStyle(
+                    fontFamily: 'Georgia',
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                    color: Color(0xFF6E4C59),
+                    height: 1.55,
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // ── Primary CTA — matches app style ──
+            PrimaryCtaButton(
+              icon: Icons.spa_outlined,
+              text: 'Prepare Your Space',
+              onTap: widget.onPressedCTA,
+              width: double.infinity,
+              height: 52,
+            ),
+          ],
         );
       },
     );
   }
 }
+
 
 class _HourglassParticles extends StatefulWidget {
   const _HourglassParticles();
@@ -1329,7 +1290,11 @@ class _WhileYouWaitCardState extends State<_WhileYouWaitCard> {
             ),
           ),
           const SizedBox(height: 18),
-          _OnboardingStyleCTAButton(onPressed: widget.onPressedCTA),
+          PrimaryCtaButton(
+            icon: Icons.spa_outlined,
+            text: 'Prepare Your Space',
+            onTap: widget.onPressedCTA,
+          ),
         ],
       ),
     );
@@ -1381,77 +1346,6 @@ class _FloatingStarState extends State<_FloatingStar>
           ),
         );
       },
-    );
-  }
-}
-
-class _OnboardingStyleCTAButton extends StatefulWidget {
-  final VoidCallback onPressed;
-  const _OnboardingStyleCTAButton({required this.onPressed});
-
-  @override
-  State<_OnboardingStyleCTAButton> createState() => _OnboardingStyleCTAButtonState();
-}
-
-class _OnboardingStyleCTAButtonState extends State<_OnboardingStyleCTAButton> {
-  double _scale = 1.0;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _scale = 0.96),
-      onTapUp: (_) {
-        setState(() => _scale = 1.0);
-        widget.onPressed();
-      },
-      onTapCancel: () => setState(() => _scale = 1.0),
-      child: AnimatedScale(
-        scale: _scale,
-        duration: const Duration(milliseconds: 100),
-        child: Align(
-          alignment: Alignment.center,
-          child: PremiumSheen(
-            animationDuration: const Duration(milliseconds: 1500),
-            pauseDuration: const Duration(seconds: 8),
-            sheenOpacity: 0.15,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-            height: 54,
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A1214),
-              borderRadius: BorderRadius.circular(27),
-              border: Border.all(
-                color: const Color(0xFF911746).withOpacity(0.5),
-                width: 1.2,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-            children: const [
-              Icon(
-                Icons.spa_outlined,
-                color: Color(0xFFDD8F9F),
-                size: 18,
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Prepare Your Space',
-                style: TextStyle(
-                  fontFamily: 'Georgia',
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  fontStyle: FontStyle.italic,
-                  color: Color(0xFFDD8F9F),
-                ),
-              ),
-            ],
-          ),
-        ),
-        ),
-        ),
-      ),
     );
   }
 }

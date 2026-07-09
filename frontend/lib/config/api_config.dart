@@ -1,6 +1,6 @@
 class ApiConfig {
   // Use local backend for testing
-  static const String baseUrl = 'http://3.110.252.52:8001/api/v1';
+  static const String baseUrl = 'http://192.168.1.4:8000/api/v1';
 
   // Home Endpoints
   static const String homeHero = '$baseUrl/home/hero';
@@ -18,6 +18,8 @@ class ApiConfig {
   static const String inviteCode = '$baseUrl/partners/invite-code';
   static const String joinPartner = '$baseUrl/partners/join';
   static const String disconnectPartner = '$baseUrl/partners/disconnect';
+  static const String sendPoke = '$baseUrl/partners/poke';
+  static String acknowledgePoke(int pokeId) => '$baseUrl/partners/poke/$pokeId/acknowledge';
 
   // Separations Endpoints
   static const String separations = '$baseUrl/separations/';
@@ -65,4 +67,6 @@ class ApiConfig {
   static const String skyHavenStatus = '$baseUrl/skyhaven/status';
   static const String skyHavenAssets = '$baseUrl/skyhaven/assets';
   static const String skyHavenPlaceObject = '$baseUrl/skyhaven/place-object';
+  static const String skyHavenReadWhisper = '$baseUrl/skyhaven/object';
+  static const String skyHavenReactObject = '$baseUrl/skyhaven/object';
 }

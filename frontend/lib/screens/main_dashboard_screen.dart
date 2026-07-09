@@ -34,6 +34,7 @@ import '../features/drift_bottle/controllers/drift_bottle_controller.dart';
 import '../features/drift_bottle/widgets/drift_bottle_widget.dart';
 import '../features/drift_bottle/widgets/drift_bottle_opening_overlay.dart';
 import 'sky_haven/sky_haven_screen.dart';
+import 'sky_haven/widgets/sky_haven_living_portal.dart';
 
 class MainDashboardScreen extends StatefulWidget {
   final String userName;
@@ -73,6 +74,8 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
   bool _hasCompletedSeparation = false;
   bool _showConnectedPill = false;
   bool _isHeroEmpty = true;
+  bool _userReflectionsCompleted = false;
+  bool _partnerReflectionsCompleted = false;
   late String _currentUserName;
   late bool _localIsWaitingForPartner;
   int _unreadCount = 0;
@@ -84,6 +87,31 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
   int? _totalDays;
   String? _moodPhrase;
   int? _completedReflections;
+
+  Map<String, dynamic>? _latestPoke;
+
+  Future<void> _sendPoke(String gesture) async {
+    try {
+      await ApiService.sendPoke(gesture);
+      _fetchDashboardData();
+    } catch (e) {
+      debugPrint("Failed to send poke: $e");
+    }
+  }
+
+  Future<void> _acknowledgePoke(int pokeId) async {
+    try {
+      await ApiService.acknowledgePoke(pokeId);
+      setState(() {
+        if (_latestPoke != null && _latestPoke!['id'] == pokeId) {
+          _latestPoke = null;
+        }
+      });
+      _fetchDashboardData();
+    } catch (e) {
+      debugPrint("Failed to acknowledge poke: $e");
+    }
+  }
 
   @override
   void initState() {
@@ -115,16 +143,18 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
     final prefs = await SharedPreferences.getInstance();
     final cachedHeroStr = prefs.getString('cached_home_hero');
     final cachedSepStr = prefs.getString('cached_active_separation');
-    
+    // Restore acknowledged state immediately — prevents flash of wrong card
+    final cachedAcknowledged = prefs.getBool('cached_has_acknowledged_completion') ?? false;
+
     if (!mounted) return;
-    
+
     if (cachedHeroStr != null || cachedSepStr != null) {
       setState(() {
         Map<String, dynamic>? homeHero;
         Map<String, dynamic>? sep;
         try { if (cachedHeroStr != null) homeHero = jsonDecode(cachedHeroStr); } catch(_) {}
         try { if (cachedSepStr != null) sep = jsonDecode(cachedSepStr); } catch(_) {}
-        
+
         if (homeHero != null) {
           _partnerName = homeHero['partner_name'] ?? homeHero['partnerName'];
           _moodPhrase = homeHero['comfort_message']?.toString() ?? homeHero['comfortMessage']?.toString();
@@ -133,9 +163,11 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
           _isPartnerConnected = homeHero['partner_connected'] == true || homeHero['partnerConnected'] == true;
           _isMissedDayFlow = homeHero['is_missed_day_flow'] == true || homeHero['isMissedDayFlow'] == true;
           _hasCompletedSeparation = homeHero['has_completed_separation'] == true || homeHero['hasCompletedSeparation'] == true;
+          _userReflectionsCompleted = homeHero['user_reflections_completed'] == true || homeHero['userReflectionsCompleted'] == true;
+          _partnerReflectionsCompleted = homeHero['partner_reflections_completed'] == true || homeHero['partnerReflectionsCompleted'] == true;
           _isHeroEmpty = false;
         }
-        
+
         if (sep != null) {
           _activeSeparation = sep;
           _partnerName ??= sep['partner_name'] ?? sep['partnerName'];
@@ -157,7 +189,9 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
           }
           _isHeroEmpty = false;
         }
-        
+
+        // Restore acknowledgement from cache — correct card shown on first frame
+        _hasAcknowledgedCompletion = cachedAcknowledged;
         _isLoadingSeparation = false;
       });
     }
@@ -170,9 +204,12 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
         setState(() {
           _hasAcknowledgedCompletion = true;
         });
+        // Persist so next app start shows the correct card immediately
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('cached_has_acknowledged_completion', true);
       }
     } catch (e) {
-      debugPrint("Failed to acknowledge completion: $e");
+      debugPrint('Failed to acknowledge completion: $e');
     }
   }
 
@@ -202,7 +239,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
 
   void _startPresenceTimer() {
     _presenceTimer?.cancel();
-    _presenceTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+    _presenceTimer = Timer.periodic(const Duration(seconds: 4), (_) {
       _pollSharedPresence();
     });
     // Immediately ping backend once to establish presence upon resume
@@ -214,35 +251,58 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
     try {
       final homeHero = await ApiService.getHomeHero();
       final bool presence = homeHero['shared_presence'] == true;
-      final bool partnerConnected = homeHero['partner_connected'] == true || 
+      final bool partnerConnected = homeHero['partner_connected'] == true ||
                                     homeHero['partnerConnected'] == true;
-                                    
+
       bool needsSetState = false;
+
+      // ── Always sync _isPartnerConnected FIRST so the connection-change
+      //    guards below never permanently short-circuit poke updates. ──
+      if (partnerConnected != _isPartnerConnected) {
+        if (!_isPartnerConnected && partnerConnected) {
+          // Partner just connected — do a full refresh and bail
+          _isPartnerConnected = partnerConnected;
+          _fetchDashboardData();
+          return;
+        }
+        if (_isPartnerConnected && !partnerConnected) {
+          // Partner just disconnected — do a full refresh and bail
+          _localIsWaitingForPartner = false;
+          _isPartnerConnected = partnerConnected;
+          _fetchDashboardData();
+          return;
+        }
+      }
+
       if (presence != _sharedPresence) {
         _sharedPresence = presence;
         needsSetState = true;
       }
-      
-      // Dynamically detect if partner connected while app is open!
-      if (!_isPartnerConnected && partnerConnected) {
-        _fetchDashboardData();
-        return; // _fetchDashboardData calls setState itself
+
+      // ── Poke detection: compare by ID so we never miss an update ──
+      final dynamic rawPoke = homeHero['latest_poke'];
+      Map<String, dynamic>? latestPoke;
+      if (rawPoke != null) {
+        latestPoke = Map<String, dynamic>.from(rawPoke as Map);
       }
 
-      // Dynamically detect if partner DISCONNECTED while app is open
-      if (_isPartnerConnected && !partnerConnected) {
-        _localIsWaitingForPartner = false;
-        _fetchDashboardData();
-        return;
+      final int? newPokeId = latestPoke?['id'] as int?;
+      final int? curPokeId = _latestPoke?['id'] as int?;
+
+      if (newPokeId != curPokeId) {
+        _latestPoke = latestPoke;
+        needsSetState = true;
+        debugPrint('[Poll] New poke detected — id=$newPokeId gesture=${latestPoke?['gesture']}');
       }
 
       if (mounted && needsSetState) {
         setState(() {});
       }
-    } catch (_) {
-      // Ignore background errors
+    } catch (e) {
+      debugPrint('[Poll] Error: $e');
     }
   }
+
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -376,7 +436,15 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
         
         // Backend signals missed-day flow: active journey day < calendar day
         _isMissedDayFlow = homeHero['is_missed_day_flow'] == true || homeHero['isMissedDayFlow'] == true;
-      } 
+
+        Map<String, dynamic>? latestPoke;
+        if (homeHero['latest_poke'] != null) {
+          latestPoke = Map<String, dynamic>.from(homeHero['latest_poke']);
+        }
+        _latestPoke = latestPoke;
+      } else {
+        _latestPoke = null;
+      }
       
       bool isSepActive = sep != null && (sep['is_active'] == true || sep['isActive'] == true || sep['status'] == 'active');
 
@@ -474,12 +542,18 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
         _hasPastRelationship = homeHero['has_past_relationship'] == true;
         _hasCompletedSeparation = homeHero['has_completed_separation'] == true || homeHero['hasCompletedSeparation'] == true;
         _hasAcknowledgedCompletion = homeHero['has_acknowledged_completion'] == true || homeHero['hasAcknowledgedCompletion'] == true;
+        _userReflectionsCompleted = homeHero['user_reflections_completed'] == true || homeHero['userReflectionsCompleted'] == true;
+        _partnerReflectionsCompleted = homeHero['partner_reflections_completed'] == true || homeHero['partnerReflectionsCompleted'] == true;
+        // Keep cache in sync so next cold start shows the right card immediately
+        prefs.setBool('cached_has_acknowledged_completion', _hasAcknowledgedCompletion);
       } else {
         // Fall back to cached connection state if API fails
         _isPartnerConnected = profileData != null 
             ? (profileData['data'] ?? profileData)['isPartnerConnected'] == true
             : cachedIsConnected;
         _hasCompletedSeparation = false;
+        _userReflectionsCompleted = false;
+        _partnerReflectionsCompleted = false;
       }
 
       // (Removed: Journey completion no longer bypasses the daily mood check-in requirement)
@@ -823,20 +897,43 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
                           currentDay: _totalDays ?? 21,
                           totalDays: _totalDays ?? 21,
                           moodPhrase: 'You did it!',
-                          statusLine: 'Congratulations, your journey is complete!',
+                          statusLine: 'Your insights are ready to explore',
                           isEmpty: false,
                           isCompleted: true,
                           partnerName: _partnerName,
+                          onInsightsTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => JourneyScreen(
+                                  userName: _currentUserName ?? widget.userName,
+                                ),
+                              ),
+                            );
+                          },
                           onClose: () => _acknowledgeCompletion(),
                         )
                       else if (_hasCompletedSeparation && _hasAcknowledgedCompletion)
                         PostJourneySanctuaryCard(
                           partnerName: _partnerName ?? 'your partner',
+                          onInsightsTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => JourneyScreen(
+                                  userName: _currentUserName ?? widget.userName,
+                                ),
+                              ),
+                            );
+                          },
                         )
                       // Scenario 2: Partner connected, no active separation yet
                       else if (_isHeroEmpty)
                         ConnectedReadyHeroCard(
                           partnerName: _partnerName ?? 'your partner',
+                          latestPoke: _latestPoke,
+                          onSendPoke: _sendPoke,
+                          onAcknowledgePoke: _acknowledgePoke,
                         )
                       else if (_activeSeparation != null || (_currentDay ?? 0) > 0)
                         LivingJourneyCard(
@@ -850,6 +947,12 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
                               : _formatStartDate(
                                   _activeSeparation?['start_date'] ??
                                   _activeSeparation?['startDate'] ?? DateTime.now().toIso8601String()),
+                          latestPoke: _latestPoke,
+                          onSendPoke: _sendPoke,
+                          onAcknowledgePoke: _acknowledgePoke,
+                          isWaitingForPartnerReflections: _userReflectionsCompleted && !_partnerReflectionsCompleted,
+                          userCompletedReflections: _userReflectionsCompleted,
+                          partnerCompletedReflections: _partnerReflectionsCompleted,
                         )
                       else
                         const SizedBox.shrink(),
@@ -879,61 +982,9 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
                       const SizedBox(height: 24),
 
                       // ── Sky Haven Entry ──
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => const SkyHavenScreen()),
-                          );
-                        },
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF2E1065), Color(0xFF4C1D95)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(color: Colors.purpleAccent.withOpacity(0.5), width: 1.5),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.purple.withOpacity(0.3),
-                                blurRadius: 15,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text(
-                                '✨ Enter Sky Haven',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  fontFamily: 'Inter',
-                                ),
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                'Visit your shared floating island',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 14,
-                                  fontFamily: 'Inter',
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                      // const SkyHavenLivingPortal(),
 
-                      const SizedBox(height: 36),
-
-                      // ── Insight Card ──
+                      const SizedBox(height: 36),                      // ── Insight Card ──
                       _InsightCard(
                         day: _currentDay ?? 1,
                         insight: _dailyInsights[_currentDay ?? 1] ?? _dailyInsights.values.first,
@@ -1094,7 +1145,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
             ),
 
             // ── Drift Bottle Widget ──
-            if (_currentIndex == 0)
+            /* if (_currentIndex == 0)
               Positioned(
                 bottom: 90,
                 left: 20,
@@ -1115,7 +1166,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
                     return const SizedBox.shrink();
                   },
                 ),
-              ),
+              ), */
           ],
         ),
       ),

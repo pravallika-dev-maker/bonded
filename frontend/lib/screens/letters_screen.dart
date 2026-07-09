@@ -623,27 +623,27 @@ class _LockedLettersViewState extends State<_LockedLettersView> with TickerProvi
                                 children: [
                                   // Headline
                                   const Text(
-                                    'A space for the things left unsaid',
+                                    'A space for things left unsaid',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       fontFamily: 'Georgia',
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w500,
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w400,
                                       color: Color(0xFFFFFFF0), // Premium ivory
                                       height: 1.3,
                                     ),
                                   ),
                                   
-                                  const SizedBox(height: 16),
+                                  const SizedBox(height: 12),
                                   
                                   // Supporting Copy
                                   const Text(
-                                    'Letters unlock during your separation journey, giving you a private place to hold thoughts, memories, and feelings that matter.',
+                                    'Write letters to hold thoughts, memories, and feelings during your journey.',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      fontSize: 14,
-                                      color: Color(0xFFD4C4C7), // Soft blush-gray
-                                      height: 1.6,
+                                      fontSize: 13,
+                                      color: Color(0xFF866571), // Soft rose-gray
+                                      height: 1.5,
                                     ),
                                   ),
                                   

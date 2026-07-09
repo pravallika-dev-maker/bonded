@@ -74,146 +74,149 @@ class _SeparationTransitionScreenState extends State<SeparationTransitionScreen>
 
   @override
   Widget build(BuildContext context) {
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-      ),
-      child: Scaffold(
-        backgroundColor: const Color(0xFF090204),
-        resizeToAvoidBottomInset: false,
-        body: AnimatedBuilder(
-          animation: _breathingController,
-          builder: (context, child) {
-            return Stack(
-              children: [
-                // ── Breathing ambient glow ──
-                Center(
-                  child: Container(
-                    width: 320,
-                    height: 320,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          const Color(0xFFDD8F9F).withOpacity(_glowAnimation.value),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                // ── Ambient glow bottom corner ──
-                Positioned(
-                  bottom: -80,
-                  right: -60,
-                  child: Container(
-                    width: 260,
-                    height: 260,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          const Color(0xFF9E7E5A).withOpacity(0.04),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-                Center(
-                  child: FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        // ── Pulsing glow ring + heart ──
-                        Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            // Outer glow ring
-                            Container(
-                              width: 80 * _breatheAnimation.value * 1.8,
-                              height: 80 * _breatheAnimation.value * 1.8,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: const Color(0xFFDD8F9F).withOpacity(_glowAnimation.value * 0.6),
-                                  width: 1,
-                                ),
-                              ),
-                            ),
-                            // Inner ring
-                            Container(
-                              width: 80 * _breatheAnimation.value * 1.35,
-                              height: 80 * _breatheAnimation.value * 1.35,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: const Color(0xFFDD8F9F).withOpacity(_glowAnimation.value * 0.4),
-                                  width: 1,
-                                ),
-                              ),
-                            ),
-                            // Heart icon
-                            ScaleTransition(
-                              scale: _breatheAnimation,
-                              child: const AppHeartIcon(size: 72),
-                            ),
+    return PopScope(
+      canPop: false,
+      child: AnnotatedRegion<SystemUiOverlayStyle>(
+        value: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.light,
+        ),
+        child: Scaffold(
+          backgroundColor: const Color(0xFF090204),
+          resizeToAvoidBottomInset: false,
+          body: AnimatedBuilder(
+            animation: _breathingController,
+            builder: (context, child) {
+              return Stack(
+                children: [
+                  // ── Breathing ambient glow ──
+                  Center(
+                    child: Container(
+                      width: 320,
+                      height: 320,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            const Color(0xFFDD8F9F).withOpacity(_glowAnimation.value),
+                            Colors.transparent,
                           ],
                         ),
-
-                        const SizedBox(height: 52),
-
-                        // ── Text content ──
-                        const Text(
-                          'A new separation\nhas just begun...',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontFamily: 'Georgia',
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                            fontStyle: FontStyle.italic,
-                            color: Color(0xFFDD8F9F),
-                            height: 1.3,
-                          ),
+                      ),
+                    ),
+                  ),
+                  // ── Ambient glow bottom corner ──
+                  Positioned(
+                    bottom: -80,
+                    right: -60,
+                    child: Container(
+                      width: 260,
+                      height: 260,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            const Color(0xFF9E7E5A).withOpacity(0.04),
+                            Colors.transparent,
+                          ],
                         ),
-                        const SizedBox(height: 24),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 40),
-                          child: Text(
-                            'Distance gives the heart room to remember.\nBreathe, and trust this time.',
+                      ),
+                    ),
+                  ),
+
+                  Center(
+                    child: FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // ── Pulsing glow ring + heart ──
+                          Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Outer glow ring
+                              Container(
+                                width: 80 * _breatheAnimation.value * 1.8,
+                                height: 80 * _breatheAnimation.value * 1.8,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: const Color(0xFFDD8F9F).withOpacity(_glowAnimation.value * 0.6),
+                                    width: 1,
+                                  ),
+                                ),
+                              ),
+                              // Inner ring
+                              Container(
+                                width: 80 * _breatheAnimation.value * 1.35,
+                                height: 80 * _breatheAnimation.value * 1.35,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: const Color(0xFFDD8F9F).withOpacity(_glowAnimation.value * 0.4),
+                                    width: 1,
+                                  ),
+                                ),
+                              ),
+                              // Heart icon
+                              ScaleTransition(
+                                scale: _breatheAnimation,
+                                child: const AppHeartIcon(size: 72),
+                              ),
+                            ],
+                          ),
+
+                          const SizedBox(height: 52),
+
+                          // ── Text content ──
+                          const Text(
+                            'A new separation\nhas just begun...',
                             textAlign: TextAlign.center,
                             style: TextStyle(
                               fontFamily: 'Georgia',
-                              fontSize: 15,
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
                               fontStyle: FontStyle.italic,
-                              color: Color(0xFF7A5C67),
-                              height: 1.6,
-                              letterSpacing: 0.5,
+                              color: Color(0xFFDD8F9F),
+                              height: 1.3,
                             ),
                           ),
-                        ),
-                        const SizedBox(height: 64),
-
-                        // ── Subtle gold label ──
-                        const Text(
-                          'TAKING YOU TO YOUR SPACE',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 2.0,
-                            color: Color(0xFF3D1627),
+                          const SizedBox(height: 24),
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 40),
+                            child: Text(
+                              'Distance gives the heart room to remember.\nBreathe, and trust this time.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontFamily: 'Georgia',
+                                fontSize: 15,
+                                fontStyle: FontStyle.italic,
+                                color: Color(0xFF7A5C67),
+                                height: 1.6,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 64),
+
+                          // ── Subtle gold label ──
+                          const Text(
+                            'TAKING YOU TO YOUR SPACE',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 2.0,
+                              color: Color(0xFF3D1627),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
-            );
-          },
+                ],
+              );
+            },
+          ),
         ),
       ),
     );

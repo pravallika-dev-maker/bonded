@@ -14,6 +14,10 @@ class HomeHeroResponse(BaseModel):
     has_completed_separation: bool = False
     is_waiting_for_partner: bool = False
     has_acknowledged_completion: bool = False
+    latest_poke: Optional[dict] = None
+    user_reflections_completed: bool = False
+    partner_reflections_completed: bool = False
 
     class Config:
         from_attributes = True
+

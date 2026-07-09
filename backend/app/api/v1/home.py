@@ -8,6 +8,8 @@ from ..deps import get_current_user
 from ...models.user import User
 from ...models.relationship import Relationship
 from ...models.separation import Separation
+from ...models.reflection_session import ReflectionSession
+from ...api.v1.separations import check_and_expire_separation
 import random
 
 router = APIRouter(prefix="/home", tags=["Home"])
@@ -50,11 +52,8 @@ async def get_home_hero(
             (Relationship.user1_id == current_user.id) | (Relationship.user2_id == current_user.id)
         ).first() is not None
 
-        # Check for active separation
-        active_sep = db.query(Separation).filter(
-            (Separation.creator_id == current_user.id) | (Separation.partner_id == current_user.id),
-            Separation.status == "active"
-        ).order_by(Separation.created_at.desc()).first()
+        # Check for active separation (auto-expires overdue ones)
+        active_sep = check_and_expire_separation(db, current_user.id)
 
         partner_connected = active_rel is not None
         partner_name = current_user.partner_name
@@ -86,6 +85,24 @@ async def get_home_hero(
         ).order_by(Separation.ended_at.desc()).first()
         has_completed_separation = completed_sep is not None
 
+        # Check for unacknowledged poke/gesture
+        from ...models.poke import Poke
+        unacknowledged_poke = db.query(Poke).filter(
+            Poke.recipient_id == current_user.id,
+            Poke.is_acknowledged == False
+        ).order_by(Poke.created_at.desc()).first()
+
+        latest_poke_data = None
+        if unacknowledged_poke:
+            sender = db.query(User).filter(User.id == unacknowledged_poke.sender_id).first()
+            sender_name = sender.user_name if sender else "Your partner"
+            latest_poke_data = {
+                "id": unacknowledged_poke.id,
+                "sender_name": sender_name,
+                "gesture": unacknowledged_poke.gesture,
+                "created_at": unacknowledged_poke.created_at.isoformat()
+            }
+
         # Check for active invite code (waiting for partner)
         from ...models.invite_code import InviteCode
         pending_invite = db.query(InviteCode).filter(
@@ -103,7 +120,10 @@ async def get_home_hero(
                 shared_presence=shared_presence,
                 has_completed_separation=has_completed_separation,
                 is_waiting_for_partner=is_waiting,
-                has_acknowledged_completion=current_user.has_acknowledged_completion
+                has_acknowledged_completion=current_user.has_acknowledged_completion,
+                latest_poke=latest_poke_data,
+                user_reflections_completed=False,
+                partner_reflections_completed=False
             )
 
         if not active_sep:
@@ -114,7 +134,10 @@ async def get_home_hero(
                 shared_presence=shared_presence,
                 has_completed_separation=has_completed_separation,
                 is_waiting_for_partner=is_waiting,
-                has_acknowledged_completion=current_user.has_acknowledged_completion
+                has_acknowledged_completion=current_user.has_acknowledged_completion,
+                latest_poke=latest_poke_data,
+                user_reflections_completed=False,
+                partner_reflections_completed=False
             )
 
         from ...api.v1.reflections import _day_number
@@ -199,6 +222,24 @@ async def get_home_hero(
         if is_missed_day_flow:
             comfort_message = "It's okay to take a break. Take your time catching up, one step at a time."
 
+        # Count completed reflections for this separation
+        user_completed_reflections = db.query(ReflectionSession).filter(
+            ReflectionSession.user_id == current_user.id,
+            ReflectionSession.separation_id == active_sep.id,
+            ReflectionSession.is_completed == True
+        ).count()
+        
+        partner_completed_reflections = 0
+        if partner:
+            partner_completed_reflections = db.query(ReflectionSession).filter(
+                ReflectionSession.user_id == partner.id,
+                ReflectionSession.separation_id == active_sep.id,
+                ReflectionSession.is_completed == True
+            ).count()
+            
+        user_reflections_completed = (user_completed_reflections >= total_days)
+        partner_reflections_completed = (partner_completed_reflections >= total_days)
+
         return HomeHeroResponse(
             partner_connected=partner_connected,
             partner_name=partner_name,
@@ -211,7 +252,10 @@ async def get_home_hero(
             shared_presence=shared_presence,
             has_completed_separation=has_completed_separation,
             is_waiting_for_partner=is_waiting,
-            has_acknowledged_completion=current_user.has_acknowledged_completion
+            has_acknowledged_completion=current_user.has_acknowledged_completion,
+            latest_poke=latest_poke_data,
+            user_reflections_completed=user_reflections_completed,
+            partner_reflections_completed=partner_reflections_completed
         )
 
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../widgets/app_heart_icon.dart';
 import '../widgets/premium_sheen.dart';
+import '../widgets/primary_cta_button.dart';
 import 'home_screen.dart';
 
 class PromiseScreen extends StatefulWidget {
@@ -153,11 +154,9 @@ class _PromiseScreenState extends State<PromiseScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 16),
-                                _buildPromiseLine("I will respect this space."),
+                                _buildPromiseLine("I will choose reflection over reaction."),
                                 const SizedBox(height: 8),
-                                _buildPromiseLine("I will take this time to reflect,\nnot react."),
-                                const SizedBox(height: 8),
-                                _buildPromiseLine("I will allow distance to help me\nunderstand, not avoid."),
+                                _buildPromiseLine("I will use this space to understand, not avoid."),
                               ],
                             ),
                           ],
@@ -165,20 +164,7 @@ class _PromiseScreenState extends State<PromiseScreen> {
                       ),
                     ),
                     
-                    const SizedBox(height: 24),
-                    
-                    // Footer Text Above Button
-                    const Text(
-                      '"Distance only works when it\'s respected"',
-                      style: TextStyle(
-                        fontFamily: 'Georgia',
-                        fontSize: 12,
-                        fontStyle: FontStyle.italic,
-                        color: Color(0xFF6B4B55),
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 28),
                     
                     // Interactive Checkbox Button
                     GestureDetector(
@@ -238,52 +224,10 @@ class _PromiseScreenState extends State<PromiseScreen> {
                     const SizedBox(height: 28),
                     
                     // Step into the space Button
-                    GestureDetector(
+                    PrimaryCtaButton(
+                      icon: Icons.favorite,
+                      text: "Step into the space",
                       onTap: _isChecked ? _proceedToTransition : null,
-                      child: PremiumSheen(
-                        animationDuration: const Duration(milliseconds: 1500),
-                        pauseDuration: const Duration(seconds: 8),
-                        sheenOpacity: 0.15,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: double.infinity,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: _isChecked 
-                                ? const Color(0xFF1A1214) 
-                                : const Color(0xFF0D080A),
-                            borderRadius: BorderRadius.circular(26),
-                            border: Border.all(
-                              color: _isChecked 
-                                  ? const Color(0xFF911746).withOpacity(0.5) 
-                                  : const Color(0xFF26151B),
-                              width: 1.2,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.favorite,
-                                size: 18,
-                                color: _isChecked ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                "Step into the space",
-                                style: TextStyle(
-                                  fontFamily: 'Georgia',
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  fontStyle: FontStyle.italic,
-                                  letterSpacing: 0.5,
-                                  color: _isChecked ? const Color(0xFFDD8F9F) : const Color(0xFF5A3C47),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                     ),
                     
                     const SizedBox(height: 16),

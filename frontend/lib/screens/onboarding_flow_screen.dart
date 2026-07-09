@@ -249,43 +249,56 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
     );
 
     // ── Root Stack with Bulletproof Splash Overlay ──
-    return Stack(
-      children: [
-        // The main app underneath
-        mainFlow,
+    return PopScope(
+      canPop: !_showSplash && _currentPage == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (!_showSplash && _currentPage > 0) {
+          _pageController.animateToPage(
+            _currentPage - 1,
+            duration: const Duration(milliseconds: 600),
+            curve: Curves.easeInOutQuart,
+          );
+        }
+      },
+      child: Stack(
+        children: [
+          // The main app underneath
+          mainFlow,
 
-        // The Splash Screen overlays everything and animates away
-        if (_showSplash)
-          Positioned.fill(
-            child: IgnorePointer(
-              child: TweenAnimationBuilder<double>(
-                tween: Tween<double>(begin: 1.0, end: _splashOpacity),
-                duration: const Duration(milliseconds: 600),
-                curve: Curves.easeInOut,
-                onEnd: () {
-                  if (_splashOpacity == 0.0 && mounted) {
-                    setState(() {
-                      _showSplash = false;
-                    });
-                  }
-                },
-                builder: (context, value, child) {
-                  return Opacity(
-                    opacity: value,
-                    child: Transform.scale(
-                      scale: 1.0 + (1.0 - value) * 0.05, // Scales from 1.0 up to 1.05 smoothly
-                      child: child,
-                    ),
-                  );
-                },
-                child: const Scaffold(
-                  backgroundColor: Color(0xFF090103),
-                  body: SplashContent(),
+          // The Splash Screen overlays everything and animates away
+          if (_showSplash)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 1.0, end: _splashOpacity),
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeInOut,
+                  onEnd: () {
+                    if (_splashOpacity == 0.0 && mounted) {
+                      setState(() {
+                        _showSplash = false;
+                      });
+                    }
+                  },
+                  builder: (context, value, child) {
+                    return Opacity(
+                      opacity: value,
+                      child: Transform.scale(
+                        scale: 1.0 + (1.0 - value) * 0.05, // Scales from 1.0 up to 1.05 smoothly
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: const Scaffold(
+                    backgroundColor: Color(0xFF090103),
+                    body: SplashContent(),
+                  ),
                 ),
               ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }

@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Sky Haven 3D</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: transparent; }
+        canvas { display: block; width: 100vw; height: 100vh; }
+    </style>
+    <!-- Three.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+</head>
+<body>
+    <script>
+        let scene, camera, renderer, controls;
+        let islandBase;
+        let placedObjects = [];
+        let placementMode = false;
+        let currentPlacementModel = null;
+        let placementMesh = null;
+        let placementRing = null;
+        let placementGlow = null;
+        
+        // Selection and Adjustments
+        let selectedObject = null;
+        let selectionRing = null;
+        let isAdjustingPlace = false;
+        
+        // Raycaster for placement
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        
+        // Asset loading setup
+        const gltfLoader = new THREE.GLTFLoader();
+        
+        // Cache to store Base64 string representations of the models
+        const modelDataCache = {};
+
+        function base64ToArrayBuffer(base64) {
+            const binaryString = window.atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        function getModelKey(assetId) {
+            switch(parseInt(assetId)) {
+                case 1: return 'tree';
+                case 2: return 'lantern';
+                case 3: return 'bench';
+                default: return 'tree';
+            }
+        }
+
+        function loadModelFromCache(key, onLoad, onError) {
+            const base64Data = modelDataCache[key];
+            if (!base64Data) {
+                if (onError) onError("Model not in cache: " + key);
+                return;
+            }
+            try {
+                const arrayBuffer = base64ToArrayBuffer(base64Data);
+                gltfLoader.parse(arrayBuffer, '', function(gltf) {
+                    onLoad(gltf.scene);
+                }, function(error) {
+                    if (onError) onError(error);
+                });
+            } catch(e) {
+                if (onError) onError(e);
+            }
+        }
+
+        function isIslandBase(obj) {
+            if (!islandBase) return false;
+            let node = obj;
+            while (node != null) {
+                if (node === islandBase) return true;
+                node = node.parent;
+            }
+            return false;
+        }
+        
+        function createProceduralIsland() {
+            const islandGroup = new THREE.Group();
+
+            // 1. Lush Green Grass Surface (Top layer)
+            const grassMatMain = new THREE.MeshStandardMaterial({ 
+                color: 0x3d8b54, 
+                roughness: 0.9, 
+                metalness: 0.05 
+            });
+            const grassMain = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 4.4, 0.4, 32), grassMatMain);
+            grassMain.position.y = -0.2;
+            grassMain.receiveShadow = true;
+            islandGroup.add(grassMain);
+
+            const grassMatDark = new THREE.MeshStandardMaterial({ 
+                color: 0x2e693e, 
+                roughness: 0.9 
+            });
+            
+            // Adding two organic dark green path circles to break flat texture
+            const grassPath1 = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.05, 16), grassMatDark);
+            grassPath1.position.set(-1.2, 0.01 - 0.2, -0.6);
+            grassPath1.receiveShadow = true;
+            islandGroup.add(grassPath1);
+
+            const grassPath2 = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 1.0, 0.05, 16), grassMatDark);
+            grassPath2.position.set(1.4, 0.01 - 0.2, 1.0);
+            grassPath2.receiveShadow = true;
+            islandGroup.add(grassPath2);
+
+            // 2. Earthy Rocky Underneath (Bottom layer pointing down)
+            const stoneMat = new THREE.MeshStandardMaterial({ 
+                color: 0x564946, 
+                roughness: 0.9 
+            });
+
+            // Center large core pointing down
+            const stoneCore = new THREE.Mesh(new THREE.ConeGeometry(4.3, 4.8, 8), stoneMat);
+            stoneCore.rotation.x = Math.PI;
+            stoneCore.position.y = -2.6;
+            stoneCore.castShadow = true;
+            stoneCore.receiveShadow = true;
+            islandGroup.add(stoneCore);
+
+            // Secondary rock spires at different rotations & offsets for detailed low-poly cliff texture
+            const rockPositions = [
+                { x: -2.0, y: -1.4, z: -1.5, r: 1.4, h: 2.3 },
+                { x: 2.1, y: -1.2, z: -1.0, r: 1.1, h: 1.9 },
+                { x: -1.7, y: -1.5, z: 1.9, r: 1.5, h: 2.8 },
+                { x: 1.4, y: -1.3, z: 2.1, r: 1.3, h: 2.0 },
+                { x: 0.0, y: -4.3, z: 0.0, r: 0.8, h: 1.8 }
+            ];
+
+            rockPositions.forEach(rp => {
+                const rock = new THREE.Mesh(new THREE.ConeGeometry(rp.r, rp.h, 6), stoneMat);
+                rock.rotation.x = Math.PI;
+                rock.rotation.y = Math.random() * Math.PI;
+                rock.position.set(rp.x, rp.y - (rp.h / 2), rp.z);
+                rock.castShadow = true;
+                rock.receiveShadow = true;
+                islandGroup.add(rock);
+            });
+
+            // 3. Magical Glowing Crystals emerging from rock crevices
+            const crystalColors = [0x00E5FF, 0xE040FB];
+            for (let i = 0; i < 4; i++) {
+                const crystalGeo = new THREE.ConeGeometry(0.12, 0.7, 4);
+                const crystalMat = new THREE.MeshStandardMaterial({
+                    color: crystalColors[i % 2],
+                    emissive: crystalColors[i % 2],
+                    emissiveIntensity: 1.8,
+                    roughness: 0.2
+                });
+                const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+                const angle = (i * Math.PI / 2) + Math.random() * 0.5;
+                const radius = 3.6;
+                crystal.position.set(Math.cos(angle) * radius, -0.6 - Math.random() * 0.8, Math.sin(angle) * radius);
+                crystal.rotation.z = Math.cos(angle) * 0.6;
+                crystal.rotation.x = Math.sin(angle) * 0.6;
+                islandGroup.add(crystal);
+            }
+
+            // 4. Orbiting Mini Islets (Stepping stones)
+            const isletMat = new THREE.MeshStandardMaterial({ color: 0x483e3c, roughness: 0.9 });
+            const isletGrassMat = new THREE.MeshStandardMaterial({ color: 0x3d8b54, roughness: 0.9 });
+            
+            const isletsData = [
+                { angle: 0, rad: 6.8, size: 0.5, y: -0.6, speed: 0.001 },
+                { angle: Math.PI * 0.75, rad: 8.0, size: 0.4, y: -1.2, speed: -0.0008 }
+            ];
+
+            const isletMeshes = [];
+            isletsData.forEach(data => {
+                const group = new THREE.Group();
+                
+                const base = new THREE.Mesh(new THREE.ConeGeometry(data.size, data.size * 1.5, 5), isletMat);
+                base.rotation.x = Math.PI;
+                base.position.y = -data.size * 0.75;
+                group.add(base);
+                
+                const cap = new THREE.Mesh(new THREE.CylinderGeometry(data.size, data.size * 0.9, 0.1, 8), isletGrassMat);
+                cap.position.y = 0;
+                group.add(cap);
+
+                group.position.set(Math.cos(data.angle) * data.rad, data.y, Math.sin(data.angle) * data.rad);
+                islandGroup.add(group);
+                
+                isletMeshes.push({
+                    mesh: group,
+                    data: data,
+                    currentAngle: data.angle
+                });
+            });
+
+            // 5. Orbiting Cloud Rings around the base
+            const cloudGroup = new THREE.Group();
+            const cloudMat = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                roughness: 0.9,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            const cloudData = [];
+            for (let i = 0; i < 5; i++) {
+                const cloudSphere = new THREE.Mesh(new THREE.DodecahedronGeometry(0.35 + Math.random() * 0.25), cloudMat);
+                const cloudAngle = (i * Math.PI * 2 / 5);
+                const cloudRad = 5.2 + Math.random() * 0.5;
+                cloudSphere.position.set(Math.cos(cloudAngle) * cloudRad, -2.0 - Math.random() * 0.5, Math.sin(cloudAngle) * cloudRad);
+                cloudGroup.add(cloudSphere);
+                cloudData.push({
+                    mesh: cloudSphere,
+                    angle: cloudAngle,
+                    radius: cloudRad,
+                    speed: 0.002 + Math.random() * 0.001
+                });
+            }
+            islandGroup.add(cloudGroup);
+
+            // Store references in userData for animation
+            islandGroup.userData = {
+                isletMeshes: isletMeshes,
+                cloudData: cloudData
+            };
+
+            return islandGroup;
+        }
+
+        function init() {
+            // Scene
+            scene = new THREE.Scene();
+            
+            // Camera
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 5, 12);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.setClearColor(0x000000, 0); // Transparent
+            document.body.appendChild(renderer.domElement);
+            
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 - 0.1; // Don't go below ground
+            controls.minDistance = 5;
+            controls.maxDistance = 20;
+            
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+            scene.add(ambientLight);
+            
+            const dirLight = new THREE.DirectionalLight(0xffdfb0, 0.85);
+            dirLight.position.set(5, 10, 7);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 1024;
+            dirLight.shadow.mapSize.height = 1024;
+            scene.add(dirLight);
+ 
+            const rimLight = new THREE.DirectionalLight(0x911746, 0.55);
+            rimLight.position.set(-5, 5, -5);
+            scene.add(rimLight);
+ 
+            // Particles (Sparkles/Fireflies)
+            createParticles();
+            
+            // Create and add the stunning procedural 3D floating island base
+            islandBase = createProceduralIsland();
+            scene.add(islandBase);
+ 
+            window.addEventListener('resize', onWindowResize, false);
+            
+            // Listen for taps (Discovery or Placement)
+            renderer.domElement.addEventListener('pointerdown', onPointerDown, false);
+            renderer.domElement.addEventListener('pointermove', onPointerMove, false);
+            
+            // Ready callback to Flutter
+            if (window.FlutterChannel) {
+                window.FlutterChannel.postMessage(JSON.stringify({ type: 'ready' }));
+            }
+            
+            animate();
+        }
+ 
+        function createParticles() {
+            const particleGeo = new THREE.BufferGeometry();
+            const particleCount = 50;
+            const posArray = new Float32Array(particleCount * 3);
+            for(let i=0; i<particleCount*3; i++) {
+                posArray[i] = (Math.random() - 0.5) * 10;
+            }
+            particleGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            const particleMat = new THREE.PointsMaterial({
+                size: 0.1,
+                color: 0xffeebb,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending
+            });
+            const particles = new THREE.Points(particleGeo, particleMat);
+            particles.position.y = 2;
+            scene.add(particles);
+            
+            // Simple animation for particles
+            setInterval(() => {
+                particles.rotation.y += 0.002;
+                particles.position.y = 2 + Math.sin(Date.now() * 0.001) * 0.2;
+            }, 16);
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+ 
+        function animate() {
+            requestAnimationFrame(animate);
+            TWEEN.update();
+            controls.update();
+            
+            // Gentle floating of the island base
+            const time = Date.now() * 0.001;
+            scene.position.y = Math.sin(time) * 0.1;
+
+            // Animate islets and clouds
+            if (islandBase && islandBase.userData) {
+                const now = Date.now();
+                
+                // Animate islets
+                if (islandBase.userData.isletMeshes) {
+                    islandBase.userData.isletMeshes.forEach(islet => {
+                        islet.currentAngle += islet.data.speed;
+                        islet.mesh.position.x = Math.cos(islet.currentAngle) * islet.data.rad;
+                        islet.mesh.position.z = Math.sin(islet.currentAngle) * islet.data.rad;
+                        islet.mesh.position.y = islet.data.y + Math.sin(now * 0.002 + islet.data.angle) * 0.1;
+                        islet.mesh.rotation.y += 0.005;
+                    });
+                }
+
+                // Animate clouds
+                if (islandBase.userData.cloudData) {
+                    islandBase.userData.cloudData.forEach(cloud => {
+                        cloud.angle += cloud.speed;
+                        cloud.mesh.position.x = Math.cos(cloud.angle) * cloud.radius;
+                        cloud.mesh.position.z = Math.sin(cloud.angle) * cloud.radius;
+                    });
+                }
+            }
+            
+            renderer.render(scene, camera);
+        }
+ 
+        // ── Interaction Logic ──
+ 
+        function getIntersects(event) {
+            let clientX = event.clientX;
+            let clientY = event.clientY;
+            if (event.touches && event.touches.length > 0) {
+                clientX = event.touches[0].clientX;
+                clientY = event.touches[0].clientY;
+            }
+            mouse.x = (clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            return raycaster.intersectObjects(scene.children, true);
+        }
+ 
+        function selectObject(mesh) {
+            deselectObject();
+
+            selectedObject = mesh;
+            
+            // Create a gorgeous cyan glowing selection ring at the object's base
+            const s = mesh.scale.x;
+            const ringGeo = new THREE.RingGeometry(0.8 * s, 0.95 * s, 32);
+            ringGeo.rotateX(-Math.PI / 2);
+            const ringMat = new THREE.MeshBasicMaterial({ 
+                color: 0x00e5ff, 
+                side: THREE.DoubleSide, 
+                transparent: true, 
+                opacity: 0.85 
+            });
+            selectionRing = new THREE.Mesh(ringGeo, ringMat);
+            selectionRing.position.copy(mesh.position);
+            selectionRing.position.y = 0.02; // Slightly above ground
+            scene.add(selectionRing);
+
+            // Notify Flutter
+            if (window.FlutterChannel) {
+                window.FlutterChannel.postMessage(JSON.stringify({
+                    type: 'object_selected',
+                    objectId: mesh.userData.objectId,
+                    scale: mesh.scale.x,
+                    rotation: mesh.rotation.y,
+                    x: mesh.position.x,
+                    y: mesh.position.z
+                }));
+            }
+        }
+
+        function deselectObject() {
+            if (selectedObject) {
+                selectedObject.traverse(child => {
+                    if (child.isMesh) {
+                        child.material.transparent = false;
+                        child.material.opacity = 1.0;
+                    }
+                });
+                selectedObject = null;
+            }
+            if (selectionRing) {
+                scene.remove(selectionRing);
+                selectionRing = null;
+            }
+            isAdjustingPlace = false;
+        }
+
+        function onPointerDown(event) {
+            const intersects = getIntersects(event);
+            if (intersects.length > 0) {
+                // 1. Reposition mode pointer down
+                if (isAdjustingPlace && selectedObject) {
+                    const groundIntersect = intersects.find(i => isIslandBase(i.object));
+                    if (groundIntersect) {
+                        selectedObject.position.copy(groundIntersect.point);
+                        if (selectionRing) {
+                            selectionRing.position.copy(groundIntersect.point);
+                            selectionRing.position.y = 0.02;
+                        }
+                        
+                        window.stopRepositionMode();
+
+                        // Notify Flutter of the new position
+                        if (window.FlutterChannel) {
+                            window.FlutterChannel.postMessage(JSON.stringify({
+                                type: 'object_repositioned',
+                                objectId: selectedObject.userData.objectId,
+                                x: selectedObject.position.x,
+                                y: selectedObject.position.z
+                            }));
+                        }
+                    }
+                    return;
+                }
+
+                // 2. Normal / Placer mode pointer down
+                if (!placementMode) {
+                    for (let i = 0; i < intersects.length; i++) {
+                        let obj = intersects[i].object;
+                        // Find the root object that has userdata
+                        while (obj && !obj.userData.objectId && obj.parent !== scene) {
+                            obj = obj.parent;
+                        }
+                        if (obj && obj.userData.objectId) {
+                            // Select it
+                            selectObject(obj);
+                            return;
+                        }
+                    }
+                } else if (placementMode && placementMesh) {
+                    // Try to place it!
+                    const groundIntersect = intersects.find(i => isIslandBase(i.object));
+                    if (groundIntersect) {
+                        // Confirm placement
+                        if (window.FlutterChannel) {
+                            window.FlutterChannel.postMessage(JSON.stringify({
+                                type: 'placement_confirmed',
+                                x: groundIntersect.point.x,
+                                y: groundIntersect.point.z, // 2D grid
+                                rotation: placementMesh.rotation.y,
+                                scale: 1.0
+                            }));
+                        }
+                        
+                        // Spawn placement visual/magic effects
+                        spawnBirds(groundIntersect.point);
+                        spawnPetals(groundIntersect.point);
+                        spawnSoundRipple(groundIntersect.point);
+                        
+                        // Remove temporary placement helpers
+                        scene.remove(placementMesh);
+                        if (placementRing) scene.remove(placementRing);
+                        if (placementGlow) scene.remove(placementGlow);
+                        placementMesh = null;
+                        placementRing = null;
+                        placementGlow = null;
+                        placementMode = false;
+                    }
+                }
+            }
+        }
+ 
+        function onPointerMove(event) {
+            if (isAdjustingPlace && selectedObject) {
+                const intersects = getIntersects(event);
+                const groundIntersect = intersects.find(i => isIslandBase(i.object));
+                if (groundIntersect) {
+                    selectedObject.position.copy(groundIntersect.point);
+                    if (selectionRing) {
+                        selectionRing.position.copy(groundIntersect.point);
+                        selectionRing.position.y = 0.02;
+                    }
+                }
+            } else if (placementMode && placementMesh) {
+                const intersects = getIntersects(event);
+                const groundIntersect = intersects.find(i => isIslandBase(i.object));
+                if (groundIntersect) {
+                    placementMesh.position.copy(groundIntersect.point);
+                    if (placementRing) {
+                        placementRing.position.copy(groundIntersect.point);
+                        placementRing.position.y += 0.02; // slightly above ground to prevent z-fighting
+                    }
+                    if (placementGlow) {
+                        placementGlow.position.copy(groundIntersect.point);
+                        placementGlow.position.y += 0.2;
+                    }
+                }
+            }
+        }
+ 
+        // ── Magical Placement Visual Effects ──
+        
+        function spawnBirds(point) {
+            const birdCount = 6;
+            for (let i = 0; i < birdCount; i++) {
+                // Low-poly bird geometry
+                const birdGeo = new THREE.BufferGeometry();
+                const vertices = new Float32Array([
+                    -0.08, 0, 0,
+                    0, 0.04, 0.04,
+                    0.08, 0, 0,
+                    0, 0, -0.08
+                ]);
+                birdGeo.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+                const birdMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+                const bird = new THREE.Mesh(birdGeo, birdMat);
+                
+                bird.position.copy(point);
+                bird.position.y += 0.5;
+                scene.add(bird);
+                
+                // Random upward path
+                const targetX = point.x + (Math.random() - 0.5) * 4;
+                const targetY = point.y + 6 + Math.random() * 3;
+                const targetZ = point.z - 3 - Math.random() * 4;
+                
+                new TWEEN.Tween(bird.position)
+                    .to({ x: targetX, y: targetY, z: targetZ }, 2000 + Math.random() * 1000)
+                    .easing(TWEEN.Easing.Quadratic.Out)
+                    .onComplete(() => scene.remove(bird))
+                    .start();
+                    
+                // Flapping wing animation
+                new TWEEN.Tween(bird.scale)
+                    .to({ y: 0.1 }, 150)
+                    .repeat(15)
+                    .yoyo(true)
+                    .start();
+            }
+        }
+
+        function spawnPetals(point) {
+            const petalCount = 15;
+            for (let i = 0; i < petalCount; i++) {
+                const petalGeo = new THREE.BoxGeometry(0.08, 0.01, 0.08);
+                const petalMat = new THREE.MeshBasicMaterial({ color: 0xffb7c5 });
+                const petal = new THREE.Mesh(petalGeo, petalMat);
+                
+                petal.position.set(
+                    point.x + (Math.random() - 0.5) * 2.0,
+                    point.y + 3.0 + Math.random() * 2.0,
+                    point.z + (Math.random() - 0.5) * 2.0
+                );
+                scene.add(petal);
+                
+                // Drift downwards
+                new TWEEN.Tween(petal.position)
+                    .to({
+                        x: petal.position.x + (Math.random() - 0.5) * 1.5,
+                        y: point.y + 0.1,
+                        z: petal.position.z + (Math.random() - 0.5) * 1.5
+                    }, 3000 + Math.random() * 1500)
+                    .easing(TWEEN.Easing.Quadratic.Out)
+                    .onComplete(() => {
+                        new TWEEN.Tween(petal.scale)
+                            .to({ x: 0.001, y: 0.001, z: 0.001 }, 500)
+                            .onComplete(() => scene.remove(petal))
+                            .start();
+                    })
+                    .start();
+                    
+                // Soft spin
+                new TWEEN.Tween(petal.rotation)
+                    .to({ x: Math.random() * 5, y: Math.random() * 5, z: Math.random() * 5 }, 3000)
+                    .start();
+            }
+        }
+
+        function spawnSoundRipple(point) {
+            const rippleGeo = new THREE.RingGeometry(0.1, 0.15, 32);
+            rippleGeo.rotateX(-Math.PI / 2);
+            const rippleMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
+            const ripple = new THREE.Mesh(rippleGeo, rippleMat);
+            ripple.position.copy(point);
+            ripple.position.y += 0.02;
+            scene.add(ripple);
+            
+            // Expand
+            new TWEEN.Tween(ripple.scale)
+                .to({ x: 8, y: 8, z: 8 }, 1200)
+                .easing(TWEEN.Easing.Quadratic.Out)
+                .start();
+                
+            // Fade out
+            new TWEEN.Tween(ripple.material)
+                .to({ opacity: 0.0 }, 1200)
+                .onComplete(() => scene.remove(ripple))
+                .start();
+        }
+
+        // ── Exposed Functions for Flutter ──
+
+        window.set3DModel = function(key, base64Data) {
+            modelDataCache[key] = base64Data;
+        };
+
+        window.setSelectedObjectScale = function(scaleVal) {
+            if (selectedObject) {
+                const s = parseFloat(scaleVal);
+                selectedObject.scale.set(s, s, s);
+                
+                // Re-render ring with updated scale
+                if (selectionRing) {
+                    scene.remove(selectionRing);
+                    const ringGeo = new THREE.RingGeometry(0.8 * s, 0.95 * s, 32);
+                    ringGeo.rotateX(-Math.PI / 2);
+                    const ringMat = new THREE.MeshBasicMaterial({ 
+                        color: 0x00e5ff, 
+                        side: THREE.DoubleSide, 
+                        transparent: true, 
+                        opacity: 0.85 
+                    });
+                    selectionRing = new THREE.Mesh(ringGeo, ringMat);
+                    selectionRing.position.copy(selectedObject.position);
+                    selectionRing.position.y = 0.02;
+                    scene.add(selectionRing);
+                }
+            }
+        };
+
+        window.setSelectedObjectRotation = function(rotVal) {
+            if (selectedObject) {
+                selectedObject.rotation.y = parseFloat(rotVal);
+            }
+        };
+
+        window.startRepositionMode = function() {
+            if (selectedObject) {
+                isAdjustingPlace = true;
+                selectedObject.traverse(child => {
+                    if (child.isMesh) {
+                        child.material.transparent = true;
+                        child.material.opacity = 0.6;
+                    }
+                });
+                if (selectionRing) {
+                    selectionRing.material.color.setHex(0xff8bc2); // Shift highlight color to pink
+                }
+            }
+        };
+
+        window.stopRepositionMode = function() {
+            if (selectedObject) {
+                isAdjustingPlace = false;
+                selectedObject.traverse(child => {
+                    if (child.isMesh) {
+                        child.material.transparent = false;
+                        child.material.opacity = 1.0;
+                    }
+                });
+                if (selectionRing) {
+                    selectionRing.material.color.setHex(0x00e5ff); // Restore cyan highlight
+                }
+            }
+        };
+
+        window.deselectObject = deselectObject;
+        
+        window.loadObjects = function(jsonArrayStr) {
+            // Clear existing
+            placedObjects.forEach(obj => scene.remove(obj));
+            placedObjects = [];
+            
+            const objects = JSON.parse(jsonArrayStr);
+            objects.forEach(data => {
+                const key = getModelKey(data.assetId);
+                loadModelFromCache(key, function(mesh) {
+                    mesh.position.set(data.x, 0.0, data.y);
+                    mesh.rotation.y = data.rotation;
+                    mesh.userData = { objectId: data.id };
+                    
+                    mesh.traverse(child => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            
+                            if (data.isNew) {
+                                child.material.emissive = new THREE.Color(0x331100);
+                            }
+                        }
+                    });
+                    
+                    // Entrance animation with a tiny bounce!
+                    const targetScale = data.scale || 1.0;
+                    mesh.scale.set(0.01, 0.01, 0.01);
+                    new TWEEN.Tween(mesh.scale)
+                        .to({ x: targetScale * 1.15, y: targetScale * 1.15, z: targetScale * 1.15 }, 400)
+                        .easing(TWEEN.Easing.Back.Out)
+                        .chain(
+                            new TWEEN.Tween(mesh.scale)
+                                .to({ x: targetScale, y: targetScale, z: targetScale }, 300)
+                                .easing(TWEEN.Easing.Quadratic.Out)
+                        )
+                        .start();
+                        
+                    scene.add(mesh);
+                    placedObjects.push(mesh);
+                }, function(error) {
+                    console.error("Error loading placed object from cache, using fallback:", error);
+                    
+                    // Fallback to box
+                    const geo = new THREE.BoxGeometry(0.5, 1, 0.5);
+                    const mat = new THREE.MeshStandardMaterial({ 
+                        color: data.isNew ? 0xffcc00 : 0x88cc88,
+                        emissive: data.isNew ? 0x553300 : 0x000000 
+                    });
+                    const mesh = new THREE.Mesh(geo, mat);
+                    mesh.position.set(data.x, 0.5, data.y);
+                    mesh.rotation.y = data.rotation;
+                    mesh.userData = { objectId: data.id };
+                    mesh.castShadow = true;
+                    
+                    mesh.scale.set(0.01, 0.01, 0.01);
+                    new TWEEN.Tween(mesh.scale)
+                        .to({ x: data.scale, y: data.scale, z: data.scale }, 1000)
+                        .easing(TWEEN.Easing.Elastic.Out)
+                        .start();
+                        
+                    scene.add(mesh);
+                    placedObjects.push(mesh);
+                });
+            });
+        };
+ 
+        window.enterPlacementMode = function(assetDataStr) {
+            const data = JSON.parse(assetDataStr);
+            placementMode = true;
+            
+            if (placementMesh) scene.remove(placementMesh);
+            if (placementRing) scene.remove(placementRing);
+            if (placementGlow) scene.remove(placementGlow);
+            
+            // Create placement ring
+            const ringGeo = new THREE.RingGeometry(0.6, 0.7, 32);
+            ringGeo.rotateX(-Math.PI / 2);
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0xff8bc2, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
+            placementRing = new THREE.Mesh(ringGeo, ringMat);
+            scene.add(placementRing);
+            
+            // Create placement glow light
+            placementGlow = new THREE.PointLight(0xff8bc2, 2.0, 4);
+            placementGlow.position.y = 0.1;
+            scene.add(placementGlow);
+            
+            const key = getModelKey(data.id);
+            loadModelFromCache(key, function(mesh) {
+                if (!placementMode) return;
+                
+                placementMesh = mesh;
+                placementMesh.position.set(0, 0, 0);
+                
+                placementMesh.traverse(child => {
+                    if (child.isMesh) {
+                        child.material = new THREE.MeshBasicMaterial({
+                            color: 0xff8bc2,
+                            wireframe: true,
+                            transparent: true,
+                            opacity: 0.6
+                        });
+                    }
+                });
+                
+                scene.add(placementMesh);
+            }, function(error) {
+                console.error("Error loading placement preview, using fallback:", error);
+                
+                const geo = new THREE.BoxGeometry(0.5, 1, 0.5);
+                const mat = new THREE.MeshBasicMaterial({ color: 0xff8bc2, wireframe: true });
+                placementMesh = new THREE.Mesh(geo, mat);
+                placementMesh.position.set(0, 0.5, 0);
+                scene.add(placementMesh);
+            });
+        };
+        
+        window.cancelPlacementMode = function() {
+            placementMode = false;
+            if (placementMesh) {
+                scene.remove(placementMesh);
+                placementMesh = null;
+            }
+            if (placementRing) {
+                scene.remove(placementRing);
+                placementRing = null;
+            }
+            if (placementGlow) {
+                scene.remove(placementGlow);
+                placementGlow = null;
+            }
+        };
+ 
+        window.onload = init;
+    </script>
+</body>
+</html>

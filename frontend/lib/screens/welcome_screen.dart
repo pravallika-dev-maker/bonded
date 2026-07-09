@@ -139,31 +139,19 @@ class _WelcomeScreenState extends State<WelcomeScreen>
 
                       const SizedBox(height: 24),
 
-                      // ── Emotional Explanation ──
-                      _poeticLine(
-                          'Here, you don\'t have to fix everything at once.'),
-                      const SizedBox(height: 12),
-                      _poeticLine('You just have to be honest… with yourself.'),
-                      const SizedBox(height: 12),
-                      _poeticLine(
-                          'And slowly, things begin to make sense.'),
+                      // ── Consolidated Poetic & Purpose Quote ──
+                      const Text(
+                        'Bonded is a quiet space to understand what you feel, reflect on your connection, and grow closer at your own pace.',
+                        style: TextStyle(
+                          fontFamily: 'Georgia',
+                          fontSize: 15,
+                          fontStyle: FontStyle.italic,
+                          color: Color(0xFF8B6774),
+                          height: 1.6,
+                        ),
+                      ),
 
-                      const Spacer(flex: 1),
-
-                      // ── What App Does ──
-                      _featureLine(
-                          Icons.self_improvement_outlined,
-                          'We guide you through small moments of reflection'),
-                      const SizedBox(height: 14),
-                      _featureLine(
-                          Icons.favorite_border_outlined,
-                          'Help you understand what you feel'),
-                      const SizedBox(height: 14),
-                      _featureLine(
-                          Icons.wb_twilight_outlined,
-                          'And bring clarity to your connection'),
-
-                      const Spacer(flex: 1),
+                      const Spacer(flex: 2),
 
                       // ── Reassurance ──
                       Center(
@@ -231,42 +219,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
           ),
         ),
       ),
-    );
-  }
-
-  Widget _poeticLine(String text) {
-    return Text(
-      text,
-      style: const TextStyle(
-        fontFamily: 'Georgia',
-        fontSize: 13,
-        fontStyle: FontStyle.italic,
-        color: Color(0xFF7A5060),
-        height: 1.5,
-      ),
-    );
-  }
-
-  Widget _featureLine(IconData icon, String text) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          margin: const EdgeInsets.only(top: 2),
-          child: Icon(icon, size: 16, color: const Color(0xFF6B3048)),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF6B4A57),
-              height: 1.5,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

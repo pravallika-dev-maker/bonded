@@ -374,7 +374,7 @@ async def get_journey_insights(
         elif "month" in duration_label or "30" in duration_label:
             expected_days = 30
 
-    # Auto-unlock early if both partners completed all required reflection days
+    # Auto-unlock if both partners completed all required reflection days
     completed_all_reflections = (shared_days >= expected_days)
 
     # Check if locked or unlocked
@@ -383,14 +383,14 @@ async def get_journey_insights(
     if days_remaining < 0:
         days_remaining = 0
         
-    is_unlocked = (days_remaining <= 0) or (sep.status == "completed") or completed_all_reflections
+    is_unlocked = completed_all_reflections
 
     if not is_unlocked:
         # If locked, return the status so the vault remains visual & locked on frontend
         return {
             "isUnlocked": False,
             "daysRemaining": max(0, days_remaining),
-            "message": f"Your insights vault unlocks on the final day of separation ({days_remaining} days left).",
+            "message": "Your insights vault unlocks once both partners have completed all reflections.",
             "insights": None
         }
 

@@ -4,151 +4,212 @@ import '../config/api_config.dart';
 import 'api_service.dart';
 
 class SkyHavenService {
-  static Future<Map<String, String>> _getHeaders() async {
-    final token = await ApiService.getToken();
-    final headers = {
-      'accept': 'application/json',
-      'Content-Type': 'application/json',
-    };
-    if (token != null) {
-      headers['Authorization'] = 'Bearer $token';
-    }
-    return headers;
-  }
-
-  /// Fetch the full island state
-  static Future<Map<String, dynamic>> getIsland() async {
+  static Future<Map<String, dynamic>?> getIsland() async {
     try {
-      final headers = await _getHeaders();
+      final token = await ApiService.getToken();
+      if (token == null) return null;
+
       final response = await http.get(
         Uri.parse(ApiConfig.skyHavenIsland),
-        headers: headers,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
       );
 
-      final decoded = jsonDecode(response.body);
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return decoded;
-      } else {
-        throw Exception(decoded['detail'] ?? decoded['message'] ?? 'Failed to get island');
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
       }
+      return null;
     } catch (e) {
-      throw Exception('Network error: ${e.toString()}');
+      print('Error getting Sky Haven island: $e');
+      return null;
     }
   }
 
-  /// Fetch the island status for polling
-  static Future<Map<String, dynamic>> getStatus() async {
+  static Future<Map<String, dynamic>?> getStatus() async {
     try {
-      final headers = await _getHeaders();
+      final token = await ApiService.getToken();
+      if (token == null) return null;
+
       final response = await http.get(
         Uri.parse(ApiConfig.skyHavenStatus),
-        headers: headers,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
       );
 
-      final decoded = jsonDecode(response.body);
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return decoded;
-      } else {
-        throw Exception(decoded['detail'] ?? decoded['message'] ?? 'Failed to get island status');
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
       }
+      return null;
     } catch (e) {
-      throw Exception('Network error: ${e.toString()}');
+      print('Error getting Sky Haven status: $e');
+      return null;
     }
   }
 
-  /// Fetch all unlocked assets
-  static Future<Map<String, dynamic>> getAssets() async {
+  static Future<List<dynamic>?> getAssets() async {
     try {
-      final headers = await _getHeaders();
+      final token = await ApiService.getToken();
+      if (token == null) return null;
+
       final response = await http.get(
         Uri.parse(ApiConfig.skyHavenAssets),
-        headers: headers,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
       );
 
-      final decoded = jsonDecode(response.body);
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return decoded;
-      } else {
-        throw Exception(decoded['detail'] ?? decoded['message'] ?? 'Failed to get assets');
+      if (response.statusCode == 200) {
+        final dynamic data = jsonDecode(response.body);
+        if (data is Map && data.containsKey('assets')) {
+          return List<dynamic>.from(data['assets']);
+        } else if (data is List) {
+          return List<dynamic>.from(data);
+        }
+        return [];
       }
+      return null;
     } catch (e) {
-      throw Exception('Network error: ${e.toString()}');
+      print('Error getting Sky Haven assets: $e');
+      return null;
     }
   }
 
-  /// Place an object on the island
-  static Future<Map<String, dynamic>> placeObject({
-    required String assetId,
-    required double x,
-    required double y,
-    double rotation = 0.0,
-    double scale = 1.0,
+  static Future<bool> placeObject({
+    required int assetId,
+    required double positionX,
+    required double positionY,
+    required double rotation,
+    required double scale,
     String? whisper,
   }) async {
     try {
-      final headers = await _getHeaders();
+      final token = await ApiService.getToken();
+      if (token == null) return false;
+
+      final body = {
+        'asset_id': assetId,
+        'position_x': positionX,
+        'position_y': positionY,
+        'rotation': rotation,
+        'scale': scale,
+        'optional_whisper': whisper,
+      };
+
       final response = await http.post(
         Uri.parse(ApiConfig.skyHavenPlaceObject),
-        headers: headers,
-        body: jsonEncode({
-          'asset_id': assetId,
-          'position_x': x,
-          'position_y': y,
-          'rotation': rotation,
-          'scale': scale,
-          if (whisper != null && whisper.isNotEmpty) 'optional_whisper': whisper,
-        }),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(body),
       );
 
-      final decoded = jsonDecode(response.body);
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return decoded;
-      } else {
-        throw Exception(decoded['detail'] ?? decoded['message'] ?? 'Failed to place object');
-      }
+      return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
-      throw Exception('Network error: ${e.toString()}');
+      print('Error placing Sky Haven object: $e');
+      return false;
     }
   }
 
-  /// React to an object
-  static Future<Map<String, dynamic>> reactToObject(String objectId, String reaction) async {
+  static Future<bool> readWhisper(String objectId) async {
     try {
-      final headers = await _getHeaders();
+      final token = await ApiService.getToken();
+      if (token == null) return false;
+
       final response = await http.post(
-        Uri.parse('${ApiConfig.skyHavenBase}object/$objectId/react'),
-        headers: headers,
+        Uri.parse('${ApiConfig.skyHavenReadWhisper}/$objectId/read'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error reading Sky Haven whisper: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> reactToObject(String objectId, String reaction) async {
+    try {
+      final token = await ApiService.getToken();
+      if (token == null) return false;
+
+      final response = await http.post(
+        Uri.parse('${ApiConfig.skyHavenReactObject}/$objectId/react'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
         body: jsonEncode({'reaction': reaction}),
       );
 
-      final decoded = jsonDecode(response.body);
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return decoded;
-      } else {
-        throw Exception(decoded['detail'] ?? decoded['message'] ?? 'Failed to react to object');
-      }
+      return response.statusCode == 200;
     } catch (e) {
-      throw Exception('Network error: ${e.toString()}');
+      print('Error reacting to Sky Haven object: $e');
+      return false;
     }
   }
 
-  /// Mark a whisper as read
-  static Future<Map<String, dynamic>> readWhisper(String objectId) async {
+  static Future<bool> updateObject({
+    required String objectId,
+    required dynamic assetId,
+    required double positionX,
+    required double positionY,
+    required double rotation,
+    required double scale,
+  }) async {
     try {
-      final headers = await _getHeaders();
-      final response = await http.post(
-        Uri.parse('${ApiConfig.skyHavenBase}object/$objectId/read-whisper'),
-        headers: headers,
+      final token = await ApiService.getToken();
+      if (token == null) return false;
+
+      final body = {
+        'asset_id': assetId.toString(),
+        'position_x': positionX,
+        'position_y': positionY,
+        'rotation': rotation,
+        'scale': scale,
+      };
+
+      final response = await http.patch(
+        Uri.parse('${ApiConfig.skyHavenReactObject}/$objectId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(body),
       );
 
-      final decoded = jsonDecode(response.body);
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return decoded;
-      } else {
-        throw Exception(decoded['detail'] ?? decoded['message'] ?? 'Failed to mark whisper read');
-      }
+      return response.statusCode == 200;
     } catch (e) {
-      throw Exception('Network error: ${e.toString()}');
+      print('Error updating Sky Haven object: $e');
+      return false;
+    }
+  }
+
+  static Future<bool> deleteObject(String objectId) async {
+    try {
+      final token = await ApiService.getToken();
+      if (token == null) return false;
+
+      final response = await http.delete(
+        Uri.parse('${ApiConfig.skyHavenReactObject}/$objectId'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error deleting Sky Haven object: $e');
+      return false;
     }
   }
 }

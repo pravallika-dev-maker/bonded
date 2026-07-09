@@ -20,6 +20,106 @@ MOOD_PHRASES = {
     7: "A week of choosing space"
 }
 
+# ── Auto-expiry helper ────────────────────────────────────────────────────────
+from typing import Optional
+
+from ...models.reflection_session import ReflectionSession
+
+def check_and_expire_separation(db: Session, user_id: int) -> Optional["Separation"]:
+    """
+    Fetches the current active separation for `user_id`.
+    If the separation is completed by both partners (both completed all required reflection sessions),
+    it is automatically marked as 'completed' and notifications are sent to both participants.
+    Returns the active Separation object, or None if there is no active separation
+    (including the case where it was just auto-completed).
+    """
+    sep = db.query(Separation).filter(
+        (Separation.creator_id == user_id) | (Separation.partner_id == user_id),
+        Separation.status == "active"
+    ).order_by(Separation.created_at.desc()).first()
+
+    if sep is None:
+        return None
+
+    # Calculate expected days
+    if sep.expected_end_date and sep.start_date:
+        expected_days = (sep.expected_end_date - sep.start_date).days
+    else:
+        duration_label = (sep.duration_label or "").lower()
+        expected_days = 7  # default
+        import re
+        match = re.search(r'(\d+)', duration_label)
+        if match:
+            expected_days = int(match.group(1))
+        elif "2" in duration_label or "two" in duration_label:
+            expected_days = 14
+        elif "month" in duration_label or "30" in duration_label:
+            expected_days = 30
+
+    creator_completed = db.query(ReflectionSession).filter(
+        ReflectionSession.user_id == sep.creator_id,
+        ReflectionSession.separation_id == sep.id,
+        ReflectionSession.is_completed == True
+    ).count()
+
+    partner_completed = 0
+    if sep.partner_id:
+        partner_completed = db.query(ReflectionSession).filter(
+            ReflectionSession.user_id == sep.partner_id,
+            ReflectionSession.separation_id == sep.id,
+            ReflectionSession.is_completed == True
+        ).count()
+
+    if sep.partner_id:
+        both_completed = (creator_completed >= expected_days) and (partner_completed >= expected_days)
+    else:
+        both_completed = (creator_completed >= expected_days)
+
+    # Auto-complete only if both completed all reflections
+    if both_completed:
+        try:
+            sep.status = "completed"
+            sep.ended_at = datetime.now(timezone.utc)
+            db.commit()
+            db.refresh(sep)
+        except Exception:
+            db.rollback()
+            # Re-query to get the committed state (e.g. another request won the race)
+            sep = db.query(Separation).filter(
+                (Separation.creator_id == user_id) | (Separation.partner_id == user_id),
+                Separation.status == "completed"
+            ).order_by(Separation.ended_at.desc()).first()
+        finally:
+            # Send completion notifications to both participants
+            if sep:
+                participant_ids = [i for i in [sep.creator_id, sep.partner_id] if i is not None]
+                for uid in participant_ids:
+                    try:
+                        u = db.query(User).filter(User.id == uid).first()
+                        if u:
+                            create_notification_and_push(
+                                db,
+                                recipient_id=u.id,
+                                notification_type="separation_ended",
+                                title="Separation Completed",
+                                body="\U0001f305 Your separation journey has reached its final chapter.",
+                                fcm_token=u.fcm_token
+                            )
+                            create_notification_and_push(
+                                db,
+                                recipient_id=u.id,
+                                notification_type="insight_unlocked",
+                                title="Insight Ready",
+                                body="\U0001f513 Your shared journey insight is ready.",
+                                fcm_token=u.fcm_token
+                            )
+                    except Exception:
+                        pass  # Notification failures must not block the response
+        return None  # separation is no longer active
+
+    return sep
+
+
 @router.post("/", response_model=SeparationResponse)
 def create_separation(
     request: SeparationCreate, 
@@ -27,17 +127,23 @@ def create_separation(
     db: Session = Depends(get_db),
     active_rel = Depends(get_active_relationship)
 ):
-    # Check if active separation already exists
-    existing_sep = db.query(Separation).filter(
-        (Separation.creator_id == current_user.id) | (Separation.partner_id == current_user.id),
-        Separation.status == "active"
-    ).first()
+    # Check if active separation already exists (auto-expires overdue ones first)
+    existing_sep = check_and_expire_separation(db, current_user.id)
     
     if existing_sep:
         raise HTTPException(
             status_code=409,
             detail="An active separation already exists. You cannot create another one."
         )
+
+    # Reset completion acknowledgement for both users when starting a new separation
+    user_ids_to_reset = [current_user.id]
+    if current_user.partner_id:
+        user_ids_to_reset.append(current_user.partner_id)
+    db.query(User).filter(User.id.in_(user_ids_to_reset)).update(
+        {"has_acknowledged_completion": False}, synchronize_session=False
+    )
+    db.commit()
 
     # Create Separation row
     start_d = datetime.fromisoformat(request.start_date.replace('Z', '+00:00')).date()
@@ -100,12 +206,9 @@ def get_active_separation(
     db: Session = Depends(get_db),
     active_rel = Depends(get_active_relationship)
 ):
-    # 1. Query where (creator_id = user.id OR partner_id = user.id) AND status = "active"
-    sep = db.query(Separation).filter(
-        (Separation.creator_id == current_user.id) | (Separation.partner_id == current_user.id),
-        Separation.status == "active"
-    ).order_by(Separation.created_at.desc()).first()
-    
+    # 1. Query active separation — auto-expires overdue ones
+    sep = check_and_expire_separation(db, current_user.id)
+
     if not sep:
         return ActiveSeparationResponse(is_active=False)
         

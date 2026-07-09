@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'partner_name_entry_screen.dart';
 import '../services/api_service.dart';
+import '../widgets/primary_cta_button.dart';
 
 class BondSelectionScreen extends StatefulWidget {
   final String userName;
@@ -153,7 +154,9 @@ class _BondSelectionScreenState extends State<BondSelectionScreen> {
                 // ── Bottom Button ──
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 24.0),
-                  child: GestureDetector(
+                  child: PrimaryCtaButton(
+                    icon: Icons.favorite,
+                    text: "This is my bond",
                     onTap: () async {
                       final relationType = _selectedIndex == 0
                           ? 'partner'
@@ -172,41 +175,6 @@ class _BondSelectionScreenState extends State<BondSelectionScreen> {
                             )),
                       );
                     },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: double.infinity,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1A1214),
-                        borderRadius: BorderRadius.circular(28),
-                        border: Border.all(
-                          color: const Color(0xFF911746).withOpacity(0.5),
-                          width: 1.2,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(
-                            Icons.favorite,
-                            size: 18,
-                            color: Color(0xFFDD8F9F),
-                          ),
-                          SizedBox(width: 12),
-                          Text(
-                            "This is my bond",
-                            style: TextStyle(
-                              fontFamily: 'Georgia',
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              fontStyle: FontStyle.italic,
-                              letterSpacing: 0.5,
-                              color: Color(0xFFDD8F9F),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
                 ),
               ],

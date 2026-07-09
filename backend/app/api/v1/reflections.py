@@ -17,6 +17,7 @@ from ...schemas.reflection import (
     TodayStatusResponse,
 )
 from ...services.ai_service import analyze_answer
+from ...api.v1.separations import check_and_expire_separation
 
 router = APIRouter(prefix="/reflections", tags=["Reflections"])
 logger = logging.getLogger("bonded.reflections")
@@ -26,13 +27,10 @@ logger = logging.getLogger("bonded.reflections")
 
 def _get_active_separation(user: User, db: Session) -> Separation:
     """
-    Resolves the active separation by checking if the user is the creator or partner.
-    Supports both connected relationships and solo separations.
+    Resolves the active separation for the user, auto-expiring it if overdue.
+    Raises 404 if no active separation exists.
     """
-    sep = db.query(Separation).filter(
-        (Separation.creator_id == user.id) | (Separation.partner_id == user.id),
-        Separation.status == "active"
-    ).order_by(Separation.created_at.desc()).first()
+    sep = check_and_expire_separation(db, user.id)
 
     if not sep:
         raise HTTPException(

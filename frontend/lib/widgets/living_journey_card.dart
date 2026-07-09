@@ -2,6 +2,8 @@ import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'premium_sheen.dart';
+import 'poke_menu.dart';
+import 'poke_particles.dart';
 
 class LivingJourneyCard extends StatefulWidget {
   final int currentDay;
@@ -13,6 +15,13 @@ class LivingJourneyCard extends StatefulWidget {
   final bool isCompleted;
   final bool isMissedDayFlow;
   final VoidCallback? onClose;
+  final VoidCallback? onInsightsTap;
+  final Map<String, dynamic>? latestPoke;
+  final Future<void> Function(String gesture)? onSendPoke;
+  final Future<void> Function(int pokeId)? onAcknowledgePoke;
+  final bool isWaitingForPartnerReflections;
+  final bool partnerCompletedReflections;
+  final bool userCompletedReflections;
 
   const LivingJourneyCard({
     super.key,
@@ -25,11 +34,19 @@ class LivingJourneyCard extends StatefulWidget {
     this.isCompleted = false,
     this.isMissedDayFlow = false,
     this.onClose,
+    this.onInsightsTap,
+    this.latestPoke,
+    this.onSendPoke,
+    this.onAcknowledgePoke,
+    this.isWaitingForPartnerReflections = false,
+    this.partnerCompletedReflections = false,
+    this.userCompletedReflections = false,
   });
 
   @override
   State<LivingJourneyCard> createState() => _LivingJourneyCardState();
 }
+
 
 class _LivingJourneyCardState extends State<LivingJourneyCard>
     with TickerProviderStateMixin {
@@ -43,6 +60,9 @@ class _LivingJourneyCardState extends State<LivingJourneyCard>
   // Tap spring
   late AnimationController _tapController;
   late Animation<double> _tapScale;
+
+  final PokeParticlesController _particlesController = PokeParticlesController();
+  bool _forceOpenPokeMenu = false;
 
   @override
   void initState() {
@@ -74,11 +94,33 @@ class _LivingJourneyCardState extends State<LivingJourneyCard>
   }
 
   @override
+  void didUpdateWidget(covariant LivingJourneyCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final bool hasNewPoke = widget.latestPoke != null &&
+        (oldWidget.latestPoke == null ||
+         widget.latestPoke!['id'] != oldWidget.latestPoke!['id']);
+    if (hasNewPoke) {
+      _particlesController.spawn(widget.latestPoke!['gesture'] ?? 'Love');
+      setState(() {
+        _forceOpenPokeMenu = false;
+      });
+    }
+  }
+
+  @override
   void dispose() {
     _breatheController.dispose();
     _driftController.dispose();
     _tapController.dispose();
+    _particlesController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleSendPoke(String gesture) async {
+    _particlesController.spawn(gesture);
+    if (widget.onSendPoke != null) {
+      await widget.onSendPoke!(gesture);
+    }
   }
 
   @override
@@ -116,6 +158,12 @@ class _LivingJourneyCardState extends State<LivingJourneyCard>
                     spreadRadius: 4,
                     offset: const Offset(0, 24),
                   ),
+                  if (widget.latestPoke != null)
+                    BoxShadow(
+                      color: const Color(0xFFDD8F9F).withValues(alpha: 0.25 + 0.15 * math.sin(breathe * math.pi)),
+                      blurRadius: 24 + 12 * math.sin(breathe * math.pi),
+                      spreadRadius: 2 + 2 * math.sin(breathe * math.pi),
+                    ),
                 ],
               ),
               child: ClipRRect(
@@ -188,13 +236,20 @@ class _LivingJourneyCardState extends State<LivingJourneyCard>
                       ),
                     ),
 
+                    // ── POKE PARTICLES ──
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: PokeParticlesWidget(controller: _particlesController),
+                      ),
+                    ),
+
                     // ── MAIN CONTENT ──
                     PremiumSheen(
                       animationDuration: const Duration(milliseconds: 2000),
                       pauseDuration: const Duration(seconds: 9),
                       sheenOpacity: 0.25,
                       child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+                      padding: const EdgeInsets.fromLTRB(24, 18, 24, 16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -265,268 +320,690 @@ class _LivingJourneyCardState extends State<LivingJourneyCard>
                             ),
 
                           if (widget.isCompleted) ...[
-                            const SizedBox(height: 10),
-                            const Text(
-                              'Journey Completed',
-                              style: TextStyle(
-                                fontFamily: 'Georgia',
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                height: 1.1,
-                                letterSpacing: -0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              "Congratulations! You've successfully completed this space with ${widget.partnerName ?? 'your partner'}.",
-                              style: TextStyle(
-                                fontFamily: 'Georgia',
-                                fontSize: 14,
-                                fontStyle: FontStyle.italic,
-                                color: const Color(0xFFD4C4CA).withValues(alpha: 0.75 + breathe * 0.15),
-                                height: 1.45,
-                              ),
-                            ),
-                            if (widget.onClose != null) ...[
-                              const SizedBox(height: 24),
-                              GestureDetector(
-                                onTap: widget.onClose,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF8A2E55).withValues(alpha: 0.15 + breathe * 0.05),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: const Color(0xFF8A2E55).withValues(alpha: 0.4),
-                                      width: 1,
+                            const SizedBox(height: 4),
+
+                            // ── GOLDEN LIGHT BURST (top accent) ──
+                            IgnorePointer(
+                              child: Container(
+                                height: 0,
+                                decoration: BoxDecoration(
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFFD4A853)
+                                          .withValues(alpha: 0.10 + breathe * 0.08),
+                                      blurRadius: 60,
+                                      spreadRadius: 30,
                                     ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        'Continue',
-                                        style: TextStyle(
-                                          fontFamily: 'Georgia',
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                          color: const Color(0xFFDD8F9F),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            // ── HEADER ROW: icon + headline ──
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                // Animated unlock orb
+                                TweenAnimationBuilder<double>(
+                                  tween: Tween(begin: 0.88, end: 1.08),
+                                  duration: const Duration(milliseconds: 2200),
+                                  curve: Curves.easeInOutSine,
+                                  builder: (context, scale, _) {
+                                    return Transform.scale(
+                                      scale: scale * (1.0 + breathe * 0.04),
+                                      child: Container(
+                                        width: 48,
+                                        height: 48,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          gradient: RadialGradient(
+                                            colors: [
+                                              Color.lerp(
+                                                const Color(0xFFD4A853),
+                                                const Color(0xFFECC8D4),
+                                                breathe,
+                                              )!.withValues(alpha: 0.18),
+                                              const Color(0xFF8A2E55)
+                                                  .withValues(alpha: 0.08),
+                                              Colors.transparent,
+                                            ],
+                                            stops: const [0.0, 0.5, 1.0],
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: const Color(0xFFD4A853)
+                                                  .withValues(alpha: 0.25 + breathe * 0.20),
+                                              blurRadius: 16,
+                                              spreadRadius: 2,
+                                            ),
+                                          ],
+                                          border: Border.all(
+                                            color: const Color(0xFFD4A853)
+                                                .withValues(alpha: 0.22 + breathe * 0.15),
+                                            width: 1.2,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          Icons.auto_awesome,
+                                          size: 22,
+                                          color: Color.lerp(
+                                            const Color(0xFFD4A853),
+                                            const Color(0xFFECC8D4),
+                                            breathe,
+                                          ),
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
-                                      Icon(
-                                        Icons.arrow_forward,
-                                        size: 16,
-                                        color: const Color(0xFFDD8F9F),
+                                    );
+                                  },
+                                ),
+
+                                const SizedBox(width: 14),
+
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      ShaderMask(
+                                        shaderCallback: (bounds) => LinearGradient(
+                                          colors: [
+                                            const Color(0xFFECC8D4),
+                                            Color.lerp(
+                                              const Color(0xFFD4A853),
+                                              const Color(0xFFDD8F9F),
+                                              breathe,
+                                            )!,
+                                          ],
+                                        ).createShader(bounds),
+                                        child: const Text(
+                                          'Your Insights Are Ready',
+                                          style: TextStyle(
+                                            fontFamily: 'Georgia',
+                                            fontSize: 19,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                            height: 1.15,
+                                            letterSpacing: -0.3,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        widget.partnerName != null
+                                            ? 'The space you held with ${widget.partnerName} left something behind.'
+                                            : 'The space you held left something behind.',
+                                        style: TextStyle(
+                                          fontFamily: 'Georgia',
+                                          fontSize: 11.5,
+                                          fontStyle: FontStyle.italic,
+                                          color: const Color(0xFFD4C4CA)
+                                              .withValues(alpha: 0.70 + breathe * 0.15),
+                                          height: 1.4,
+                                        ),
                                       ),
                                     ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 12),
-                          ] else if (widget.isEmpty) ...[
-                            const SizedBox(height: 10),
-                            const Text(
-                              'Your journey begins here',
-                              style: TextStyle(
-                                fontFamily: 'Georgia',
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                height: 1.1,
-                                letterSpacing: -0.5,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              "When you're ready, begin a journey of reflection, growth, and connection.",
-                              style: TextStyle(
-                                fontFamily: 'Georgia',
-                                fontSize: 14,
-                                fontStyle: FontStyle.italic,
-                                color: const Color(0xFFD4C4CA).withValues(alpha: 0.75 + breathe * 0.15),
-                                height: 1.45,
-                              ),
-                            ),
-                            const SizedBox(height: 24),
-                          ] else ...[
-                            const SizedBox(height: 18),
-
-                            // BIG DAY COUNTER
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.baseline,
-                              textBaseline: TextBaseline.alphabetic,
-                              children: [
-                                Text(
-                                  'Day ',
-                                  style: TextStyle(
-                                    fontFamily: 'Georgia',
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.w300,
-                                    color: Colors.white
-                                        .withValues(alpha: 0.35 + breathe * 0.15),
-                                  ),
-                                ),
-                                ShaderMask(
-                                  shaderCallback: (bounds) =>
-                                      LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      const Color(0xFFECC8D4),
-                                      const Color(0xFFDD8F9F),
-                                      Color.lerp(
-                                        const Color(0xFF9E7E5A),
-                                        const Color(0xFFDD8F9F),
-                                        breathe,
-                                      )!,
-                                    ],
-                                  ).createShader(bounds),
-                                  child: Text(
-                                    '${widget.currentDay}',
-                                    style: const TextStyle(
-                                      fontFamily: 'Georgia',
-                                      fontSize: 60,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                      height: 1.0,
-                                      letterSpacing: -2,
-                                    ),
                                   ),
                                 ),
                               ],
                             ),
 
-                            const SizedBox(height: 4),
-
-                            // PARTNER NAME — "a space with [name]"
-                            if (widget.partnerName != null &&
-                                widget.partnerName!.isNotEmpty)
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.favorite,
-                                    size: 10,
-                                    color: const Color(0xFFDD8F9F)
-                                        .withValues(alpha: 0.5 + breathe * 0.3),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'a space with ${widget.partnerName}',
-                                    style: TextStyle(
-                                      fontFamily: 'Georgia',
-                                      fontSize: 13,
-                                      fontStyle: FontStyle.italic,
-                                      color: const Color(0xFFDD8F9F)
-                                          .withValues(alpha: 0.55 + breathe * 0.2),
-                                      letterSpacing: 0.3,
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                            const SizedBox(height: 10),
-
-                            // MOOD PHRASE
-                            if (widget.moodPhrase.isNotEmpty)
-                              Text(
-                                widget.moodPhrase,
-                                style: TextStyle(
-                                  fontFamily: 'Georgia',
-                                  fontSize: 14,
-                                  fontStyle: FontStyle.italic,
-                                  color: const Color(0xFFD4C4CA)
-                                      .withValues(alpha: 0.75 + breathe * 0.15),
-                                  height: 1.45,
-                                ),
-                              ),
-
                             const SizedBox(height: 18),
 
-                            // MISSED DAY MESSAGE
-                            if (widget.isMissedDayFlow) ...[
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            // ── INSIGHT CTA BUTTON ──
+                            GestureDetector(
+                              onTap: widget.onInsightsTap,
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                    vertical: 14, horizontal: 20),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF8A2E55).withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: const Color(0xFFDD8F9F).withValues(alpha: 0.2),
-                                    width: 1,
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      Color.lerp(
+                                        const Color(0xFFD4A853),
+                                        const Color(0xFF9E7E5A),
+                                        0.3 + breathe * 0.4,
+                                      )!.withValues(alpha: 0.18),
+                                      const Color(0xFF8A2E55)
+                                          .withValues(alpha: 0.14),
+                                    ],
                                   ),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: Color.lerp(
+                                      const Color(0xFFD4A853),
+                                      const Color(0xFFDD8F9F),
+                                      breathe,
+                                    )!.withValues(alpha: 0.35 + breathe * 0.15),
+                                    width: 1.2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: const Color(0xFFD4A853)
+                                          .withValues(alpha: 0.08 + breathe * 0.06),
+                                      blurRadius: 12,
+                                      spreadRadius: 1,
+                                    ),
+                                  ],
                                 ),
                                 child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Icon(
-                                      Icons.history,
-                                      size: 16,
-                                      color: const Color(0xFFDD8F9F).withValues(alpha: 0.8),
+                                    Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Explore Your Journey',
+                                          style: TextStyle(
+                                            fontFamily: 'Georgia',
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            color: Color.lerp(
+                                              const Color(0xFFECC8D4),
+                                              const Color(0xFFD4A853),
+                                              breathe * 0.6,
+                                            ),
+                                            letterSpacing: 0.1,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Scores · Reflections · Closing insight',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: const Color(0xFF9E7E5A)
+                                                .withValues(alpha: 0.8),
+                                            letterSpacing: 0.2,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 10),
-                                    Expanded(
-                                      child: Text(
-                                        "You missed a few days of reflection. Take a moment to catch up on the previous check-ins to continue your journey together.",
-                                        style: TextStyle(
-                                          fontFamily: 'Georgia',
-                                          fontSize: 12,
-                                          fontStyle: FontStyle.italic,
-                                          color: const Color(0xFFD4C4CA).withValues(alpha: 0.85),
-                                          height: 1.4,
+                                    Container(
+                                      width: 32,
+                                      height: 32,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: const Color(0xFFD4A853)
+                                            .withValues(alpha: 0.15 + breathe * 0.08),
+                                        border: Border.all(
+                                          color: const Color(0xFFD4A853)
+                                              .withValues(alpha: 0.30),
+                                          width: 1,
+                                        ),
+                                      ),
+                                      child: Icon(
+                                        Icons.arrow_forward_rounded,
+                                        size: 15,
+                                        color: Color.lerp(
+                                          const Color(0xFFD4A853),
+                                          const Color(0xFFECC8D4),
+                                          breathe,
                                         ),
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
-                              const SizedBox(height: 18),
-                            ],
-
-                            // PROGRESS LINE
-                            _ProgressLine(
-                              progress: (widget.totalDays > 0 ? widget.currentDay / widget.totalDays : 0.0).clamp(0.0, 1.0),
-                              breathe: breathe,
                             ),
 
+                            // ── DISMISS BUTTON ──
+                            if (widget.onClose != null) ...[
+                              const SizedBox(height: 12),
+                              GestureDetector(
+                                onTap: widget.onClose,
+                                child: Center(
+                                  child: Text(
+                                    'Begin a new separation',
+                                    style: TextStyle(
+                                      fontFamily: 'Georgia',
+                                      fontSize: 11.5,
+                                      fontStyle: FontStyle.italic,
+                                      decoration: TextDecoration.underline,
+                                      decorationColor: const Color(0xFF866571)
+                                          .withValues(alpha: 0.5),
+                                      color: const Color(0xFF866571)
+                                          .withValues(alpha: 0.65 + breathe * 0.15),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                            const SizedBox(height: 8),
+                          ] else if (widget.isEmpty) ...[
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Your journey begins here',
+                              style: TextStyle(
+                                fontFamily: 'Georgia',
+                                fontSize: 22,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                height: 1.1,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              "Begin a journey of reflection, growth, and connection.",
+                              style: TextStyle(
+                                fontFamily: 'Georgia',
+                                fontSize: 12.5,
+                                fontStyle: FontStyle.italic,
+                                color: const Color(0xFFD4C4CA).withValues(alpha: 0.75 + breathe * 0.15),
+                                height: 1.45,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                          ] else ...[
                             const SizedBox(height: 10),
 
-                            // BOTTOM STATUS ROW
-                            Row(
-                              children: [
-                                Icon(
-                                  Icons.auto_awesome,
-                                  size: 11,
-                                  color: const Color(0xFF9E7E5A)
-                                      .withValues(alpha: 0.6 + breathe * 0.3),
+                            if (widget.isWaitingForPartnerReflections) ...[
+                              // ── CALM COMPLETION CARD (PARTNER A — finished, waiting for partner) ──
+                              const SizedBox(height: 6),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  const Text(
+                                    '🌙 ',
+                                    style: TextStyle(fontSize: 20),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      'Your reflections are complete.',
+                                      style: TextStyle(
+                                        fontFamily: 'Georgia',
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        height: 1.2,
+                                        letterSpacing: -0.3,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                "You've shared your side of the story. Relationship insights are created from both perspectives and will unlock once both partners have completed their reflections.",
+                                style: TextStyle(
+                                  fontFamily: 'Georgia',
+                                  fontSize: 13,
+                                  color: const Color(0xFFD4C4CA)
+                                      .withValues(alpha: 0.75 + breathe * 0.15),
+                                  height: 1.5,
                                 ),
-                                const SizedBox(width: 7),
-                                Expanded(
-                                  child: Text(
-                                    widget.statusLine,
+                              ),
+                              const SizedBox(height: 20),
+                              // WAITING STATUS — no progress bar or day counter
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.hourglass_empty_rounded,
+                                    size: 11,
+                                    color: const Color(0xFF9E7E5A)
+                                        .withValues(alpha: 0.6 + breathe * 0.3),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Waiting for your partner...',
                                     style: TextStyle(
                                       fontSize: 11,
+                                      fontWeight: FontWeight.w500,
                                       color: const Color(0xFF866571)
                                           .withValues(alpha: 0.8 + breathe * 0.1),
                                       letterSpacing: 0.2,
                                     ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
                                   ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                            ] else ...[
+                              // ── ACTIVE SEPARATION CARD ──
+                              // BIG DAY COUNTER
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.baseline,
+                                textBaseline: TextBaseline.alphabetic,
+                                children: [
+                                  Text(
+                                    'Day ',
+                                    style: TextStyle(
+                                      fontFamily: 'Georgia',
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w300,
+                                      color: Colors.white
+                                          .withValues(alpha: 0.35 + breathe * 0.15),
+                                    ),
+                                  ),
+                                  ShaderMask(
+                                    shaderCallback: (bounds) =>
+                                        LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [
+                                        const Color(0xFFECC8D4),
+                                        const Color(0xFFDD8F9F),
+                                        Color.lerp(
+                                          const Color(0xFF9E7E5A),
+                                          const Color(0xFFDD8F9F),
+                                          breathe,
+                                        )!,
+                                      ],
+                                    ).createShader(bounds),
+                                    child: Text(
+                                      '${widget.currentDay}',
+                                      style: const TextStyle(
+                                        fontFamily: 'Georgia',
+                                        fontSize: 38,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                        height: 1.0,
+                                        letterSpacing: -1,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 2),
+
+                              // PARTNER NAME — "a space with [name]"
+                              if (widget.partnerName != null &&
+                                  widget.partnerName!.isNotEmpty)
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.favorite,
+                                      size: 9,
+                                      color: const Color(0xFFDD8F9F)
+                                          .withValues(alpha: 0.5 + breathe * 0.3),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      'a space with ${widget.partnerName}',
+                                      style: TextStyle(
+                                        fontFamily: 'Georgia',
+                                        fontSize: 12,
+                                        fontStyle: FontStyle.italic,
+                                        color: const Color(0xFFDD8F9F)
+                                            .withValues(alpha: 0.55 + breathe * 0.2),
+                                        letterSpacing: 0.2,
+                                      ),
+                                    ),
+                                  ],
                                 ),
+
+                              const SizedBox(height: 6),
+
+                              // MOOD PHRASE
+                              if (widget.moodPhrase.isNotEmpty)
                                 Text(
-                                  'of ${widget.totalDays}',
+                                  widget.moodPhrase,
                                   style: TextStyle(
                                     fontFamily: 'Georgia',
-                                    fontSize: 10,
+                                    fontSize: 12.5,
                                     fontStyle: FontStyle.italic,
-                                    color: const Color(0xFF9E7E5A)
-                                        .withValues(alpha: 0.5 + breathe * 0.2),
+                                    color: const Color(0xFFD4C4CA)
+                                        .withValues(alpha: 0.75 + breathe * 0.15),
+                                    height: 1.45,
                                   ),
                                 ),
+
+                              const SizedBox(height: 10),
+
+                              // MISSED DAY MESSAGE
+                              if (widget.isMissedDayFlow) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF8A2E55).withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: const Color(0xFFDD8F9F).withValues(alpha: 0.2),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(
+                                        Icons.history,
+                                        size: 15,
+                                        color: const Color(0xFFDD8F9F).withValues(alpha: 0.8),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          "Catch up on previous check-ins to continue your journey.",
+                                          style: TextStyle(
+                                            fontFamily: 'Georgia',
+                                            fontSize: 11,
+                                            fontStyle: FontStyle.italic,
+                                            color: const Color(0xFFD4C4CA).withValues(alpha: 0.85),
+                                            height: 1.4,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
                               ],
-                            ),
+
+                              // 🌱 GENTLE SPROUT NUDGE — Partner B sees this when Partner A is done
+                              if (widget.partnerCompletedReflections && !widget.userCompletedReflections) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF4A6F52).withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: const Color(0xFF7CA982).withValues(alpha: 0.25),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        "🌱",
+                                        style: TextStyle(fontSize: 14),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          "Your partner has completed their reflections for this separation. Take your time. Your shared relationship insights will be ready once you've completed yours.",
+                                          style: TextStyle(
+                                            fontFamily: 'Georgia',
+                                            fontSize: 11.5,
+                                            fontStyle: FontStyle.italic,
+                                            color: const Color(0xFFD4C4CA).withValues(alpha: 0.9),
+                                            height: 1.45,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                              ],
+
+                              // PROGRESS LINE
+                              _ProgressLine(
+                                progress: (widget.totalDays > 0 ? widget.currentDay / widget.totalDays : 0.0).clamp(0.0, 1.0),
+                                breathe: breathe,
+                              ),
+
+                              const SizedBox(height: 6),
+
+                              // BOTTOM STATUS ROW
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.auto_awesome,
+                                    size: 10,
+                                    color: const Color(0xFF9E7E5A)
+                                        .withValues(alpha: 0.6 + breathe * 0.3),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      widget.statusLine,
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        color: const Color(0xFF866571)
+                                            .withValues(alpha: 0.8 + breathe * 0.1),
+                                        letterSpacing: 0.2,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  Text(
+                                    'of ${widget.totalDays}',
+                                    style: TextStyle(
+                                      fontFamily: 'Georgia',
+                                      fontSize: 9.5,
+                                      fontStyle: FontStyle.italic,
+                                      color: const Color(0xFF9E7E5A)
+                                          .withValues(alpha: 0.5 + breathe * 0.2),
+                                    ),
+                                  ),
+                                ],
+                              ),
+
+                              const SizedBox(height: 12),
+                            ],
+
+                            const SizedBox(height: 12),
+
+                            // ── Poking interaction ──
+                            if (widget.latestPoke != null)
+                              // Received gesture view
+                              Center(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF8A2E55).withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: const Color(0xFFDD8F9F).withValues(alpha: 0.22),
+                                      width: 1,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFFDD8F9F).withValues(alpha: 0.05),
+                                        blurRadius: 10,
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      // Pulsing Heart / Sparkle Icon
+                                      TweenAnimationBuilder<double>(
+                                        tween: Tween(begin: 0.95, end: 1.05),
+                                        duration: const Duration(seconds: 1),
+                                        curve: Curves.easeInOutSine,
+                                        builder: (context, scale, child) {
+                                          final gesture = (widget.latestPoke!['gesture'] ?? 'Love').toString();
+                                          return Transform.scale(
+                                            scale: scale + 0.05 * math.sin(breathe * math.pi * 2),
+                                            child: GestureIcon(
+                                              gesture: gesture,
+                                              color: getGestureColor(gesture),
+                                              size: 24,
+                                              strokeWidth: 1.5,
+                                              filled: true,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            '${widget.partnerName ?? "Partner"} sent you a ${widget.latestPoke!['gesture'] ?? "Poke"}',
+                                            style: const TextStyle(
+                                              fontFamily: 'Georgia',
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                              color: Color(0xFFECC8D4),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          if (PokeMenu.cooldownRemaining > 0)
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFDD8F9F).withValues(alpha: 0.08),
+                                                borderRadius: BorderRadius.circular(12),
+                                                border: Border.all(
+                                                  color: const Color(0xFFDD8F9F).withValues(alpha: 0.20),
+                                                  width: 0.8,
+                                                ),
+                                              ),
+                                              child: Row(
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Icon(
+                                                    Icons.access_time_rounded,
+                                                    size: 11,
+                                                    color: const Color(0xFFECC8D4).withValues(alpha: 0.8),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Text(
+                                                    'Send back in ${PokeMenu.cooldownRemaining}s',
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.w600,
+                                                      fontFamily: 'Georgia',
+                                                      letterSpacing: 0.2,
+                                                      color: const Color(0xFFECC8D4).withValues(alpha: 0.9),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            )
+                                          else
+                                            GestureDetector(
+                                              onTap: () {
+                                                final pokeId = widget.latestPoke!['id'];
+                                                if (widget.onAcknowledgePoke != null) {
+                                                  widget.onAcknowledgePoke!(pokeId);
+                                                }
+                                                setState(() {
+                                                  _forceOpenPokeMenu = true;
+                                                });
+                                              },
+                                              child: Text(
+                                                'Send Back',
+                                                style: TextStyle(
+                                                  fontSize: 10.5,
+                                                  fontWeight: FontWeight.bold,
+                                                  fontFamily: 'Georgia',
+                                                  decoration: TextDecoration.underline,
+                                                  color: const Color(0xFFDD8F9F).withValues(alpha: 0.95),
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            else if (widget.onSendPoke != null)
+                              PokeMenu(
+                                onSendPoke: _handleSendPoke,
+                                partnerName: widget.partnerName,
+                                startExpanded: _forceOpenPokeMenu,
+                              ),
                           ],
                         ],
                       ),

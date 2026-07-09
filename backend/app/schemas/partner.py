@@ -24,3 +24,7 @@ class PartnerMeResponse(BaseSchema):
     relation_type: Optional[str] = None
     relationship_date: Optional[date] = None
     relationship_score: Optional[int] = None
+
+class PokeRequest(BaseSchema):
+    gesture: str
+

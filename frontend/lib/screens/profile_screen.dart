@@ -544,7 +544,30 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 await ApiService.disconnectPartner();
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Partner disconnected successfully.')),
+                    SnackBar(
+                      content: Row(
+                        children: const [
+                          Icon(Icons.check_circle, color: Color(0xFFFFF0F3), size: 18),
+                          SizedBox(width: 12),
+                          Text(
+                            'Partner disconnected successfully',
+                            style: TextStyle(
+                              fontFamily: 'Georgia',
+                              fontWeight: FontWeight.w600,
+                              fontStyle: FontStyle.italic,
+                              color: Color(0xFFFFF0F3),
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                      backgroundColor: const Color(0xFFBD386A), // Premium pink/rose
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      duration: const Duration(seconds: 2),
+                    ),
                   );
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(
@@ -560,7 +583,32 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                 if (context.mounted) {
                   Navigator.pop(context); // Close dialog
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to disconnect: $e')),
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: Color(0xFFFFF0F3), size: 18),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Failed to disconnect: $e',
+                              style: const TextStyle(
+                                fontFamily: 'Georgia',
+                                fontWeight: FontWeight.w600,
+                                fontStyle: FontStyle.italic,
+                                color: Color(0xFFFFF0F3),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      backgroundColor: const Color(0xFF781E43), // Burgundy red
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      duration: const Duration(seconds: 3),
+                    ),
                   );
                 }
               }
@@ -634,7 +682,32 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                   
                   // Show error
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed to delete account: $e')),
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: Color(0xFFFFF0F3), size: 18),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Failed to delete account: $e',
+                              style: const TextStyle(
+                                fontFamily: 'Georgia',
+                                fontWeight: FontWeight.w600,
+                                fontStyle: FontStyle.italic,
+                                color: Color(0xFFFFF0F3),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      backgroundColor: const Color(0xFF781E43), // Burgundy red
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      duration: const Duration(seconds: 3),
+                    ),
                   );
                 }
               }

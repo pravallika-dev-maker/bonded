@@ -3,9 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'screens/onboarding_flow_screen.dart';
-import 'screens/splash_screen.dart';
-import 'services/api_service.dart';
 import 'services/local_notification_service.dart';
 
 @pragma('vm:entry-point')
@@ -58,16 +57,20 @@ class BondedApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final baseTheme = ThemeData(
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: const Color(0xFF0E0608),
+      colorScheme: ColorScheme.fromSeed(
+        seedColor: const Color(0xFFB52B6E),
+        brightness: Brightness.dark,
+      ),
+    );
+
     return MaterialApp(
       title: 'Bonded',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0E0608),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFB52B6E),
-          brightness: Brightness.dark,
-        ),
+      theme: baseTheme.copyWith(
+        textTheme: GoogleFonts.quicksandTextTheme(baseTheme.textTheme),
       ),
       home: const OnboardingFlowScreen(),
     );

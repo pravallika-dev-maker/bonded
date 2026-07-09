@@ -208,7 +208,7 @@ class _UnconnectedHeroCardState extends State<UnconnectedHeroCard>
 
                     // ── Main content ──
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 28, 24, 28),
+                      padding: const EdgeInsets.fromLTRB(24, 18, 24, 18),
                       child: widget.isWaitingState
                           ? _buildWaiting(breathe, heartFloat)
                           : _buildNotConnected(breathe, heartFloat),
@@ -230,28 +230,28 @@ class _UnconnectedHeroCardState extends State<UnconnectedHeroCard>
       children: [
         // Badge
         _Badge(label: 'START YOUR CONNECTION', breathe: breathe),
-        const SizedBox(height: 22),
+        const SizedBox(height: 12),
 
         // Animated hearts illustration
         _TwoHeartsConnecting(breathe: breathe, heartFloat: heartFloat),
-        const SizedBox(height: 22),
+        const SizedBox(height: 12),
 
         // Heading
-        _GradientHeading(text: 'Your shared journey\nawaits', breathe: breathe),
-        const SizedBox(height: 12),
+        _GradientHeading(text: 'Your shared journey awaits', breathe: breathe),
+        const SizedBox(height: 6),
 
         // Description
         Text(
-          'Invite your partner and enter their code to create your private space together.',
+          'Invite your partner to create your private space.',
           style: TextStyle(
             fontFamily: 'Georgia',
-            fontSize: 14,
+            fontSize: 12.5,
             fontStyle: FontStyle.italic,
             color: const Color(0xFFD4C4CA).withValues(alpha: 0.75 + breathe * 0.10),
-            height: 1.6,
+            height: 1.45,
           ),
         ),
-        const SizedBox(height: 28),
+        const SizedBox(height: 16),
 
         // Buttons
         Row(
@@ -276,24 +276,24 @@ class _UnconnectedHeroCardState extends State<UnconnectedHeroCard>
           ],
         ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 10),
 
         // Helper text
         Row(
           children: [
             Icon(
               Icons.info_outline_rounded,
-              size: 12,
+              size: 11,
               color: const Color(0xFF866571).withValues(alpha: 0.7),
             ),
-            const SizedBox(width: 7),
+            const SizedBox(width: 6),
             Expanded(
               child: Text(
-                'Both partners need to connect before starting a separation phase.',
+                'Connect to begin a separation phase.',
                 style: TextStyle(
-                  fontSize: 11,
+                  fontSize: 10.5,
                   color: const Color(0xFF866571).withValues(alpha: 0.7),
-                  height: 1.5,
+                  height: 1.4,
                 ),
               ),
             ),
@@ -313,33 +313,33 @@ class _UnconnectedHeroCardState extends State<UnconnectedHeroCard>
       children: [
         // Badge
         _Badge(label: 'WAITING FOR CONNECTION', breathe: breathe, isWaiting: true),
-        const SizedBox(height: 22),
+        const SizedBox(height: 12),
 
         // Floating envelope + heart illustration
         _FloatingEnvelope(breathe: breathe, heartFloat: heartFloat),
-        const SizedBox(height: 22),
+        const SizedBox(height: 12),
 
         // Heading
-        _GradientHeading(text: 'Your journey\nbegins here', breathe: breathe),
-        const SizedBox(height: 12),
+        _GradientHeading(text: 'Your journey begins here', breathe: breathe),
+        const SizedBox(height: 6),
 
         // Description
         Text(
-          'When your partner joins, your shared reflection space will unlock just for the two of you.',
+          'Your shared space unlocks when they join.',
           style: TextStyle(
             fontFamily: 'Georgia',
-            fontSize: 14,
+            fontSize: 12.5,
             fontStyle: FontStyle.italic,
             color: const Color(0xFFD4C4CA).withValues(alpha: 0.75 + breathe * 0.10),
-            height: 1.6,
+            height: 1.45,
           ),
         ),
 
-        const SizedBox(height: 22),
+        const SizedBox(height: 12),
 
         // Waiting pill
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
             color: const Color(0xFF8A1C4A).withValues(alpha: 0.10 + breathe * 0.05),
             borderRadius: BorderRadius.circular(20),
@@ -352,16 +352,16 @@ class _UnconnectedHeroCardState extends State<UnconnectedHeroCard>
             children: [
               Icon(
                 Icons.favorite,
-                size: 14,
+                size: 13,
                 color: const Color(0xFFDD8F9F).withValues(alpha: 0.8 + breathe * 0.2),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Waiting for your partner',
                   style: TextStyle(
                     fontFamily: 'Georgia',
-                    fontSize: 13,
+                    fontSize: 12,
                     color: const Color(0xFFDD8F9F).withValues(alpha: 0.85),
                   ),
                 ),
@@ -372,11 +372,11 @@ class _UnconnectedHeroCardState extends State<UnconnectedHeroCard>
                 children: List.generate(3, (i) {
                   final dotFade = math.sin(
                     (dotsProgress * math.pi * 2) - (i * math.pi / 2),
-                  ).clamp(0.2, 1.0) as double;
+                  ).clamp(0.2, 1.0);
                   return Container(
                     margin: const EdgeInsets.only(left: 3),
-                    width: 4,
-                    height: 4,
+                    width: 3.5,
+                    height: 3.5,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: const Color(0xFFDD8F9F).withValues(alpha: dotFade * 0.9),
@@ -388,21 +388,21 @@ class _UnconnectedHeroCardState extends State<UnconnectedHeroCard>
           ),
         ),
 
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
 
         // "Invite sent" notice
         Row(
           children: [
             Icon(
               Icons.check_circle_outline_rounded,
-              size: 13,
+              size: 12,
               color: const Color(0xFF9E7E5A).withValues(alpha: 0.80),
             ),
-            const SizedBox(width: 7),
+            const SizedBox(width: 6),
             Text(
               'Invite sent successfully',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11.5,
                 color: const Color(0xFF9E7E5A).withValues(alpha: 0.80),
                 fontWeight: FontWeight.w500,
               ),
@@ -410,7 +410,7 @@ class _UnconnectedHeroCardState extends State<UnconnectedHeroCard>
           ],
         ),
 
-        const SizedBox(height: 22),
+        const SizedBox(height: 12),
 
         // Resend invite button
         _GlowButton(
@@ -508,11 +508,11 @@ class _GradientHeading extends StatelessWidget {
         text,
         style: const TextStyle(
           fontFamily: 'Georgia',
-          fontSize: 30,
+          fontSize: 21,
           fontWeight: FontWeight.bold,
           color: Colors.white,
           height: 1.15,
-          letterSpacing: -0.5,
+          letterSpacing: -0.3,
         ),
       ),
     );
@@ -639,20 +639,20 @@ class _TwoHeartsConnecting extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Hearts move toward each other as heartFloat increases
-    final separation = 38.0 - heartFloat * 16.0; // 38px apart → 22px apart
+    final separation = 26.0 - heartFloat * 10.0; // 26px apart → 16px apart
     final glowPulse = heartFloat > 0.75 ? (heartFloat - 0.75) / 0.25 : 0.0;
 
     return Center(
       child: SizedBox(
-        height: 72,
+        height: 50,
         child: Stack(
           alignment: Alignment.center,
           children: [
             // Central glow pulse when hearts are close
             if (glowPulse > 0)
               Container(
-                width: 60 * glowPulse,
-                height: 60 * glowPulse,
+                width: 44 * glowPulse,
+                height: 44 * glowPulse,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(colors: [
@@ -664,15 +664,15 @@ class _TwoHeartsConnecting extends StatelessWidget {
 
             // Dotted line between hearts
             CustomPaint(
-              size: const Size(160, 2),
+              size: const Size(120, 2),
               painter: _DottedLinePainter(breathe: breathe, heartFloat: heartFloat),
             ),
 
             // Left heart
             Transform.translate(
-              offset: Offset(-separation, math.sin(heartFloat * math.pi * 2) * 3),
+              offset: Offset(-separation, math.sin(heartFloat * math.pi * 2) * 2),
               child: _HeartIcon(
-                size: 28,
+                size: 22,
                 color: const Color(0xFFCA366C),
                 glowAlpha: 0.25 + breathe * 0.15 + glowPulse * 0.3,
               ),
@@ -680,9 +680,9 @@ class _TwoHeartsConnecting extends StatelessWidget {
 
             // Right heart
             Transform.translate(
-              offset: Offset(separation, -math.sin(heartFloat * math.pi * 2) * 3),
+              offset: Offset(separation, -math.sin(heartFloat * math.pi * 2) * 2),
               child: _HeartIcon(
-                size: 28,
+                size: 22,
                 color: const Color(0xFFE89FB8),
                 glowAlpha: 0.20 + breathe * 0.12 + glowPulse * 0.3,
               ),
@@ -765,69 +765,72 @@ class _FloatingEnvelope extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final floatY = math.sin(heartFloat * math.pi * 2) * 5.0;
+    final floatY = math.sin(heartFloat * math.pi * 2) * 4.0;
 
     return Center(
-      child: Transform.translate(
-        offset: Offset(0, floatY),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // Glow ring
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF8A1C4A).withValues(alpha: 0.20 + breathe * 0.15),
-                    blurRadius: 24,
-                    spreadRadius: 4,
-                  ),
-                ],
-              ),
-            ),
-            // Glass orb
-            ClipRRect(
-              borderRadius: BorderRadius.circular(28),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                child: Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF8A1C4A).withValues(alpha: 0.12 + breathe * 0.06),
-                    border: Border.all(
-                      color: const Color(0xFFDD8F9F).withValues(alpha: 0.22 + breathe * 0.10),
-                      width: 1,
+      child: SizedBox(
+        height: 50,
+        child: Transform.translate(
+          offset: Offset(0, floatY),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Glow ring
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF8A1C4A).withValues(alpha: 0.20 + breathe * 0.15),
+                      blurRadius: 18,
+                      spreadRadius: 2,
                     ),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      Icons.mail_outline_rounded,
-                      color: const Color(0xFFDD8F9F).withValues(alpha: 0.85 + breathe * 0.15),
-                      size: 26,
+                  ],
+                ),
+              ),
+              // Glass orb
+              ClipRRect(
+                borderRadius: BorderRadius.circular(21),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                  child: Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF8A1C4A).withValues(alpha: 0.12 + breathe * 0.06),
+                      border: Border.all(
+                        color: const Color(0xFFDD8F9F).withValues(alpha: 0.22 + breathe * 0.10),
+                        width: 1,
+                      ),
+                    ),
+                    child: Center(
+                      child: Icon(
+                        Icons.mail_outline_rounded,
+                        color: const Color(0xFFDD8F9F).withValues(alpha: 0.85 + breathe * 0.15),
+                        size: 20,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-            // Small floating heart
-            Positioned(
-              top: 0,
-              right: 0,
-              child: Transform.scale(
-                scale: 0.8 + breathe * 0.2,
-                child: const Icon(
-                  Icons.favorite,
-                  color: Color(0xFFDD8F9F),
-                  size: 14,
+              // Small floating heart
+              Positioned(
+                top: 0,
+                right: 4,
+                child: Transform.scale(
+                  scale: 0.8 + breathe * 0.2,
+                  child: const Icon(
+                    Icons.favorite,
+                    color: Color(0xFFDD8F9F),
+                    size: 11,
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

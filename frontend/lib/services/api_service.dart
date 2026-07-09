@@ -259,6 +259,65 @@ class ApiService {
     }
   }
 
+  /// Sends a poke gesture to the partner.
+  static Future<Map<String, dynamic>> sendPoke(String gesture) async {
+    try {
+      final token = await getToken();
+      final headers = {
+        'accept': 'application/json',
+        'Content-Type': 'application/json',
+      };
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+
+      final response = await http.post(
+        Uri.parse(ApiConfig.sendPoke),
+        headers: headers,
+        body: jsonEncode({'gesture': gesture}),
+      );
+
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return responseData;
+      } else {
+        throw Exception(responseData['detail'] ?? responseData['message'] ?? 'Failed to send poke');
+      }
+    } catch (e) {
+      throw Exception('Network error: ${e.toString()}');
+    }
+  }
+
+  /// Acknowledges a received poke.
+  static Future<Map<String, dynamic>> acknowledgePoke(int pokeId) async {
+    try {
+      final token = await getToken();
+      final headers = {
+        'accept': 'application/json',
+      };
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+
+      final response = await http.post(
+        Uri.parse(ApiConfig.acknowledgePoke(pokeId)),
+        headers: headers,
+      );
+
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return responseData;
+      } else {
+        throw Exception(responseData['detail'] ?? responseData['message'] ?? 'Failed to acknowledge poke');
+      }
+    } catch (e) {
+      throw Exception('Network error: ${e.toString()}');
+    }
+  }
+
+
   /// Joins a partner through their invite code.
   static Future<Map<String, dynamic>> joinPartner({
     required String code,
@@ -402,8 +461,11 @@ class ApiService {
         headers: headers,
       );
 
-      // Handle 404 case if there is no active separation
+      final prefs = await SharedPreferences.getInstance();
+
+      // 404 = no separation exists at all
       if (response.statusCode == 404) {
+        await prefs.remove('cached_active_separation');
         return null;
       }
 
@@ -411,7 +473,12 @@ class ApiService {
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final data = responseData['data'] ?? responseData;
-        final prefs = await SharedPreferences.getInstance();
+        // is_active == false means the separation was auto-completed or never existed
+        final bool isActive = data['is_active'] == true || data['isActive'] == true;
+        if (!isActive) {
+          await prefs.remove('cached_active_separation');
+          return null;
+        }
         await prefs.setString('cached_active_separation', jsonEncode(data));
         return data;
       } else {

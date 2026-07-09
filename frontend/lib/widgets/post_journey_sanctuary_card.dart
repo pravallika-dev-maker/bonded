@@ -5,10 +5,12 @@ import 'package:flutter/material.dart';
 /// Scenario 3 — Separation journey completed. Peaceful, reflective sanctuary.
 class PostJourneySanctuaryCard extends StatefulWidget {
   final String partnerName;
+  final VoidCallback? onInsightsTap;
 
   const PostJourneySanctuaryCard({
     super.key,
     required this.partnerName,
+    this.onInsightsTap,
   });
 
   @override
@@ -95,8 +97,8 @@ class _PostJourneySanctuaryCardState extends State<PostJourneySanctuaryCard>
           child: Transform.translate(
             offset: Offset(0, _slideAnim.value),
             child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
+                width: double.infinity,
+                decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(32),
                 boxShadow: [
                   BoxShadow(
@@ -169,8 +171,10 @@ class _PostJourneySanctuaryCardState extends State<PostJourneySanctuaryCard>
 
                     // ── Falling sparkles ──
                     Positioned.fill(
-                      child: CustomPaint(
-                        painter: _FallingSparklesPainter(drift: drift, breathe: breathe, pulse: pulse),
+                      child: IgnorePointer(
+                        child: CustomPaint(
+                          painter: _FallingSparklesPainter(drift: drift, breathe: breathe, pulse: pulse),
+                        ),
                       ),
                     ),
 
@@ -205,107 +209,180 @@ class _PostJourneySanctuaryCardState extends State<PostJourneySanctuaryCard>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
 
-                          // ── Badge ──
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF3D1627).withValues(alpha: 0.30),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: const Color(0xFFDD8F9F).withValues(alpha: 0.16 + breathe * 0.06),
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
+                          // ── Badge, Heart, Heading, Description, Partner Row ──
+                          // (wrapped in AbsorbPointer so taps here do nothing)
+                          AbsorbPointer(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Icon(
-                                  Icons.nights_stay_rounded,
-                                  size: 9,
-                                  color: const Color(0xFFDD8F9F).withValues(alpha: 0.9),
-                                ),
-                                const SizedBox(width: 6),
-                                const Text(
-                                  'POST-JOURNEY SANCTUARY',
-                                  style: TextStyle(
-                                    fontSize: 8.5,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.5,
-                                    color: Color(0xFFDD8F9F),
+                                // ── Badge ──
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF3D1627).withValues(alpha: 0.30),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(
+                                      color: const Color(0xFFDD8F9F).withValues(alpha: 0.16 + breathe * 0.06),
+                                      width: 1,
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.nights_stay_rounded,
+                                        size: 9,
+                                        color: const Color(0xFFDD8F9F).withValues(alpha: 0.9),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      const Text(
+                                        'POST-JOURNEY SANCTUARY',
+                                        style: TextStyle(
+                                          fontSize: 8.5,
+                                          fontWeight: FontWeight.bold,
+                                          letterSpacing: 1.5,
+                                          color: Color(0xFFDD8F9F),
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
+
+                                const SizedBox(height: 26),
+
+                                // ── Completed heart with glowing ring ──
+                                _CompletedHeartRing(breathe: breathe, pulse: pulse, ring: ring),
+
+                                const SizedBox(height: 26),
+
+                                // ── Heading ──
+                                ShaderMask(
+                                  shaderCallback: (bounds) => LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      Colors.white,
+                                      const Color(0xFFF5E8ED),
+                                      Color.lerp(const Color(0xFFDD8F9F), const Color(0xFFCCA060), breathe)!,
+                                    ],
+                                  ).createShader(bounds),
+                                  child: const Text(
+                                    'Congratulations!',
+                                    style: TextStyle(
+                                      fontFamily: 'Georgia',
+                                      fontSize: 30,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                      height: 1.1,
+                                      letterSpacing: -0.5,
+                                    ),
+                                  ),
+                                ),
+
+                                const SizedBox(height: 12),
+
+                                Text(
+                                  "This space is complete. Your sanctuary is always open.",
+                                  style: TextStyle(
+                                    fontFamily: 'Georgia',
+                                    fontSize: 14,
+                                    fontStyle: FontStyle.italic,
+                                    color: const Color(0xFFD4C4CA).withValues(alpha: 0.75 + breathe * 0.10),
+                                    height: 1.6,
+                                  ),
+                                ),
+
+                                const SizedBox(height: 20),
+
+                                // ── Partner attribution ──
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.favorite,
+                                      size: 12,
+                                      color: const Color(0xFFDD8F9F).withValues(alpha: 0.55 + pulse * 0.25),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'A space shared with ${widget.partnerName}',
+                                      style: TextStyle(
+                                        fontFamily: 'Georgia',
+                                        fontSize: 13,
+                                        fontStyle: FontStyle.italic,
+                                        color: const Color(0xFFDD8F9F).withValues(alpha: 0.65 + pulse * 0.15),
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ],
                             ),
                           ),
 
-                          const SizedBox(height: 26),
+                          const SizedBox(height: 24),
 
-                          // ── Completed heart with glowing ring ──
-                          _CompletedHeartRing(breathe: breathe, pulse: pulse, ring: ring),
-
-                          const SizedBox(height: 26),
-
-                          // ── Heading ──
-                          ShaderMask(
-                            shaderCallback: (bounds) => LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                Colors.white,
-                                const Color(0xFFF5E8ED),
-                                Color.lerp(const Color(0xFFDD8F9F), const Color(0xFFCCA060), breathe)!,
-                              ],
-                            ).createShader(bounds),
-                            child: const Text(
-                              'Congratulations!',
-                              style: TextStyle(
-                                fontFamily: 'Georgia',
-                                fontSize: 30,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                height: 1.1,
-                                letterSpacing: -0.5,
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 12),
-
-                          Text(
-                            "You've successfully completed this space. The sanctuary is open whenever you need it.",
-                            style: TextStyle(
-                              fontFamily: 'Georgia',
-                              fontSize: 14,
-                              fontStyle: FontStyle.italic,
-                              color: const Color(0xFFD4C4CA).withValues(alpha: 0.75 + breathe * 0.10),
-                              height: 1.6,
-                            ),
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // ── Partner attribution ──
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.favorite,
-                                size: 12,
-                                color: const Color(0xFFDD8F9F).withValues(alpha: 0.55 + pulse * 0.25),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'A space shared with ${widget.partnerName}',
-                                style: TextStyle(
-                                  fontFamily: 'Georgia',
-                                  fontSize: 13,
-                                  fontStyle: FontStyle.italic,
-                                  color: const Color(0xFFDD8F9F).withValues(alpha: 0.65 + pulse * 0.15),
-                                  letterSpacing: 0.3,
+                          // ── Insights CTA — ONLY tappable element ──
+                          GestureDetector(
+                            onTap: widget.onInsightsTap,
+                            behavior: HitTestBehavior.opaque,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    const Color(0xFFCCA060).withValues(alpha: 0.15 + breathe * 0.05),
+                                    const Color(0xFF8A2E55).withValues(alpha: 0.10),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: const Color(0xFFCCA060).withValues(alpha: 0.30 + breathe * 0.10),
+                                  width: 1,
                                 ),
                               ),
-                            ],
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.auto_awesome,
+                                        size: 16,
+                                        color: Color.lerp(
+                                          const Color(0xFFCCA060),
+                                          const Color(0xFFDD8F9F),
+                                          breathe,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                        'View Journey Insights',
+                                        style: TextStyle(
+                                          fontFamily: 'Georgia',
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color.lerp(
+                                            const Color(0xFFF5E8ED),
+                                            const Color(0xFFCCA060),
+                                            breathe * 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Icon(
+                                    Icons.arrow_forward_rounded,
+                                    size: 14,
+                                    color: const Color(0xFFCCA060).withValues(alpha: 0.8),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-
 
                         ],
                       ),

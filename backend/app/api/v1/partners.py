@@ -8,8 +8,9 @@ from ...models.relationship import Relationship
 from ...models.separation import Separation
 from ...models.letter import Letter
 from ...models.reflection_session import ReflectionSession
+from ...models.poke import Poke
 from ...services.ai_service import generate_relationship_summary
-from ...schemas.partner import InviteCodeResponse, JoinRequest, JoinResponse, PartnerMeResponse
+from ...schemas.partner import InviteCodeResponse, JoinRequest, JoinResponse, PartnerMeResponse, PokeRequest
 from ...services.notification_service import create_notification, create_notification_and_push
 from datetime import datetime, timedelta, timezone
 import secrets
@@ -280,3 +281,70 @@ async def disconnect_partner(current_user: User = Depends(get_current_user), db:
         db.rollback()
         logger.error(f"Database error in disconnect_partner: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An internal error occurred. Please try again.")
+
+@router.post("/poke")
+def send_poke(
+    request: PokeRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if not current_user.partner_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You do not have a partner connected"
+        )
+    
+    # Acknowledge older unacknowledged pokes from partner to current user to avoid pileups
+    db.query(Poke).filter(
+        Poke.sender_id == current_user.partner_id,
+        Poke.recipient_id == current_user.id,
+        Poke.is_acknowledged == False
+    ).update({"is_acknowledged": True})
+    
+    new_poke = Poke(
+        sender_id=current_user.id,
+        recipient_id=current_user.partner_id,
+        gesture=request.gesture,
+        is_acknowledged=False
+    )
+    db.add(new_poke)
+    db.commit()
+    db.refresh(new_poke)
+    
+    try:
+        partner = db.query(User).filter(User.id == current_user.partner_id).first()
+        if partner and partner.fcm_token:
+            create_notification_and_push(
+                db,
+                recipient_id=partner.id,
+                notification_type="poke",
+                title=f"{current_user.user_name or 'Your partner'} sent you a {request.gesture}! 💕",
+                body="Tap to view.",
+                fcm_token=partner.fcm_token
+            )
+    except Exception as e:
+        logger.error(f"Failed to send push for poke: {e}")
+        
+    return {"success": True, "poke_id": new_poke.id}
+
+@router.post("/poke/{poke_id}/acknowledge")
+def acknowledge_poke(
+    poke_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    poke = db.query(Poke).filter(
+        Poke.id == poke_id,
+        Poke.recipient_id == current_user.id
+    ).first()
+    
+    if not poke:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Poke not found or not sent to you"
+        )
+    
+    poke.is_acknowledged = True
+    db.commit()
+    return {"success": True}
+

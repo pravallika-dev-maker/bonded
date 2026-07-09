@@ -195,25 +195,64 @@ class _NotificationsScreenState extends State<NotificationsScreen> with TickerPr
                         onPressed: () async {
                           try {
                             await ApiService.markAllNotificationsAsRead();
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('All notifications marked as read'),
-                                  backgroundColor: Color(0xFF26181E),
-                                  duration: Duration(seconds: 2),
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: const [
+                                    Icon(Icons.check_circle, color: Color(0xFFFFF0F3), size: 18),
+                                    SizedBox(width: 12),
+                                    Text(
+                                      'All notifications marked as read',
+                                      style: TextStyle(
+                                        fontFamily: 'Georgia',
+                                        fontWeight: FontWeight.w600,
+                                        fontStyle: FontStyle.italic,
+                                        color: Color(0xFFFFF0F3),
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              );
-                              _fetchNotifications();
-                            }
+                                backgroundColor: const Color(0xFFBD386A), // Bright vibrant rose-pink
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                            _fetchNotifications();
                           } catch (e) {
-                            if (mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Failed to mark read: $e'),
-                                  backgroundColor: const Color(0xFF911746),
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Row(
+                                  children: [
+                                    const Icon(Icons.error_outline, color: Color(0xFFFFF0F3), size: 18),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        'Failed to mark read: $e',
+                                        style: const TextStyle(
+                                          fontFamily: 'Georgia',
+                                          fontWeight: FontWeight.w600,
+                                          fontStyle: FontStyle.italic,
+                                          color: Color(0xFFFFF0F3),
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              );
-                            }
+                                backgroundColor: const Color(0xFF781E43), // Burgundy red
+                                behavior: SnackBarBehavior.floating,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                duration: const Duration(seconds: 3),
+                              ),
+                            );
                           }
                         },
                         icon: const Icon(Icons.done_all, color: Color(0xFFDD8F9F)),
