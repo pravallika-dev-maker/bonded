@@ -1,6 +1,6 @@
 class ApiConfig {
-  // Use local backend for testing
-  static const String baseUrl = 'http://192.168.1.4:8000/api/v1';
+  // Use real server for production
+  static const String baseUrl = 'http://3.110.252.52:8001/api/v1';
 
   // Home Endpoints
   static const String homeHero = '$baseUrl/home/hero';

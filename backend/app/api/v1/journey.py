@@ -171,10 +171,14 @@ async def get_journey_score(
             "presenceProgress": 0.0,
         }
 
-    active_sep = db.query(Separation).filter(
+    active_sep_query = db.query(Separation).filter(
         (Separation.creator_id == current_user.id) | (Separation.partner_id == current_user.id),
         Separation.status == "active"
-    ).order_by(Separation.created_at.desc()).first()
+    )
+    if active_rel:
+        active_sep_query = active_sep_query.filter(Separation.relationship_id == active_rel.id)
+        
+    active_sep = active_sep_query.order_by(Separation.created_at.desc()).first()
 
     if not active_sep:
         return {

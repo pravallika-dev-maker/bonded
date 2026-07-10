@@ -411,6 +411,31 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   child: TextField(
                     controller: relDateCtrl,
+                    readOnly: true,
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: DateTime.now(),
+                        firstDate: DateTime(1900),
+                        lastDate: DateTime.now(),
+                        builder: (context, child) {
+                          return Theme(
+                            data: Theme.of(context).copyWith(
+                              colorScheme: const ColorScheme.dark(
+                                primary: Color(0xFFDD8F9F),
+                                onPrimary: Colors.white,
+                                surface: Color(0xFF160A0E),
+                                onSurface: Colors.white,
+                              ),
+                            ),
+                            child: child!,
+                          );
+                        },
+                      );
+                      if (picked != null) {
+                        relDateCtrl.text = "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+                      }
+                    },
                     style: const TextStyle(fontSize: 15, color: Colors.white),
                     decoration: const InputDecoration(
                       border: InputBorder.none,

@@ -35,7 +35,7 @@ async def get_home_hero(
 ):
     try:
         # ── Update presence timestamp ──
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.utcnow()
         current_user.last_active_at = now_utc
         try:
             db.commit()
@@ -68,21 +68,25 @@ async def get_home_hero(
                     partner_name = partner.user_name
 
             # ── Detect shared presence (both active within 90 seconds) ──
-            PRESENCE_WINDOW = timedelta(seconds=90)
+            PRESENCE_WINDOW = 90
             if partner and partner.last_active_at:
                 partner_active_at = partner.last_active_at
-                # Make timezone-aware if naive
-                if partner_active_at.tzinfo is None:
-                    partner_active_at = partner_active_at.replace(tzinfo=timezone.utc)
+                # Make naive if aware, so we can subtract naive from naive
+                if partner_active_at.tzinfo is not None:
+                    partner_active_at = partner_active_at.replace(tzinfo=None)
                 
-                time_diff = now_utc - partner_active_at
-                shared_presence = timedelta(seconds=0) <= time_diff <= PRESENCE_WINDOW
+                time_diff = (now_utc - partner_active_at).total_seconds()
+                shared_presence = 0 <= time_diff <= PRESENCE_WINDOW
 
         # Check for completed separation
-        completed_sep = db.query(Separation).filter(
+        completed_sep_query = db.query(Separation).filter(
             (Separation.creator_id == current_user.id) | (Separation.partner_id == current_user.id),
             Separation.status == "completed"
-        ).order_by(Separation.ended_at.desc()).first()
+        )
+        if active_rel:
+            completed_sep_query = completed_sep_query.filter(Separation.relationship_id == active_rel.id)
+            
+        completed_sep = completed_sep_query.order_by(Separation.ended_at.desc()).first()
         has_completed_separation = completed_sep is not None
 
         # Check for unacknowledged poke/gesture

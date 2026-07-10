@@ -122,6 +122,12 @@ def join_partner(request: JoinRequest, current_user: User = Depends(get_current_
         current_user.is_partnered = True
         creator.is_partnered = True
 
+        # Reset legacy caches for the new relationship
+        current_user.relationship_score = 0
+        creator.relationship_score = 0
+        current_user.has_acknowledged_completion = False
+        creator.has_acknowledged_completion = False
+
         # 7. Mark code is_used = True
         invite.is_used = True
         
@@ -255,6 +261,7 @@ async def disconnect_partner(current_user: User = Depends(get_current_user), db:
         current_user.partner_name = None
         current_user.relation_type = None
         current_user.relationship_date = None
+        current_user.relationship_score = 0
 
         if partner:
             # Clear all active partner fields for the other user too
@@ -263,6 +270,7 @@ async def disconnect_partner(current_user: User = Depends(get_current_user), db:
             partner.partner_name = None
             partner.relation_type = None
             partner.relationship_date = None
+            partner.relationship_score = 0
             
             create_notification_and_push(
                 db,

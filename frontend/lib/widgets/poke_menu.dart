@@ -433,14 +433,15 @@ class PokeMenu extends StatefulWidget {
   final Future<void> Function(String gesture) onSendPoke;
   final String? partnerName;
   final bool startExpanded;
+  final VoidCallback? onMenuClosed;
 
   static DateTime? lastSentTime;
-  static const Duration cooldownDuration = Duration(seconds: 30);
+  static const Duration cooldownDuration = Duration(seconds: 15);
 
   static int get cooldownRemaining {
     if (lastSentTime == null) return 0;
-    final diff = DateTime.now().difference(lastSentTime!);
-    final remaining = cooldownDuration.inSeconds - diff.inSeconds;
+    final elapsed = DateTime.now().difference(lastSentTime!).inSeconds;
+    final remaining = cooldownDuration.inSeconds - elapsed;
     return remaining > 0 ? remaining : 0;
   }
 
@@ -449,6 +450,7 @@ class PokeMenu extends StatefulWidget {
     required this.onSendPoke,
     this.partnerName,
     this.startExpanded = false,
+    this.onMenuClosed,
   });
 
   @override
@@ -503,8 +505,8 @@ class _PokeMenuState extends State<PokeMenu> {
     super.dispose();
   }
 
-  void _showOverlayDialog() {
-    showGeneralDialog(
+  Future<void> _showOverlayDialog() async {
+    await showGeneralDialog(
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Close Dialog',
@@ -530,6 +532,10 @@ class _PokeMenuState extends State<PokeMenu> {
         );
       },
     );
+    
+    if (widget.onMenuClosed != null && mounted) {
+      widget.onMenuClosed!();
+    }
   }
 
   Future<void> _handleSendGesture(String name) async {
@@ -893,19 +899,18 @@ class _PokeOverlayDialogState extends State<_PokeOverlayDialog> with SingleTicke
                               ),
                             ),
                           ),
-                          GestureDetector(
-                            onTap: () => Navigator.pop(context),
-                            child: Container(
-                              padding: const EdgeInsets.all(5),
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: const Color(0xFFDD8F9F).withValues(alpha: 0.10),
-                              ),
-                              child: Icon(
-                                Icons.close_rounded,
-                                size: 14,
-                                color: const Color(0xFFDD8F9F).withValues(alpha: 0.7),
-                              ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(context),
+                            iconSize: 18,
+                            padding: const EdgeInsets.all(8),
+                            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                            style: IconButton.styleFrom(
+                              backgroundColor: const Color(0xFFDD8F9F).withValues(alpha: 0.10),
+                              shape: const CircleBorder(),
+                            ),
+                            icon: Icon(
+                              Icons.close_rounded,
+                              color: const Color(0xFFDD8F9F).withValues(alpha: 0.7),
                             ),
                           ),
                         ],

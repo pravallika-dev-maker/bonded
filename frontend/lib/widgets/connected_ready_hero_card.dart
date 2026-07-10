@@ -458,6 +458,13 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
                               onSendPoke: _handleSendPoke,
                               partnerName: widget.partnerName,
                               startExpanded: _forceOpenPokeMenu,
+                              onMenuClosed: () {
+                                if (mounted) {
+                                  setState(() {
+                                    _forceOpenPokeMenu = false;
+                                  });
+                                }
+                              },
                             ),
 
                           const SizedBox(height: 16),
