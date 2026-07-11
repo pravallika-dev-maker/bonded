@@ -230,26 +230,6 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
                       ),
                     ),
 
-                    // ── Poke Custom Animation ──
-                    if (widget.latestPoke != null && _playReceiveAnim)
-                      Positioned.fill(
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            return InteractionAnimator(
-                              gesture: widget.latestPoke!['gesture'] ?? 'Love',
-                              color: getGestureColor(widget.latestPoke!['gesture'] ?? 'Love'),
-                              center: Offset(constraints.maxWidth / 2, constraints.maxHeight / 2),
-                              onComplete: () {
-                                if (mounted) {
-                                  setState(() {
-                                    _playReceiveAnim = false;
-                                  });
-                                }
-                              },
-                            );
-                          }
-                        ),
-                      ),
                     
                     // ── Receiving Dim Overlay ──
                     if (widget.latestPoke != null)

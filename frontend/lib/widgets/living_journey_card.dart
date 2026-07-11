@@ -264,27 +264,7 @@ class _LivingJourneyCardState extends State<LivingJourneyCard>
                       ),
                     ),
 
-                    // ── POKE CUSTOM ANIMATION ──
-                    if (widget.latestPoke != null && _playReceiveAnim)
-                      Positioned.fill(
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            return InteractionAnimator(
-                              gesture: widget.latestPoke!['gesture'] ?? 'Love',
-                              color: getGestureColor(widget.latestPoke!['gesture'] ?? 'Love'),
-                              center: Offset(constraints.maxWidth / 2, constraints.maxHeight / 2),
-                              onComplete: () {
-                                if (mounted) {
-                                  setState(() {
-                                    _playReceiveAnim = false;
-                                  });
-                                }
-                              },
-                            );
-                          }
-                        ),
-                      ),
-                      
+
                     // ── RECEIVING DIM OVERLAY ──
                     if (widget.latestPoke != null)
                       Positioned.fill(
@@ -1074,6 +1054,27 @@ class _LivingJourneyCardState extends State<LivingJourneyCard>
                       ),
                       ),
                     ),
+
+                    // ── POKE CUSTOM ANIMATION (Rendered ON TOP of content) ──
+                    if (widget.latestPoke != null && _playReceiveAnim)
+                      Positioned.fill(
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            return InteractionAnimator(
+                              gesture: widget.latestPoke!['gesture'] ?? 'Love',
+                              color: getGestureColor(widget.latestPoke!['gesture'] ?? 'Love'),
+                              center: Offset(constraints.maxWidth / 2, constraints.maxHeight / 2),
+                              onComplete: () {
+                                if (mounted) {
+                                  setState(() {
+                                    _playReceiveAnim = false;
+                                  });
+                                }
+                              },
+                            );
+                          }
+                        ),
+                      ),
 
                     // ── GLASS BORDER HIGHLIGHT ──
                     Positioned.fill(

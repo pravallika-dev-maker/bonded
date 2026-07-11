@@ -341,16 +341,21 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
         }
       }
 
-      // ── Partner name from Home Hero or cached — and fall back to widget.partnerName
-      // if all else fails (e.g. they just entered it during solo separation creation).
+      // ── Prefer local onboarding partner name first ──
+      if (cachedPartnerName != null && cachedPartnerName.trim().isNotEmpty && cachedPartnerName.toLowerCase() != 'partner') {
+        _partnerName ??= cachedPartnerName;
+      }
+
+      // ── Fall back to Home Hero or Widget if still null ──
       _partnerName ??= homeHero?['partner_name'] ?? homeHero?['partnerName'] ??
           sep?['partner_name'] ?? sep?['partnerName'] ??
           cachedPartnerName ?? widget.partnerName;
           
-      // If all API sources returned null (e.g. after disconnect) explicitly clear name.
+      // If all API sources returned null (e.g. after disconnect) or 'null', explicitly clear name.
       if (_partnerName == null || _partnerName!.trim().isEmpty || _partnerName == 'null') {
         _partnerName = null;
       }
+
 
       // Helper function to extract days from durationLabel to fix hardcoded values
       int _extractDaysFromLabel(String label) {
