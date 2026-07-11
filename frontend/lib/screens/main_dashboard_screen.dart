@@ -341,9 +341,9 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
         }
       }
 
-      // ── Prefer local onboarding partner name first ──
+      // ── Prefer local onboarding partner name first (OVERRIDE profile/API data) ──
       if (cachedPartnerName != null && cachedPartnerName.trim().isNotEmpty && cachedPartnerName.toLowerCase() != 'partner') {
-        _partnerName ??= cachedPartnerName;
+        _partnerName = cachedPartnerName;
       }
 
       // ── Fall back to Home Hero or Widget if still null ──
@@ -351,8 +351,8 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
           sep?['partner_name'] ?? sep?['partnerName'] ??
           cachedPartnerName ?? widget.partnerName;
           
-      // If all API sources returned null (e.g. after disconnect) or 'null', explicitly clear name.
-      if (_partnerName == null || _partnerName!.trim().isEmpty || _partnerName == 'null') {
+      // If all sources returned null, 'null', or literally just 'partner', explicitly clear it.
+      if (_partnerName == null || _partnerName!.trim().isEmpty || _partnerName == 'null' || _partnerName!.toLowerCase() == 'partner') {
         _partnerName = null;
       }
 
