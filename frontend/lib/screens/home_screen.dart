@@ -8,6 +8,7 @@ import '../widgets/premium_sheen.dart';
 import '../widgets/primary_cta_button.dart';
 import '../services/api_service.dart';
 import 'main_dashboard_screen.dart';
+import 'join_partner_name_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String userName;
@@ -28,6 +29,7 @@ class _HomeScreenState extends State<HomeScreen>
   late String _partnerName;
   late AnimationController _entryController;
   bool _isLoading = true;
+  Timer? _pollingTimer;
   
   late Animation<double> _bgFade;
   late Animation<double> _glowScale;
@@ -44,6 +46,13 @@ class _HomeScreenState extends State<HomeScreen>
     _partnerName = widget.partnerName;
     WidgetsBinding.instance.addObserver(this);
     _checkConnectionStatus();
+    
+    // Poll every 5 seconds to see if partner joined
+    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted && !_isLoading) {
+        _checkConnectionStatus();
+      }
+    });
     
     _entryController = AnimationController(
       vsync: this,
@@ -102,6 +111,7 @@ class _HomeScreenState extends State<HomeScreen>
 
   @override
   void dispose() {
+    _pollingTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _entryController.dispose();
     super.dispose();
@@ -167,14 +177,38 @@ class _HomeScreenState extends State<HomeScreen>
         }
 
         if (isPartnerConnected) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => MainDashboardScreen(
-                userName: _userName,
-                partnerName: _partnerName,
+          _pollingTimer?.cancel();
+          if (_partnerName.trim().isEmpty || _partnerName == 'Partner') {
+            // Need to name the partner, navigate to JoinPartnerNameScreen which will
+            // pop back to MainDashboardScreen.
+            // We push MainDashboardScreen first so it's the root.
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => MainDashboardScreen(
+                  userName: _userName,
+                  partnerName: _partnerName,
+                ),
               ),
-            ),
-          );
+            );
+            // Then push the name prompt on top.
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => JoinPartnerNameScreen(
+                  userName: _userName,
+                  fromDashboard: true,
+                ),
+              ),
+            );
+          } else {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => MainDashboardScreen(
+                  userName: _userName,
+                  partnerName: _partnerName,
+                ),
+              ),
+            );
+          }
         } else {
           setState(() {
             _isLoading = false;
