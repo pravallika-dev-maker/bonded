@@ -6,6 +6,7 @@ import 'join_with_code_screen.dart';
 import 'promise_screen.dart';
 import 'home_screen.dart';
 import '../services/api_service.dart';
+import 'join_partner_name_screen.dart';
 
 class PartnerInviteScreen extends StatefulWidget {
   final String userName;
@@ -106,31 +107,18 @@ class _PartnerInviteScreenState extends State<PartnerInviteScreen> with TickerPr
     await Future.delayed(const Duration(milliseconds: 1500));
     if (!mounted) return;
 
-    if (widget.fromDashboard) {
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          transitionDuration: const Duration(milliseconds: 600),
-          pageBuilder: (_, __, ___) => HomeScreen(
-            userName: widget.userName,
-            partnerName: widget.partnerName,
-          ),
-          transitionsBuilder: (_, anim, __, child) =>
-              FadeTransition(opacity: anim, child: child),
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        transitionDuration: const Duration(milliseconds: 600),
+        pageBuilder: (_, __, ___) => JoinPartnerNameScreen(
+          userName: widget.userName,
+          fromDashboard: widget.fromDashboard,
+          isBondCreated: false,
         ),
-      );
-    } else {
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          transitionDuration: const Duration(milliseconds: 600),
-          pageBuilder: (_, __, ___) => PromiseScreen(
-            userName: widget.userName,
-            partnerName: widget.partnerName,
-          ),
-          transitionsBuilder: (_, anim, __, child) =>
-              FadeTransition(opacity: anim, child: child),
-        ),
-      );
-    }
+        transitionsBuilder: (_, anim, __, child) =>
+            FadeTransition(opacity: anim, child: child),
+      ),
+    );
   }
 
   @override

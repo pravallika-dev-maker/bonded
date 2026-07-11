@@ -7,13 +7,15 @@ import 'promise_screen.dart';
 import '../services/app_event_bus.dart';
 
 class JoinPartnerNameScreen extends StatefulWidget {
-  final String? userName;
+  final String userName;
   final bool fromDashboard;
+  final bool isBondCreated;
   
   const JoinPartnerNameScreen({
     super.key, 
-    this.userName, 
+    required this.userName, 
     this.fromDashboard = false,
+    this.isBondCreated = true,
   });
 
   @override
@@ -155,7 +157,7 @@ class _JoinPartnerNameScreenState extends State<JoinPartnerNameScreen> {
                             
                             // ── Top Label ──
                             Text(
-                              'BOND CREATED',
+                              widget.isBondCreated ? 'BOND CREATED' : 'NAME YOUR PARTNER',
                               style: TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
