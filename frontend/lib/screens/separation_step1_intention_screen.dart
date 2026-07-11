@@ -49,7 +49,7 @@ class _SeparationStep1IntentionScreenState extends State<SeparationStep1Intentio
             _partnerName = backendPartnerName;
           }
           _isLoading = false;
-          if (_partnerName == null || _partnerName!.isEmpty) {
+          if ((_partnerName == null || _partnerName!.isEmpty) && !_isPartnerConnected) {
             _selectedOption = 2;
           }
         });
@@ -65,11 +65,12 @@ class _SeparationStep1IntentionScreenState extends State<SeparationStep1Intentio
   }
 
   Future<void> _submit() async {
-    if (_selectedOption == 1 && _partnerName != null && _partnerName!.isNotEmpty) {
+    if (_selectedOption == 1 && (_isPartnerConnected || (_partnerName != null && _partnerName!.isNotEmpty))) {
+      final nameToPass = (_partnerName != null && _partnerName!.isNotEmpty) ? _partnerName! : 'Your partner';
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => NewSeparationScreen(partnerName: _partnerName!),
+          builder: (context) => NewSeparationScreen(partnerName: nameToPass),
         ),
       );
     } else if (_selectedOption == 2) {
@@ -296,7 +297,7 @@ class _SeparationStep1IntentionScreenState extends State<SeparationStep1Intentio
                       const SizedBox(height: 32),
 
                       // ── Option 1: Partner ──
-                      if (_partnerName != null && _partnerName!.isNotEmpty) ...[
+                      if (_isPartnerConnected || (_partnerName != null && _partnerName!.isNotEmpty)) ...[
                         GestureDetector(
                         onTap: () => setState(() => _selectedOption = 1),
                         child: AnimatedContainer(
@@ -330,7 +331,7 @@ class _SeparationStep1IntentionScreenState extends State<SeparationStep1Intentio
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      _partnerName ?? '',
+                                      (_partnerName != null && _partnerName!.isNotEmpty) ? _partnerName! : 'Your partner',
                                       style: const TextStyle(
                                         fontFamily: 'Georgia',
                                         fontSize: 18,
