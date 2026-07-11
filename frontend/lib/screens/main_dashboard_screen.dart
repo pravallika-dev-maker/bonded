@@ -342,7 +342,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
       }
 
       // ── Prefer local onboarding partner name first (OVERRIDE profile/API data) ──
-      if (cachedPartnerName != null && cachedPartnerName.trim().isNotEmpty && cachedPartnerName.toLowerCase() != 'partner') {
+      if (cachedPartnerName != null && cachedPartnerName.trim().isNotEmpty) {
         _partnerName = cachedPartnerName;
       }
 
@@ -351,8 +351,8 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
           sep?['partner_name'] ?? sep?['partnerName'] ??
           cachedPartnerName ?? widget.partnerName;
           
-      // If all sources returned null, 'null', or literally just 'partner', explicitly clear it.
-      if (_partnerName == null || _partnerName!.trim().isEmpty || _partnerName == 'null' || _partnerName!.toLowerCase() == 'partner') {
+      // If all sources returned null or 'null', explicitly clear it.
+      if (_partnerName == null || _partnerName!.trim().isEmpty || _partnerName == 'null') {
         _partnerName = null;
       }
 
