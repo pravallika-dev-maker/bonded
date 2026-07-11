@@ -46,7 +46,7 @@ async def _trigger_mood_notifications(user_id: int, partner_id: int, new_mood_id
                     recipient_id=partner_id,
                     notification_type="partner_mood",
                     title="Mood Check-In",
-                    body="🌱 Your partner checked in with their feelings today.",
+                    body=f"🌱 {partner.partner_name or user.user_name or 'Your partner'} checked in with their feelings today.",
                     fcm_token=partner.fcm_token
                 )
                 

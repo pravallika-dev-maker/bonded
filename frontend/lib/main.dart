@@ -6,6 +6,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'screens/onboarding_flow_screen.dart';
 import 'services/local_notification_service.dart';
+import 'services/app_event_bus.dart';
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -32,6 +33,7 @@ Future<void> main() async {
         debugPrint("🔥 [FCM FOREGROUND] Notification: title=${message.notification?.title}, body=${message.notification?.body}");
         debugPrint("🔥 [FCM FOREGROUND] Data: ${message.data}");
         LocalNotificationService.instance.showFromRemoteMessage(message);
+        AppEventBus().emit(AppEvent.heroDataChanged);
       });
 
       // ── Handle when user taps notification from tray ──

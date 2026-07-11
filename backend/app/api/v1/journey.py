@@ -213,7 +213,7 @@ async def get_journey_score(
     if current_user.partner_id:
         partner = db.query(User).filter(User.id == current_user.partner_id).first()
         if partner:
-            partner_name = current_user.partner_name or partner.user_name
+            partner_name = current_user.partner_name
             old_partner_score = partner.relationship_score or 0
             partner_score = calculate_user_score(db, partner, active_rel, active_sep)
             partner.relationship_score = partner_score
@@ -347,7 +347,7 @@ async def get_journey_insights(
             "insights": None
         }
     partner = db.query(User).filter(User.id == partner_user_id).first()
-    partner_name = current_user.partner_name or (partner.user_name if (partner and partner.user_name) else "Partner")
+    partner_name = current_user.partner_name or "Partner"
 
     # Count shared completed reflection days for this specific separation
     shared_days_query = db.query(ReflectionSession.day_number).filter(

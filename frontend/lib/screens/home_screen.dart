@@ -116,13 +116,16 @@ class _HomeScreenState extends State<HomeScreen>
 
   Future<void> _checkConnectionStatus() async {
     try {
-      final response = await ApiService.getUserMe();
-      final profile = response['data'] ?? response;
+      final results = await Future.wait([
+        ApiService.getUserMe(),
+        ApiService.getHomeHero().catchError((_) => null),
+        ApiService.getActiveSeparation().catchError((_) => null),
+      ]);
 
-      Map<String, dynamic>? heroResponse;
-      try {
-        heroResponse = await ApiService.getHomeHero();
-      } catch (_) {}
+      final response = results[0] as dynamic;
+      final profile = response['data'] ?? response;
+      final heroResponse = results[1] as Map<String, dynamic>?;
+      final activeSep = results[2] as Map<String, dynamic>?;
 
       if (mounted) {
         setState(() {
@@ -142,13 +145,10 @@ class _HomeScreenState extends State<HomeScreen>
         }
         
         // If they started a solo separation, they should also go to the dashboard
-        if (!isPartnerConnected) {
-          try {
-            final activeSep = await ApiService.getActiveSeparation().catchError((_) => null);
-            if (activeSep != null && (activeSep['is_active'] == true || activeSep['isActive'] == true || activeSep['status'] == 'active')) {
-              isPartnerConnected = true; // Force navigation to main dashboard
-            }
-          } catch (_) {}
+        if (!isPartnerConnected && activeSep != null) {
+          if (activeSep['is_active'] == true || activeSep['isActive'] == true || activeSep['status'] == 'active') {
+            isPartnerConnected = true; // Force navigation to main dashboard
+          }
         }
         
         // Always also check from profile as a fallback
@@ -159,13 +159,10 @@ class _HomeScreenState extends State<HomeScreen>
               profile['partner_connected'] == true ||
               (profile['partner'] != null && profile['partner'] is Map);
               
-          if (!isPartnerConnected) {
-            try {
-              final activeSep = await ApiService.getActiveSeparation().catchError((_) => null);
-              if (activeSep != null && (activeSep['is_active'] == true || activeSep['isActive'] == true || activeSep['status'] == 'active')) {
-                isPartnerConnected = true;
-              }
-            } catch (_) {}
+          if (!isPartnerConnected && activeSep != null) {
+            if (activeSep['is_active'] == true || activeSep['isActive'] == true || activeSep['status'] == 'active') {
+              isPartnerConnected = true;
+            }
           }
         }
 

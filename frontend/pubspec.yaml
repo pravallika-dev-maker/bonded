@@ -49,6 +49,7 @@ dependencies:
   webview_flutter_web: ^0.2.3+4
   visibility_detector: ^0.4.0+2
   google_fonts: ^8.1.0
+  font_awesome_flutter: ^11.0.0
 
 dev_dependencies:
   flutter_test:

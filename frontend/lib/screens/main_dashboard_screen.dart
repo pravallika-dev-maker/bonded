@@ -134,6 +134,20 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
       if (!mounted) return;
       if (event == AppEvent.partnerDisconnected) {
         _localIsWaitingForPartner = false;
+        _latestPoke = null; // Clear old interactions
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.remove('cached_active_separation');
+          prefs.remove('cached_home_hero');
+        });
+      } else if (event == AppEvent.partnerConnected) {
+        _latestPoke = null; // Clean state for new partner
+        SharedPreferences.getInstance().then((prefs) {
+          prefs.remove('cached_active_separation');
+          prefs.remove('cached_home_hero');
+        });
+      } else if (event == AppEvent.notificationsRead) {
+        // Optimistically set to 0 if we want, or just wait for fetch
+        _unreadCount = 0;
       }
       _fetchDashboardData();
     });
@@ -141,60 +155,17 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
 
   Future<void> _loadCachedDashboardData() async {
     final prefs = await SharedPreferences.getInstance();
-    final cachedHeroStr = prefs.getString('cached_home_hero');
-    final cachedSepStr = prefs.getString('cached_active_separation');
     // Restore acknowledged state immediately — prevents flash of wrong card
     final cachedAcknowledged = prefs.getBool('cached_has_acknowledged_completion') ?? false;
 
     if (!mounted) return;
 
-    if (cachedHeroStr != null || cachedSepStr != null) {
-      setState(() {
-        Map<String, dynamic>? homeHero;
-        Map<String, dynamic>? sep;
-        try { if (cachedHeroStr != null) homeHero = jsonDecode(cachedHeroStr); } catch(_) {}
-        try { if (cachedSepStr != null) sep = jsonDecode(cachedSepStr); } catch(_) {}
-
-        if (homeHero != null) {
-          _partnerName = homeHero['partner_name'] ?? homeHero['partnerName'];
-          _moodPhrase = homeHero['comfort_message']?.toString() ?? homeHero['comfortMessage']?.toString();
-          _totalDays = homeHero['total_duration_days'] ?? homeHero['totalDurationDays'];
-          _currentDay = homeHero['current_day'] ?? homeHero['currentDay'] ?? 1;
-          _isPartnerConnected = homeHero['partner_connected'] == true || homeHero['partnerConnected'] == true;
-          _isMissedDayFlow = homeHero['is_missed_day_flow'] == true || homeHero['isMissedDayFlow'] == true;
-          _hasCompletedSeparation = homeHero['has_completed_separation'] == true || homeHero['hasCompletedSeparation'] == true;
-          _userReflectionsCompleted = homeHero['user_reflections_completed'] == true || homeHero['userReflectionsCompleted'] == true;
-          _partnerReflectionsCompleted = homeHero['partner_reflections_completed'] == true || homeHero['partnerReflectionsCompleted'] == true;
-          _isHeroEmpty = false;
-        }
-
-        if (sep != null) {
-          _activeSeparation = sep;
-          _partnerName ??= sep['partner_name'] ?? sep['partnerName'];
-          if (_totalDays == null) {
-            final label = sep['duration_label']?.toString() ?? '';
-            final match = RegExp(r'(\d+)').firstMatch(label.toLowerCase());
-            if (match != null) {
-               int val = int.tryParse(match.group(1)!) ?? 21;
-               if (label.toLowerCase().contains('week')) val *= 7;
-               if (label.toLowerCase().contains('month')) val *= 30;
-               _totalDays = val;
-            } else {
-               _totalDays = 21;
-            }
-          }
-          if (_currentDay == null) {
-             final rawElapsed = sep['days_elapsed'] ?? sep['day'];
-             _currentDay = rawElapsed is int ? rawElapsed : int.tryParse(rawElapsed?.toString() ?? '') ?? 1;
-          }
-          _isHeroEmpty = false;
-        }
-
-        // Restore acknowledgement from cache — correct card shown on first frame
-        _hasAcknowledgedCompletion = cachedAcknowledged;
-        _isLoadingSeparation = false;
-      });
-    }
+    setState(() {
+      // Restore acknowledgement from cache — correct card shown on first frame
+      _hasAcknowledgedCompletion = cachedAcknowledged;
+      // Do NOT set _isLoadingSeparation to false here.
+      // It remains true until _fetchDashboardData() resolves to prevent flashing stale UI.
+    });
   }
 
   Future<void> _acknowledgeCompletion() async {
@@ -262,6 +233,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
         if (!_isPartnerConnected && partnerConnected) {
           // Partner just connected — do a full refresh and bail
           _isPartnerConnected = partnerConnected;
+          _latestPoke = null; // Clear old interactions
           _fetchDashboardData();
           return;
         }
@@ -269,6 +241,7 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
           // Partner just disconnected — do a full refresh and bail
           _localIsWaitingForPartner = false;
           _isPartnerConnected = partnerConnected;
+          _latestPoke = null; // Clear old interactions
           _fetchDashboardData();
           return;
         }

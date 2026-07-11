@@ -185,7 +185,7 @@ def create_separation(
             recipient_id=current_user.partner_id, 
             notification_type="separation_started", 
             title="🌿 Space has begun", 
-            body=f"{current_user.user_name or 'Your partner'} started a separation.",
+            body=f"{partner.partner_name or current_user.user_name or 'Your partner'} started a separation.",
             fcm_token=partner.fcm_token if partner else None
         )
         
@@ -193,7 +193,7 @@ def create_separation(
     if current_user.partner_id:
         partner = db.query(User).filter(User.id == current_user.partner_id).first()
         if partner:
-            partner_name = current_user.partner_name or partner.user_name
+            partner_name = current_user.partner_name
             
     # Convert to response — day 1 is the start date itself (1-based, same as reflections)
     new_sep.days_elapsed = (date.today() - new_sep.start_date).days + 1
@@ -226,8 +226,7 @@ def get_active_separation(
     other_user_id = sep.partner_id if sep.creator_id == current_user.id else sep.creator_id
     if other_user_id:
         other_user = db.query(User).filter(User.id == other_user_id).first()
-        if other_user and other_user.user_name and not partner_name:
-            partner_name = other_user.user_name
+        pass
             
     return ActiveSeparationResponse(
         is_active=True,

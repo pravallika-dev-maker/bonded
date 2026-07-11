@@ -1201,6 +1201,30 @@ class ApiService {
     }
   }
 
+  /// Marks a specific notification as read.
+  static Future<void> markNotificationAsRead(int notifId) async {
+    try {
+      final token = await getToken();
+      final headers = {
+        'accept': 'application/json',
+      };
+      if (token != null) {
+        headers['Authorization'] = 'Bearer $token';
+      }
+      final response = await http.patch(
+        Uri.parse('${ApiConfig.notifications}$notifId/read'),
+        headers: headers,
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return;
+      } else {
+        throw Exception('Failed to mark notification as read');
+      }
+    } catch (e) {
+      throw Exception('Network error: ${e.toString()}');
+    }
+  }
+
   // ────────────────────────────────────────────────────────────────────────────
   // Affirmations Endpoints
   // ────────────────────────────────────────────────────────────────────────────

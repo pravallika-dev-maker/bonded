@@ -3,8 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'premium_sheen.dart';
 import 'poke_menu.dart';
-import 'poke_particles.dart';
-
+import 'interaction_animator.dart';
 class LivingJourneyCard extends StatefulWidget {
   final int currentDay;
   final int totalDays;
@@ -61,12 +60,27 @@ class _LivingJourneyCardState extends State<LivingJourneyCard>
   late AnimationController _tapController;
   late Animation<double> _tapScale;
 
-  final PokeParticlesController _particlesController = PokeParticlesController();
+  late AnimationController _receiveAnimCtrl;
+  late Animation<double> _receiveScale;
+  late Animation<double> _receiveDim;
+
   bool _forceOpenPokeMenu = false;
+  bool _playReceiveAnim = false;
 
   @override
   void initState() {
     super.initState();
+
+    _receiveAnimCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+    _receiveScale = Tween<double>(begin: 0.95, end: 1.0).animate(
+      CurvedAnimation(parent: _receiveAnimCtrl, curve: Curves.easeOutCubic),
+    );
+    _receiveDim = Tween<double>(begin: 0.1, end: 0.0).animate(
+      CurvedAnimation(parent: _receiveAnimCtrl, curve: const Interval(0.0, 0.5, curve: Curves.easeOut)),
+    );
 
     _breatheController = AnimationController(
       vsync: this,
@@ -100,8 +114,9 @@ class _LivingJourneyCardState extends State<LivingJourneyCard>
         (oldWidget.latestPoke == null ||
          widget.latestPoke!['id'] != oldWidget.latestPoke!['id']);
     if (hasNewPoke) {
-      _particlesController.spawn(widget.latestPoke!['gesture'] ?? 'Love');
+      _receiveAnimCtrl.forward(from: 0.0);
       setState(() {
+        _playReceiveAnim = true;
         _forceOpenPokeMenu = false;
       });
     }
@@ -112,12 +127,11 @@ class _LivingJourneyCardState extends State<LivingJourneyCard>
     _breatheController.dispose();
     _driftController.dispose();
     _tapController.dispose();
-    _particlesController.dispose();
+    _receiveAnimCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _handleSendPoke(String gesture) async {
-    _particlesController.spawn(gesture);
     if (widget.onSendPoke != null) {
       await widget.onSendPoke!(gesture);
     }
@@ -136,11 +150,17 @@ class _LivingJourneyCardState extends State<LivingJourneyCard>
           final drift = _driftController.value; // 0..1
 
           return Transform.scale(
-            scale: _tapScale.value,
+            scale: _tapScale.value * (widget.latestPoke != null ? _receiveScale.value : 1.0),
             child: Container(
               width: double.infinity,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(36),
+                border: widget.latestPoke != null
+                    ? Border.all(
+                        color: const Color(0xFFFFD76A).withValues(alpha: 0.2 + breathe * 0.4),
+                        width: 1.2,
+                      )
+                    : null,
                 boxShadow: [
                   // Deep rose glow — breathes
                   BoxShadow(
@@ -158,11 +178,12 @@ class _LivingJourneyCardState extends State<LivingJourneyCard>
                     spreadRadius: 4,
                     offset: const Offset(0, 24),
                   ),
+                  // Subtle gold outer glow on poke
                   if (widget.latestPoke != null)
                     BoxShadow(
-                      color: const Color(0xFFDD8F9F).withValues(alpha: 0.25 + 0.15 * math.sin(breathe * math.pi)),
-                      blurRadius: 24 + 12 * math.sin(breathe * math.pi),
-                      spreadRadius: 2 + 2 * math.sin(breathe * math.pi),
+                      color: const Color(0xFFFFD76A).withValues(alpha: 0.08 + breathe * 0.08),
+                      blurRadius: 24,
+                      spreadRadius: 1,
                     ),
                 ],
               ),
@@ -185,6 +206,13 @@ class _LivingJourneyCardState extends State<LivingJourneyCard>
                         ),
                       ),
                     ),
+
+                    if (widget.latestPoke != null)
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: _PremiumSparklePainter(breathe: breathe),
+                        ),
+                      ),
 
                     // ── TOP-LEFT ROSE AURORA ──
                     Positioned(
@@ -236,12 +264,36 @@ class _LivingJourneyCardState extends State<LivingJourneyCard>
                       ),
                     ),
 
-                    // ── POKE PARTICLES ──
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        child: PokeParticlesWidget(controller: _particlesController),
+                    // ── POKE CUSTOM ANIMATION ──
+                    if (widget.latestPoke != null && _playReceiveAnim)
+                      Positioned.fill(
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            return InteractionAnimator(
+                              gesture: widget.latestPoke!['gesture'] ?? 'Love',
+                              color: getGestureColor(widget.latestPoke!['gesture'] ?? 'Love'),
+                              center: Offset(constraints.maxWidth / 2, constraints.maxHeight / 2),
+                              onComplete: () {
+                                if (mounted) {
+                                  setState(() {
+                                    _playReceiveAnim = false;
+                                  });
+                                }
+                              },
+                            );
+                          }
+                        ),
                       ),
-                    ),
+                      
+                    // ── RECEIVING DIM OVERLAY ──
+                    if (widget.latestPoke != null)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: Container(
+                            color: Colors.black.withValues(alpha: _receiveDim.value),
+                          ),
+                        ),
+                      ),
 
                     // ── MAIN CONTENT ──
                     PremiumSheen(
@@ -884,23 +936,27 @@ class _LivingJourneyCardState extends State<LivingJourneyCard>
                             if (widget.latestPoke != null)
                               // Received gesture view
                               Center(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF8A2E55).withValues(alpha: 0.12),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(
-                                      color: const Color(0xFFDD8F9F).withValues(alpha: 0.22),
-                                      width: 1,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: const Color(0xFFDD8F9F).withValues(alpha: 0.05),
-                                        blurRadius: 10,
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    // Sparkles
+                                    Positioned.fill(
+                                      child: CustomPaint(
+                                        painter: _PremiumSparklePainter(breathe: breathe),
                                       ),
-                                    ],
-                                  ),
-                                  child: Row(
+                                    ),
+                                    // Inner Card
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF150B0E), // Very dark, elegant background
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: const Color(0xFF2A161E), // Subtle dark outline, no glow
+                                          width: 1.0,
+                                        ),
+                                      ),
+                                      child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       // Pulsing Heart / Sparkle Icon
@@ -997,8 +1053,10 @@ class _LivingJourneyCardState extends State<LivingJourneyCard>
                                     ],
                                   ),
                                 ),
-                              )
-                            else if (widget.onSendPoke != null)
+                              ]
+                            ),
+                          )
+                        else if (widget.onSendPoke != null)
                               PokeMenu(
                                 onSendPoke: _handleSendPoke,
                                 partnerName: widget.partnerName,
@@ -1344,4 +1402,35 @@ class _RingPainter extends CustomPainter {
       old.progress != progress ||
       old.breathe != breathe ||
       old.drift != drift;
+}
+
+class _PremiumSparklePainter extends CustomPainter {
+  final double breathe;
+
+  _PremiumSparklePainter({required this.breathe});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFFFD76A).withValues(alpha: 0.6)
+      ..style = PaintingStyle.fill;
+    
+    // Sparkle 1
+    final alpha1 = (math.sin(breathe * math.pi * 2) * 0.5 + 0.5) * 0.8;
+    paint.color = const Color(0xFFFFD76A).withValues(alpha: alpha1);
+    canvas.drawCircle(Offset(size.width * 0.1, -5), 1.5, paint);
+
+    // Sparkle 2
+    final alpha2 = (math.cos(breathe * math.pi * 2 + 1) * 0.5 + 0.5) * 0.6;
+    paint.color = const Color(0xFFFFD76A).withValues(alpha: alpha2);
+    canvas.drawCircle(Offset(size.width * 0.85, size.height + 5), 1.2, paint);
+
+    // Sparkle 3
+    final alpha3 = (math.sin(breathe * math.pi * 2 + 2.5) * 0.5 + 0.5) * 0.7;
+    paint.color = const Color(0xFFFFD76A).withValues(alpha: alpha3);
+    canvas.drawCircle(Offset(size.width * 0.95, size.height * 0.3), 1.8, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _PremiumSparklePainter oldDelegate) => oldDelegate.breathe != breathe;
 }

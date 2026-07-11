@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'poke_menu.dart';
-import 'poke_particles.dart';
+import 'interaction_animator.dart';
 
 /// Scenario 2 — Partner is connected but no separation has been started yet.
 class ConnectedReadyHeroCard extends StatefulWidget {
@@ -34,12 +34,27 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
   late Animation<double> _fadeAnim;
   late Animation<double> _slideAnim;
 
-  final PokeParticlesController _particlesController = PokeParticlesController();
-  bool _forceOpenPokeMenu = false;
+  late AnimationController _receiveAnimCtrl;
+  late Animation<double> _receiveScale;
+  late Animation<double> _receiveDim;
 
+  bool _forceOpenPokeMenu = false;
+  bool _playReceiveAnim = false;
+  
   @override
   void initState() {
     super.initState();
+
+    _receiveAnimCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+    _receiveScale = Tween<double>(begin: 0.95, end: 1.0).animate(
+      CurvedAnimation(parent: _receiveAnimCtrl, curve: Curves.easeOutCubic),
+    );
+    _receiveDim = Tween<double>(begin: 0.1, end: 0.0).animate(
+      CurvedAnimation(parent: _receiveAnimCtrl, curve: const Interval(0.0, 0.5, curve: Curves.easeOut)),
+    );
 
     _breatheCtrl = AnimationController(
       vsync: this, duration: const Duration(seconds: 5),
@@ -75,8 +90,9 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
         (oldWidget.latestPoke == null ||
          widget.latestPoke!['id'] != oldWidget.latestPoke!['id']);
     if (hasNewPoke) {
-      _particlesController.spawn(widget.latestPoke!['gesture'] ?? 'Love');
+      _receiveAnimCtrl.forward(from: 0.0);
       setState(() {
+        _playReceiveAnim = true;
         _forceOpenPokeMenu = false; // Reset force open if new poke is received
       });
     }
@@ -88,12 +104,10 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
     _driftCtrl.dispose();
     _connectionCtrl.dispose();
     _entranceCtrl.dispose();
-    _particlesController.dispose();
     super.dispose();
   }
 
   Future<void> _handleSendPoke(String gesture) async {
-    _particlesController.spawn(gesture);
     if (widget.onSendPoke != null) {
       await widget.onSendPoke!(gesture);
     }
@@ -102,7 +116,7 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: Listenable.merge([_breathe, _driftCtrl, _connection, _entranceCtrl]),
+      animation: Listenable.merge([_breathe, _driftCtrl, _connection, _entranceCtrl, _receiveAnimCtrl]),
       builder: (context, _) {
         final breathe = _breathe.value;
         final drift = _driftCtrl.value;
@@ -112,10 +126,18 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
           opacity: _fadeAnim.value,
           child: Transform.translate(
             offset: Offset(0, _slideAnim.value),
-            child: Container(
+            child: Transform.scale(
+              scale: widget.latestPoke != null ? _receiveScale.value : 1.0,
+              child: Container(
               width: double.infinity,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(32),
+                border: widget.latestPoke != null
+                    ? Border.all(
+                        color: const Color(0xFFFFD76A).withValues(alpha: 0.2 + breathe * 0.4),
+                        width: 1.2,
+                      )
+                    : null,
                 boxShadow: [
                   // Deep rose glow — breathes
                   BoxShadow(
@@ -131,11 +153,12 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
                     spreadRadius: 4,
                     offset: const Offset(0, 24),
                   ),
+                  // Subtle gold outer glow on poke
                   if (widget.latestPoke != null)
                     BoxShadow(
-                      color: const Color(0xFFDD8F9F).withValues(alpha: 0.25 + 0.15 * math.sin(breathe * math.pi)),
-                      blurRadius: 24 + 12 * math.sin(breathe * math.pi),
-                      spreadRadius: 2 + 2 * math.sin(breathe * math.pi),
+                      color: const Color(0xFFFFD76A).withValues(alpha: 0.08 + breathe * 0.08),
+                      blurRadius: 24,
+                      spreadRadius: 1,
                     ),
                 ],
               ),
@@ -158,6 +181,13 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
                         ),
                       ),
                     ),
+
+                    if (widget.latestPoke != null)
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: _PremiumSparklePainter(breathe: breathe),
+                        ),
+                      ),
 
                     // ── Top-left rose aurora ──
                     Positioned(
@@ -200,12 +230,36 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
                       ),
                     ),
 
-                    // ── Poke Particles ──
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        child: PokeParticlesWidget(controller: _particlesController),
+                    // ── Poke Custom Animation ──
+                    if (widget.latestPoke != null && _playReceiveAnim)
+                      Positioned.fill(
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            return InteractionAnimator(
+                              gesture: widget.latestPoke!['gesture'] ?? 'Love',
+                              color: getGestureColor(widget.latestPoke!['gesture'] ?? 'Love'),
+                              center: Offset(constraints.maxWidth / 2, constraints.maxHeight / 2),
+                              onComplete: () {
+                                if (mounted) {
+                                  setState(() {
+                                    _playReceiveAnim = false;
+                                  });
+                                }
+                              },
+                            );
+                          }
+                        ),
                       ),
-                    ),
+                    
+                    // ── Receiving Dim Overlay ──
+                    if (widget.latestPoke != null)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: Container(
+                            color: Colors.black.withValues(alpha: _receiveDim.value),
+                          ),
+                        ),
+                      ),
 
                     // ── Glass border ──
                     Positioned.fill(
@@ -338,28 +392,32 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
                           // ── Poking interaction ──
                           if (widget.latestPoke != null)
                             // Received gesture view
-                            Center(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF8A2E55).withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: const Color(0xFFDD8F9F).withValues(alpha: 0.22),
-                                    width: 1,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFFDD8F9F).withValues(alpha: 0.05),
-                                      blurRadius: 10,
-                                    ),
-                                  ],
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
+                              Center(
+                                child: Stack(
+                                  clipBehavior: Clip.none,
                                   children: [
-                                    // Pulsing Heart / Sparkle Icon
-                                    TweenAnimationBuilder<double>(
+                                    // Sparkles
+                                    Positioned.fill(
+                                      child: CustomPaint(
+                                        painter: _PremiumSparklePainter(breathe: breathe),
+                                      ),
+                                    ),
+                                    // Inner Card
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF150B0E), // Very dark, elegant background
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: const Color(0xFF2A161E), // Subtle dark outline, no glow
+                                          width: 1.0,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          // Pulsing Heart / Sparkle Icon
+                                          TweenAnimationBuilder<double>(
                                       tween: Tween(begin: 0.95, end: 1.05),
                                       duration: const Duration(seconds: 1),
                                       curve: Curves.easeInOutSine,
@@ -447,13 +505,15 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
                                               ),
                                             ),
                                           ),
-                                      ],
-                                    ),
-                                  ],
+                                        ],
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            )
-                          else if (widget.onSendPoke != null)
+                              ]
+                            ),
+                          )
+                        else if (widget.onSendPoke != null)
                             PokeMenu(
                               onSendPoke: _handleSendPoke,
                               partnerName: widget.partnerName,
@@ -497,6 +557,7 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
                   ],
                 ),
               ),
+            ),
             ),
           ),
         );
@@ -549,20 +610,41 @@ class _ConnectedHeartsIllustration extends StatelessWidget {
               ),
             ),
 
-            // Center merge glow
-            Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFFDD8F9F).withValues(alpha: 0.30 + connection * 0.25),
-                    blurRadius: 12,
-                    spreadRadius: 3,
+            // Center merge glow (small glowing point with horizontal beam)
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                // Horizontal light beam
+                Container(
+                  width: 60,
+                  height: 2,
+                  decoration: BoxDecoration(
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFFD76A).withValues(alpha: 0.15 + connection * 0.25),
+                        blurRadius: 6,
+                        spreadRadius: 1,
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+                // Glowing point
+                Container(
+                  width: 5,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFFFFD76A).withValues(alpha: 0.7 + connection * 0.3),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFFD76A).withValues(alpha: 0.30 + connection * 0.30),
+                        blurRadius: 10,
+                        spreadRadius: 2,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -672,3 +754,35 @@ class _ConnectedParticlesPainter extends CustomPainter {
   bool shouldRepaint(covariant _ConnectedParticlesPainter old) =>
       old.drift != drift || old.breathe != breathe;
 }
+
+class _PremiumSparklePainter extends CustomPainter {
+  final double breathe;
+
+  _PremiumSparklePainter({required this.breathe});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFFFFD76A).withValues(alpha: 0.6)
+      ..style = PaintingStyle.fill;
+    
+    // Sparkle 1
+    final alpha1 = (math.sin(breathe * math.pi * 2) * 0.5 + 0.5) * 0.8;
+    paint.color = const Color(0xFFFFD76A).withValues(alpha: alpha1);
+    canvas.drawCircle(Offset(size.width * 0.1, -5), 1.5, paint);
+
+    // Sparkle 2
+    final alpha2 = (math.cos(breathe * math.pi * 2 + 1) * 0.5 + 0.5) * 0.6;
+    paint.color = const Color(0xFFFFD76A).withValues(alpha: alpha2);
+    canvas.drawCircle(Offset(size.width * 0.85, size.height + 5), 1.2, paint);
+
+    // Sparkle 3
+    final alpha3 = (math.sin(breathe * math.pi * 2 + 2.5) * 0.5 + 0.5) * 0.7;
+    paint.color = const Color(0xFFFFD76A).withValues(alpha: alpha3);
+    canvas.drawCircle(Offset(size.width * 0.95, size.height * 0.3), 1.8, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _PremiumSparklePainter oldDelegate) => oldDelegate.breathe != breathe;
+}
+

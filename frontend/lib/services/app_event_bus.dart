@@ -9,6 +9,7 @@ enum AppEvent {
   timeTravelCompleted,
   separationCreated,
   heroDataChanged,
+  notificationsRead,
 }
 
 class AppEventBus {

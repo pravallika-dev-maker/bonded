@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/api_service.dart';
+import '../services/app_event_bus.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -38,7 +39,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> with TickerPr
         final rawTitle = json['title'] ?? 'Notification';
         final rawSubtext = json['body'];
         final title = _removeEmojis(rawTitle);
-        final subtext = rawSubtext != null ? _removeEmojis(rawSubtext) : null;
+        String? subtext = rawSubtext != null ? _removeEmojis(rawSubtext) : null;
+        
+        // Remove "Tap to See" or "Tap to View" from historical notifications
+        if (subtext != null) {
+          subtext = subtext.replaceAll(RegExp(r'tap to see\.?', caseSensitive: false), '')
+                           .replaceAll(RegExp(r'tap to view words\.?', caseSensitive: false), '')
+                           .replaceAll(RegExp(r'tap to view\.?', caseSensitive: false), '')
+                           .trim();
+          if (subtext.isEmpty) subtext = null;
+        }
+        
         final isRead = json['isRead'] ?? true;
         final createdAtStr = json['createdAt'] ?? '';
         
@@ -75,7 +86,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> with TickerPr
           }
         }
 
+        final int id = json['id'] ?? 0;
         final item = NotificationItem(
+          id: id,
           title: title,
           time: timeStr,
           subtext: subtext,
@@ -223,6 +236,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> with TickerPr
                               ),
                             );
                             _fetchNotifications();
+                            AppEventBus().emit(AppEvent.notificationsRead);
                           } catch (e) {
                             if (!context.mounted) return;
                             ScaffoldMessenger.of(context).showSnackBar(
@@ -342,25 +356,62 @@ class _NotificationsScreenState extends State<NotificationsScreen> with TickerPr
           ),
         );
       },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: item.isRead ? const Color(0xFF160A0E) : const Color(0xFF26101A),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: item.isRead ? const Color(0xFF26181E) : const Color(0xFF911746).withOpacity(0.5), 
-            width: 1.2
+      child: GestureDetector(
+        onTap: () async {
+          if (!item.isRead) {
+            try {
+              // Optimistically update UI
+              setState(() {
+                final indexInToday = _todayItems.indexWhere((i) => i.id == item.id);
+                if (indexInToday != -1) {
+                  _todayItems[indexInToday] = NotificationItem(
+                    id: item.id,
+                    title: item.title,
+                    time: item.time,
+                    subtext: item.subtext,
+                    isRead: true,
+                  );
+                } else {
+                  final indexInEarlier = _earlierItems.indexWhere((i) => i.id == item.id);
+                  if (indexInEarlier != -1) {
+                    _earlierItems[indexInEarlier] = NotificationItem(
+                      id: item.id,
+                      title: item.title,
+                      time: item.time,
+                      subtext: item.subtext,
+                      isRead: true,
+                    );
+                  }
+                }
+              });
+              
+              AppEventBus().emit(AppEvent.notificationsRead);
+              await ApiService.markNotificationAsRead(item.id);
+            } catch (e) {
+              // Revert on failure (optional)
+              _fetchNotifications();
+            }
+          }
+        },
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: item.isRead ? const Color(0xFF160A0E) : const Color(0xFF26101A),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: item.isRead ? const Color(0xFF26181E) : const Color(0xFF911746).withOpacity(0.5), 
+              width: 1.2
+            ),
+            boxShadow: item.isRead ? [] : [
+              BoxShadow(
+                color: const Color(0xFF911746).withOpacity(0.1),
+                blurRadius: 10,
+                spreadRadius: 1,
+              )
+            ],
           ),
-          boxShadow: item.isRead ? [] : [
-            BoxShadow(
-              color: const Color(0xFF911746).withOpacity(0.1),
-              blurRadius: 10,
-              spreadRadius: 1,
-            )
-          ],
-        ),
-        child: Row(
+          child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (!item.isRead) ...[
@@ -433,7 +484,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> with TickerPr
           ],
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildEmptyState() {
@@ -670,12 +722,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> with TickerPr
 }
 
 class NotificationItem {
+  final int id;
   final String title;
   final String time;
   final String? subtext;
   final bool isRead;
 
   NotificationItem({
+    required this.id,
     required this.title,
     required this.time,
     this.subtext,

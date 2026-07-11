@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
+import 'interaction_animator.dart';
 Color getGestureColor(String name) {
   switch (name.toLowerCase()) {
     case 'hug':
@@ -691,49 +691,6 @@ class _PokeMenuState extends State<PokeMenu> {
   }
 }
 
-class _Particle {
-  Offset position;
-  Offset velocity;
-  Color color;
-  double size;
-  double life; // 0.0 to 1.0
-
-  _Particle({
-    required this.position,
-    required this.velocity,
-    required this.color,
-    required this.size,
-    required this.life,
-  });
-}
-
-class _ParticlePainter extends CustomPainter {
-  final List<_Particle> particles;
-
-  _ParticlePainter(this.particles);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final Paint paint = Paint()..style = PaintingStyle.fill;
-    for (final p in particles) {
-      if (p.life <= 0) continue;
-      paint.color = p.color.withValues(alpha: p.life.clamp(0.0, 1.0));
-      // Draw inner glowing core
-      canvas.drawCircle(p.position, p.size * p.life, paint);
-      
-      // Draw outer glowing halo
-      final Paint glowPaint = Paint()
-        ..style = PaintingStyle.fill
-        ..color = p.color.withValues(alpha: (p.life * 0.35).clamp(0.0, 1.0))
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, p.size * 0.8);
-      canvas.drawCircle(p.position, p.size * 2 * p.life, glowPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-}
-
 class _PokeOverlayDialog extends StatefulWidget {
   final String? partnerName;
   final Function(String gesture) onSend;
@@ -747,51 +704,20 @@ class _PokeOverlayDialog extends StatefulWidget {
   State<_PokeOverlayDialog> createState() => _PokeOverlayDialogState();
 }
 
-class _PokeOverlayDialogState extends State<_PokeOverlayDialog> with SingleTickerProviderStateMixin {
-  List<_Particle> _particles = [];
-  late AnimationController _particleController;
+class _PokeOverlayDialogState extends State<_PokeOverlayDialog> {
   bool _isSelecting = false;
   String? _selectedGesture;
+  
+  String? _sendingGestureText;
 
   @override
   void initState() {
     super.initState();
-    _particleController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 650),
-    );
-    _particleController.addListener(() {
-      setState(() {
-        for (final p in _particles) {
-          p.position += p.velocity;
-          p.velocity *= 0.93; // simulated friction
-          p.velocity += const Offset(0, 0.16); // light gravity pull
-          p.life = 1.0 - _particleController.value;
-        }
-      });
-    });
   }
 
   @override
   void dispose() {
-    _particleController.dispose();
     super.dispose();
-  }
-
-  void _spawnParticles(Offset center, Color color) {
-    final rand = math.Random();
-    _particles = List.generate(28, (i) {
-      final double angle = rand.nextDouble() * 2 * math.pi;
-      final double speed = 3.0 + rand.nextDouble() * 6.0;
-      return _Particle(
-        position: center,
-        velocity: Offset(math.cos(angle) * speed, math.sin(angle) * speed),
-        color: color,
-        size: 3.5 + rand.nextDouble() * 4.5,
-        life: 1.0,
-      );
-    });
-    _particleController.forward(from: 0.0);
   }
 
   Offset _getGridCenter(int index) {
@@ -955,17 +881,19 @@ class _PokeOverlayDialogState extends State<_PokeOverlayDialog> with SingleTicke
                                       setState(() {
                                         _isSelecting = true;
                                         _selectedGesture = name;
+                                        _sendingGestureText = "Sending...";
                                       });
-                                      final center = _getGridCenter(index);
-                                      _spawnParticles(center, color);
                                       
                                       // Play light haptic feedback
                                       HapticFeedback.mediumImpact();
                                       
-                                      // Wait for particle explosion to finish before closing
-                                      Timer(const Duration(milliseconds: 550), () {
+                                      // Send immediately
+                                      widget.onSend(name);
+                                      
+                                      // Small delay to show "Sending..." before closing
+                                      Timer(const Duration(milliseconds: 600), () {
+                                        if (!mounted) return;
                                         Navigator.pop(context);
-                                        widget.onSend(name);
                                       });
                                     },
                             ),
@@ -1007,14 +935,6 @@ class _PokeOverlayDialogState extends State<_PokeOverlayDialog> with SingleTicke
                         ),
                       ),
                     ],
-                  ),
-                ),
-                // Particle paint layer overlay
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: CustomPaint(
-                      painter: _ParticlePainter(_particles),
-                    ),
                   ),
                 ),
               ],

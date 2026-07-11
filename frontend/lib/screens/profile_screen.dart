@@ -61,13 +61,15 @@ class _ProfileScreenState extends State<ProfileScreen> with TickerProviderStateM
 
   Future<void> _fetchActiveSeparation() async {
     try {
-      final sep = await ApiService.getActiveSeparation();
-      final cachedPartnerName = await ApiService.getPartnerName();
-      
-      Map<String, dynamic>? profile;
-      try {
-        profile = await ApiService.getUserProfile();
-      } catch (_) {}
+      final results = await Future.wait([
+        ApiService.getActiveSeparation().catchError((_) => null),
+        ApiService.getPartnerName(),
+        ApiService.getUserProfile().catchError((_) => null),
+      ]);
+
+      final sep = results[0] as Map<String, dynamic>?;
+      final cachedPartnerName = results[1] as String?;
+      final profile = results[2] as Map<String, dynamic>?;
 
       bool isConnectedCached = false;
       if (profile == null) {

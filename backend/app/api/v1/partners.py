@@ -160,15 +160,15 @@ def join_partner(request: JoinRequest, current_user: User = Depends(get_current_
             db,
             recipient_id=creator.id,
             notification_type="partner_joined",
-            title=f"{current_user.user_name or 'Your partner'} joined your bond! 💕",
+            title=f"{creator.partner_name or 'Your partner'} joined your bond! 💕",
             body="You are now connected.",
             fcm_token=creator.fcm_token
         )
 
-        # 9. Return { success: true, partner_name: creator.user_name or current_user.partner_name }
+        # 9. Return { success: true, partner_name: current_user.partner_name }
         return JoinResponse(
             success=True, 
-            partner_name=creator.user_name or current_user.partner_name, 
+            partner_name=current_user.partner_name, 
             message="Successfully connected!"
         )
     except HTTPException:
@@ -277,7 +277,7 @@ async def disconnect_partner(current_user: User = Depends(get_current_user), db:
                 recipient_id=partner.id,
                 notification_type="partner_disconnected",
                 title="Your bond has been disconnected",
-                body=f"{current_user.user_name or 'Your partner'} has disconnected.",
+                body=f"{partner.partner_name or 'Your partner'} has disconnected.",
                 fcm_token=partner.fcm_token
             )
             
@@ -326,8 +326,8 @@ def send_poke(
                 db,
                 recipient_id=partner.id,
                 notification_type="poke",
-                title=f"{current_user.user_name or 'Your partner'} sent you a {request.gesture}! 💕",
-                body="Tap to view.",
+                title=f"{partner.partner_name or current_user.user_name or 'Your partner'} sent you a {request.gesture}! 💕",
+                body="",
                 fcm_token=partner.fcm_token
             )
     except Exception as e:

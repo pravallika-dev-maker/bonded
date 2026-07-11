@@ -184,7 +184,7 @@ async def _trigger_reflection_notifications(user_id: int, sep_id: int, db: Sessi
                     recipient_id=partner.id,
                     notification_type="partner_reflection",
                     title="Journey Reflection",
-                    body="💭 Someone spent a moment reflecting on your relationship today.",
+                    body=f"💭 {partner.partner_name or user.user_name or 'Your partner'} spent a moment reflecting on your relationship today.",
                     fcm_token=partner.fcm_token
                 )
         

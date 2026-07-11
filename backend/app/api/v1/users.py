@@ -26,8 +26,6 @@ async def get_my_profile(
         partner = db.query(User).filter(User.id == current_user.partner_id).first()
 
     partner_name = current_user.partner_name
-    if not partner_name and is_connected and partner:
-        partner_name = partner.user_name
 
     # Merge logic for missing fields
     if is_connected and partner:
@@ -231,6 +229,12 @@ async def register_fcm_token(
     current_user: User = Depends(get_current_user)
 ):
     try:
+        if data.fcmToken:
+            db.query(User).filter(
+                User.fcm_token == data.fcmToken,
+                User.id != current_user.id
+            ).update({"fcm_token": None})
+            
         current_user.fcm_token = data.fcmToken
         db.commit()
         logger.info(f"Registered FCM token for user {current_user.id}: {data.fcmToken[:15]}...")

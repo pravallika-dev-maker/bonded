@@ -64,8 +64,6 @@ async def get_home_hero(
             partner_id = active_rel.user2_id if active_rel.user1_id == current_user.id else active_rel.user1_id
             if partner_id and partner_id != current_user.id:
                 partner = db.query(User).filter(User.id == partner_id).first()
-                if partner and not partner_name and partner.user_name:
-                    partner_name = partner.user_name
 
             # ── Detect shared presence (both active within 90 seconds) ──
             PRESENCE_WINDOW = 90
@@ -91,15 +89,19 @@ async def get_home_hero(
 
         # Check for unacknowledged poke/gesture
         from ...models.poke import Poke
-        unacknowledged_poke = db.query(Poke).filter(
-            Poke.recipient_id == current_user.id,
-            Poke.is_acknowledged == False
-        ).order_by(Poke.created_at.desc()).first()
+        
+        unacknowledged_poke = None
+        if partner:
+            unacknowledged_poke = db.query(Poke).filter(
+                Poke.recipient_id == current_user.id,
+                Poke.sender_id == partner.id,
+                Poke.is_acknowledged == False
+            ).order_by(Poke.created_at.desc()).first()
 
         latest_poke_data = None
         if unacknowledged_poke:
             sender = db.query(User).filter(User.id == unacknowledged_poke.sender_id).first()
-            sender_name = sender.user_name if sender else "Your partner"
+            sender_name = current_user.partner_name or "Your partner"
             latest_poke_data = {
                 "id": unacknowledged_poke.id,
                 "sender_name": sender_name,

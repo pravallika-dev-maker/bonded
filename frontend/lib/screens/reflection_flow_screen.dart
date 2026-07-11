@@ -982,32 +982,39 @@ class _BondedAIFeedbackOverlayState extends State<_BondedAIFeedbackOverlay> with
                     const FlyingFairyWidget(triggerSuccess: true),
                     const SizedBox(height: 56), // Increased whitespace
                     // AI Response Text
-                    TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 0.0, end: 1.0),
-                      duration: const Duration(milliseconds: 1000),
-                      curve: Curves.easeOutCubic,
-                      builder: (context, value, child) {
-                        return Opacity(
-                          opacity: value,
-                          child: Transform.translate(
-                            offset: Offset(0, 15 * (1 - value)),
-                            child: Text(
-                              reactionText,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontFamily: 'Georgia',
-                                fontSize: 20, // Smaller text block for better readability
-                                fontWeight: FontWeight.w400, // No bold/heavy font
-                                color: Color(0xFFFFF5F7), // Very soft warm white text
-                                height: 1.6, // More line height for readability
-                                letterSpacing: 0.3,
-                              ),
-                            ),
+                    Expanded(
+                      child: Center(
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          child: TweenAnimationBuilder<double>(
+                            tween: Tween(begin: 0.0, end: 1.0),
+                            duration: const Duration(milliseconds: 1000),
+                            curve: Curves.easeOutCubic,
+                            builder: (context, value, child) {
+                              return Opacity(
+                                opacity: value,
+                                child: Transform.translate(
+                                  offset: Offset(0, 15 * (1 - value)),
+                                  child: Text(
+                                    reactionText,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontFamily: 'Georgia',
+                                      fontSize: 20, // Smaller text block for better readability
+                                      fontWeight: FontWeight.w400, // No bold/heavy font
+                                      color: Color(0xFFFFF5F7), // Very soft warm white text
+                                      height: 1.6, // More line height for readability
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
-                        );
-                      },
+                        ),
+                      ),
                     ),
-                    const Spacer(),
+                    const SizedBox(height: 32),
                     // Tap to continue
                     AnimatedBuilder(
                       animation: _pulseController,
