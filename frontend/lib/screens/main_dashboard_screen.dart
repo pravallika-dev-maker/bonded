@@ -13,6 +13,9 @@ import 'history_screen.dart';
 import 'feel_screen.dart';
 import 'join_with_code_screen.dart';
 import 'letters_screen.dart';
+import 'promise_screen.dart';
+import 'partner_invite_screen.dart';
+import 'join_partner_name_screen.dart';
 import 'journey_screen.dart';
 import 'profile_screen.dart';
 import 'reflection_flow_screen.dart';
@@ -235,6 +238,19 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
           _isPartnerConnected = partnerConnected;
           _latestPoke = null; // Clear old interactions
           _fetchDashboardData();
+          
+          // If we don't have a partner name, we need to ask them for it.
+          // This handles the case where THEY sent the invite and were waiting.
+          if (_partnerName == null || _partnerName!.trim().isEmpty) {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => JoinPartnerNameScreen(
+                  userName: _currentUserName ?? 'You',
+                  fromDashboard: true,
+                ),
+              ),
+            );
+          }
           return;
         }
         if (_isPartnerConnected && !partnerConnected) {
