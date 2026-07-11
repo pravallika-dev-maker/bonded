@@ -8,6 +8,7 @@ import 'promise_screen.dart';
 import 'partner_invite_screen.dart';
 import '../services/api_service.dart';
 import '../services/app_event_bus.dart';
+import 'join_partner_name_screen.dart';
 
 enum JoinCodeState { idle, loading, error, success }
 
@@ -118,14 +119,26 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
         if (!mounted) return;
 
         if (widget.fromDashboard) {
-          Navigator.of(context).pop();
-        } else {
+          // If from dashboard, navigate to JoinPartnerNameScreen and pass fromDashboard=true
           Navigator.of(context).pushReplacement(
             PageRouteBuilder(
               transitionDuration: const Duration(milliseconds: 600),
-              pageBuilder: (_, __, ___) => PromiseScreen(
+              pageBuilder: (_, __, ___) => JoinPartnerNameScreen(
                 userName: widget.userName ?? 'You',
-                partnerName: res['partnerName'] ?? 'Partner',
+                fromDashboard: true,
+              ),
+              transitionsBuilder: (_, anim, __, child) =>
+                  FadeTransition(opacity: anim, child: child),
+            ),
+          );
+        } else {
+          // If from onboarding, go to JoinPartnerNameScreen
+          Navigator.of(context).pushReplacement(
+            PageRouteBuilder(
+              transitionDuration: const Duration(milliseconds: 600),
+              pageBuilder: (_, __, ___) => JoinPartnerNameScreen(
+                userName: widget.userName ?? 'You',
+                fromDashboard: false,
               ),
               transitionsBuilder: (_, anim, __, child) =>
                   FadeTransition(opacity: anim, child: child),
