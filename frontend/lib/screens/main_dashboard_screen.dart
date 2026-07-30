@@ -316,16 +316,17 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
   /// _isCheckedIn and _partnerCompletedToday are always derived from the API,
   /// never from ephemeral session state — ensuring persistence across refreshes.
   Future<void> _fetchDashboardData() async {
-    // Also fetch moods list to detect if user submitted a check-in today
-    final results = await Future.wait([
-      ApiService.getActiveSeparation().catchError((_) => null),
-      ApiService.getReflectionTodayStatus().catchError((_) => null),
-      ApiService.getHomeHero().catchError((_) => null),
-      ApiService.getDailyInsight().catchError((_) => null),
-      ApiService.getMoods().catchError((_) => <Map<String, dynamic>>[]),
-      ApiService.getUserProfile().catchError((_) => null),
-      ApiService.getUnreadNotificationsCount().catchError((_) => 0),
-    ]);
+    try {
+      // Also fetch moods list to detect if user submitted a check-in today
+      final results = await Future.wait([
+        ApiService.getActiveSeparation().timeout(const Duration(seconds: 2)).catchError((_) => null),
+        ApiService.getReflectionTodayStatus().timeout(const Duration(seconds: 2)).catchError((_) => null),
+        ApiService.getHomeHero().timeout(const Duration(seconds: 2)).catchError((_) => null),
+        ApiService.getDailyInsight().timeout(const Duration(seconds: 2)).catchError((_) => null),
+        ApiService.getMoods().timeout(const Duration(seconds: 2)).catchError((_) => <Map<String, dynamic>>[]),
+        ApiService.getUserProfile().timeout(const Duration(seconds: 2)).catchError((_) => null),
+        ApiService.getUnreadNotificationsCount().timeout(const Duration(seconds: 2)).catchError((_) => 0),
+      ]);
 
     final sep = results[0] as Map<String, dynamic>?;
     final reflStatus = results[1] as Map<String, dynamic>?;
@@ -626,6 +627,15 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
         }
       }
     });
+    } catch (e) {
+      debugPrint("Error fetching dashboard data: $e");
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingSeparation = false;
+        });
+      }
+    }
   }
 
   String _formatStartDate(dynamic startDateStr) {

@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'interaction_animator.dart';
 Color getGestureColor(String name) {
   switch (name.toLowerCase()) {
     case 'hug':
@@ -60,6 +59,65 @@ class GestureIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final String g = gesture.toLowerCase();
+    if (g == 'love' || g == 'hug' || g == 'kiss' || g == 'flower' || g == 'sunshine') {
+      return SizedBox(
+        width: size,
+        height: size,
+        child: Center(
+          child: OverflowBox(
+            maxWidth: size * 3.0,
+            maxHeight: size * 3.0,
+            child: Image.asset(
+              'assets/images/$g.png',
+              width: size * 2.8,
+              height: size * 2.8,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                // Graceful fallback to vector CustomPaint if assets are not yet compiled
+                return SizedBox(
+                  width: size,
+                  height: size,
+                  child: CustomPaint(
+                    painter: GestureIconPainter(
+                      gesture: gesture,
+                      color: color,
+                      strokeWidth: strokeWidth,
+                      filled: filled,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+    }
+    
+    // For sparkle, continue using normal Sparkle emoji ✨ with emoji fallbacks to prevent tofu blocks
+    if (g == 'sparkle') {
+      return SizedBox(
+        width: size,
+        height: size,
+        child: Center(
+          child: Text(
+            '✨',
+            style: TextStyle(
+              fontSize: size * 0.95,
+              height: 1.0,
+              fontFamilyFallback: const [
+                'Apple Color Emoji',
+                'Segoe UI Emoji',
+                'Noto Color Emoji',
+                'Android Emoji',
+                'EmojiOne'
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return SizedBox(
       width: size,
       height: size,
@@ -74,6 +132,9 @@ class GestureIcon extends StatelessWidget {
     );
   }
 }
+
+
+
 
 class GestureIconPainter extends CustomPainter {
   final String gesture;
@@ -597,7 +658,7 @@ class _PokeMenuState extends State<PokeMenu> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                GestureIcon(gesture: _sentGestureFeedback!, color: feedbackColor, size: 18, strokeWidth: 1.6, filled: true),
+                GestureIcon(gesture: _sentGestureFeedback!, color: feedbackColor, size: 24, strokeWidth: 1.6, filled: true),
                 const SizedBox(width: 10),
                 Text(
                   getFeedbackText(_sentGestureFeedback!, widget.partnerName),
@@ -677,7 +738,7 @@ class _PokeMenuState extends State<PokeMenu> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     GestureIcon(gesture: 'Love', color: const Color(0xFFDD8F9F),
-                      size: 14, strokeWidth: 1.6, filled: true),
+                      size: 22, strokeWidth: 1.6, filled: true),
                     const SizedBox(width: 8),
                     const Text('Send Love',
                       style: TextStyle(fontFamily: 'Georgia', fontSize: 13,
@@ -707,8 +768,6 @@ class _PokeOverlayDialog extends StatefulWidget {
 class _PokeOverlayDialogState extends State<_PokeOverlayDialog> {
   bool _isSelecting = false;
   String? _selectedGesture;
-  
-  String? _sendingGestureText;
 
   @override
   void initState() {
@@ -718,15 +777,6 @@ class _PokeOverlayDialogState extends State<_PokeOverlayDialog> {
   @override
   void dispose() {
     super.dispose();
-  }
-
-  Offset _getGridCenter(int index) {
-    final int col = index % 3;
-    final int row = index ~/ 3;
-    // Estimated positions relative to card content
-    final double x = 24 + col * 85 + 42.5; // col 0: 66.5, col 1: 151.5, col 2: 236.5
-    final double y = 100 + row * 92 + 35; // row 0: 135, row 1: 227
-    return Offset(x, y);
   }
 
   @override
@@ -816,7 +866,7 @@ class _PokeOverlayDialogState extends State<_PokeOverlayDialog> {
                               colors: [Color(0xFFECC8D4), Color(0xFFDD8F9F)],
                             ).createShader(b),
                             child: const Text(
-                              'Send some love ✦',
+                              'Send some love',
                               style: TextStyle(
                                 fontFamily: 'Georgia',
                                 fontSize: 17,
@@ -881,7 +931,6 @@ class _PokeOverlayDialogState extends State<_PokeOverlayDialog> {
                                       setState(() {
                                         _isSelecting = true;
                                         _selectedGesture = name;
-                                        _sendingGestureText = "Sending...";
                                       });
                                       
                                       // Play light haptic feedback
@@ -890,8 +939,8 @@ class _PokeOverlayDialogState extends State<_PokeOverlayDialog> {
                                       // Send immediately
                                       widget.onSend(name);
                                       
-                                      // Small delay to show "Sending..." before closing
-                                      Timer(const Duration(milliseconds: 600), () {
+                                      // Delay to show zoom-in animation before closing
+                                      Timer(const Duration(milliseconds: 1900), () {
                                         if (!mounted) return;
                                         Navigator.pop(context);
                                       });
@@ -937,6 +986,65 @@ class _PokeOverlayDialogState extends State<_PokeOverlayDialog> {
                     ],
                   ),
                 ),
+                 Positioned.fill(
+                  child: IgnorePointer(
+                    ignoring: _selectedGesture == null,
+                    child: AnimatedOpacity(
+                      opacity: _selectedGesture != null ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeInOut,
+                      child: _selectedGesture == null
+                          ? const SizedBox.shrink()
+                          : Container(
+                              color: const Color(0xFF13080C).withValues(alpha: 0.5),
+                              child: Center(
+                                child: TweenAnimationBuilder<double>(
+                                  key: ValueKey('zoom_anim_$_selectedGesture'),
+                                  tween: Tween(begin: 0.0, end: 1.0),
+                                  duration: const Duration(milliseconds: 1800),
+                                  curve: Curves.linear,
+                                  builder: (context, value, child) {
+                                    double scale = 1.0;
+                                    double opacity = 1.0;
+
+                                    if (value < 0.20) {
+                                      // Phase 1: Bouncy Pop-up (0.0 to 0.20 progress)
+                                      final double progress = value / 0.20;
+                                      final double curvedProgress = Curves.easeOutBack.transform(progress);
+                                      scale = 0.2 + 0.8 * curvedProgress;
+                                      opacity = progress.clamp(0.0, 1.0);
+                                    } else if (value <= 0.70) {
+                                      // Phase 2: Hold (0.20 to 0.70 progress)
+                                      scale = 1.0;
+                                      opacity = 1.0;
+                                    } else {
+                                      // Phase 3: Slow Fade-out + Shrink (0.70 to 1.0 progress)
+                                      final double progress = (value - 0.70) / 0.30;
+                                      scale = 1.0 - 0.2 * progress;
+                                      opacity = 1.0 - progress;
+                                    }
+
+                                    return Opacity(
+                                      opacity: opacity.clamp(0.0, 1.0),
+                                      child: Transform.scale(
+                                        scale: scale,
+                                        child: child,
+                                      ),
+                                    );
+                                  },
+                                  child: GestureIcon(
+                                    gesture: _selectedGesture!,
+                                    color: getGestureColor(_selectedGesture!),
+                                    size: 110,
+                                    strokeWidth: 2.0,
+                                    filled: true,
+                                  ),
+                                ),
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -978,34 +1086,17 @@ class _GestureButtonState extends State<_GestureButton> with SingleTickerProvide
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(colors: [
-                    widget.color.withValues(alpha: _isPressed ? 0.22 : 0.13),
-                    widget.color.withValues(alpha: 0.03),
-                  ]),
-                  border: Border.all(
-                    color: widget.color.withValues(alpha: _isPressed ? 0.55 : 0.28),
-                    width: 1.2,
+              SizedBox(
+                width: 60,
+                height: 60,
+                child: Center(
+                  child: GestureIcon(
+                    gesture: widget.name,
+                    color: widget.color,
+                    size: 38,
+                    strokeWidth: 1.6,
+                    filled: true,
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: widget.color.withValues(alpha: _isPressed ? 0.25 : 0.12),
-                      blurRadius: _isPressed ? 10 : 6,
-                      spreadRadius: _isPressed ? 2 : 0,
-                    ),
-                  ],
-                ),
-                alignment: Alignment.center,
-                child: GestureIcon(
-                  gesture: widget.name,
-                  color: widget.color,
-                  size: 26,
-                  strokeWidth: 1.6,
-                  filled: true,
                 ),
               ),
               const SizedBox(height: 5),

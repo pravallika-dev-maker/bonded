@@ -28,7 +28,7 @@ class _HomeScreenState extends State<HomeScreen>
   late String _userName;
   late String _partnerName;
   late AnimationController _entryController;
-  bool _isLoading = true;
+  bool _isLoading = false;
   Timer? _pollingTimer;
   
   late Animation<double> _bgFade;
@@ -45,14 +45,6 @@ class _HomeScreenState extends State<HomeScreen>
     _userName = widget.userName;
     _partnerName = widget.partnerName;
     WidgetsBinding.instance.addObserver(this);
-    _checkConnectionStatus();
-    
-    // Poll every 5 seconds to see if partner joined
-    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (mounted && !_isLoading) {
-        _checkConnectionStatus();
-      }
-    });
     
     _entryController = AnimationController(
       vsync: this,
@@ -107,6 +99,17 @@ class _HomeScreenState extends State<HomeScreen>
         curve: const Interval(0.65, 1.0, curve: Curves.easeOut),
       ),
     );
+
+    _checkConnectionStatus();
+    
+    // Poll every 5 seconds to see if partner joined
+    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (mounted && !_isLoading) {
+        _checkConnectionStatus();
+      }
+    });
+
+    _entryController.forward();
   }
 
   @override
@@ -127,9 +130,9 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _checkConnectionStatus() async {
     try {
       final results = await Future.wait([
-        ApiService.getUserMe(),
-        ApiService.getHomeHero().catchError((_) => null),
-        ApiService.getActiveSeparation().catchError((_) => null),
+        ApiService.getUserMe().timeout(const Duration(seconds: 2)),
+        ApiService.getHomeHero().timeout(const Duration(seconds: 2)).catchError((_) => null),
+        ApiService.getActiveSeparation().timeout(const Duration(seconds: 2)).catchError((_) => null),
       ]);
 
       final response = results[0] as dynamic;
@@ -137,11 +140,20 @@ class _HomeScreenState extends State<HomeScreen>
       final heroResponse = results[1] as Map<String, dynamic>?;
       final activeSep = results[2] as Map<String, dynamic>?;
 
+      // Read the locally cached partner name as the authoritative source.
+      // The backend may not always return the nickname correctly, but the
+      // local cache is written immediately when the user saves it.
+      final cachedPartnerName = await ApiService.getPartnerName();
+
       if (mounted) {
         setState(() {
           _userName = profile['name'] ?? profile['userName'] ?? _userName;
-          _partnerName = heroResponse?['partner_name'] ?? heroResponse?['partnerName'] ??
-              profile['partnerName'] ?? _partnerName;
+          final apiPartnerName = heroResponse?['partner_name'] ?? heroResponse?['partnerName'] ??
+              profile['partnerName'];
+          // Prefer the local cache over the API value to prevent incorrect overwrites.
+          _partnerName = (cachedPartnerName != null && cachedPartnerName.trim().isNotEmpty)
+              ? cachedPartnerName
+              : (apiPartnerName ?? _partnerName);
         });
 
         // Check partner connection from heroResponse first (preferred source of truth),
@@ -178,6 +190,7 @@ class _HomeScreenState extends State<HomeScreen>
 
         if (isPartnerConnected) {
           _pollingTimer?.cancel();
+          // Use _partnerName which already prefers the local cache above.
           if (_partnerName.trim().isEmpty || _partnerName == 'Partner') {
             // Need to name the partner, navigate to JoinPartnerNameScreen which will
             // pop back to MainDashboardScreen.
@@ -209,21 +222,11 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             );
           }
-        } else {
-          setState(() {
-            _isLoading = false;
-          });
-          _entryController.forward();
         }
       }
     } catch (e) {
-      // Ignore API errors and remain on the waiting screen
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-        _entryController.forward();
-      }
+      // Ignore API errors and let background check fail silently
+      debugPrint("Background connection check failed: $e");
     }
   }
 

@@ -1402,6 +1402,25 @@ class ApiService {
     }
   }
 
+  /// Fetches onboarding configuration from the backend
+  static Future<Map<String, dynamic>> getOnboardingConfig(String deviceId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('${ApiConfig.onboardingConfig}?device_id=$deviceId'),
+        headers: {
+          'accept': 'application/json',
+        },
+      );
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Failed to load onboarding config');
+      }
+    } catch (e) {
+      throw Exception('Network error: ${e.toString()}');
+    }
+  }
+
   /// Immediately clear the user's presence signal when the app backgrounds
   static Future<void> setOffline() async {
     try {

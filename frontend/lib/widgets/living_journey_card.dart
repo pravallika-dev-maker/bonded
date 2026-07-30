@@ -21,6 +21,8 @@ class LivingJourneyCard extends StatefulWidget {
   final bool isWaitingForPartnerReflections;
   final bool partnerCompletedReflections;
   final bool userCompletedReflections;
+  final bool showSendAnimation;
+  final String sendAnimationGesture;
 
   const LivingJourneyCard({
     super.key,
@@ -40,6 +42,8 @@ class LivingJourneyCard extends StatefulWidget {
     this.isWaitingForPartnerReflections = false,
     this.partnerCompletedReflections = false,
     this.userCompletedReflections = false,
+    this.showSendAnimation = false,
+    this.sendAnimationGesture = 'Love',
   });
 
   @override
@@ -119,6 +123,14 @@ class _LivingJourneyCardState extends State<LivingJourneyCard>
         _playReceiveAnim = true;
         _forceOpenPokeMenu = false;
       });
+    }
+    // Play send animation when the flag flips on
+    if (widget.showSendAnimation && !oldWidget.showSendAnimation) {
+      _receiveAnimCtrl.forward(from: 0.0);
+      setState(() => _playReceiveAnim = true);
+    }
+    if (!widget.showSendAnimation && oldWidget.showSendAnimation) {
+      setState(() => _playReceiveAnim = false);
     }
   }
 
@@ -1056,13 +1068,17 @@ class _LivingJourneyCardState extends State<LivingJourneyCard>
                     ),
 
                     // ── POKE CUSTOM ANIMATION (Rendered ON TOP of content) ──
-                    if (widget.latestPoke != null && _playReceiveAnim)
+                    if (_playReceiveAnim)
                       Positioned.fill(
                         child: LayoutBuilder(
                           builder: (context, constraints) {
+                            // Use send gesture when sending, receive gesture when receiving
+                            final animGesture = widget.showSendAnimation
+                                ? widget.sendAnimationGesture
+                                : (widget.latestPoke?['gesture'] ?? 'Love');
                             return InteractionAnimator(
-                              gesture: widget.latestPoke!['gesture'] ?? 'Love',
-                              color: getGestureColor(widget.latestPoke!['gesture'] ?? 'Love'),
+                              gesture: animGesture,
+                              color: getGestureColor(animGesture),
                               center: Offset(constraints.maxWidth / 2, constraints.maxHeight / 2),
                               onComplete: () {
                                 if (mounted) {

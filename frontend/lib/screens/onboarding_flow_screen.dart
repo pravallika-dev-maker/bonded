@@ -1,9 +1,14 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'splash_screen.dart';
 import 'onboarding1_screen.dart';
 import 'onboarding2_screen.dart';
+import 'onboarding3_screen.dart';
+import 'onboarding4_screen.dart';
+import 'onboarding/tutorial_onboarding.dart';
+import 'onboarding/emotional_onboarding.dart';
 import 'login_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
@@ -20,6 +25,7 @@ class OnboardingFlowScreen extends StatefulWidget {
 class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
+  String _assignedFlowKey = 'stats_based'; // default fallback config key
 
   // ── Bulletproof Splash State ──
   bool _showSplash = true;
@@ -34,96 +40,98 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
   }
 
   Future<void> _checkAuthAndRoute() async {
-    // 1. Wait a minimum time for the splash to be visible (e.g., 2.0s)
+    // 1. Start the minimum 2-second timer for the splash screen
     final splashTimer = Future.delayed(const Duration(milliseconds: 2000));
     
-    // 2. Perform network/auth check
+    // 2. Start the network/auth check and config fetch in parallel
+    final Future<Map<String, dynamic>?> configFuture = () async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        String? deviceId = prefs.getString('device_id');
+        if (deviceId == null) {
+          deviceId = 'device_${DateTime.now().millisecondsSinceEpoch}_${math.Random().nextInt(900000) + 100000}';
+          await prefs.setString('device_id', deviceId);
+        }
+        return await ApiService.getOnboardingConfig(deviceId)
+            .timeout(const Duration(seconds: 2));
+      } catch (e) {
+        debugPrint("Failed to fetch backend onboarding config: $e");
+        return null;
+      }
+    }();
+
     bool isLoggedInAndOnboarded = false;
     bool isPartnerConnected = false;
     String? userName;
     String? partnerName;
-    
+
     try {
       final token = await ApiService.getToken();
       if (token != null) {
-        // Optimistically assume we are logged in if we have a token
         isLoggedInAndOnboarded = true;
-        
-        // Try to fetch cached data first if available
         userName = await ApiService.getUserName();
-        partnerName = await ApiService.getPartnerName(); // We only cache partner name currently, will update below if api succeeds
+        partnerName = await ApiService.getPartnerName();
         
         try {
-          final profileResponse = await ApiService.getUserMe();
+          final profileResponse = await ApiService.getUserMe()
+              .timeout(const Duration(seconds: 2));
           final profile = profileResponse['data'] ?? profileResponse;
-          
-          // Check if onboarding fields exist (guard against empty strings)
           final rawUserName = profile['userName'] ?? profile['name'];
           if (rawUserName != null && rawUserName.toString().trim().isNotEmpty) {
             userName = rawUserName.toString().trim();
-            partnerName = (profile['partnerName'] ?? '').toString().trim();
+            final fetchedPartnerName = (profile['partnerName'] ?? '').toString().trim();
+            if (fetchedPartnerName.isNotEmpty) {
+              partnerName = fetchedPartnerName;
+            }
 
-            // Try to get hero data to check partner connection status
             try {
-              final heroData = await ApiService.getHomeHero();
+              final heroData = await ApiService.getHomeHero()
+                  .timeout(const Duration(seconds: 2));
               isPartnerConnected =
                   heroData['partner_connected'] == true ||
                   heroData['partnerConnected'] == true ||
                   heroData['is_partner_connected'] == true;
                   
-              // If they started a solo separation, they should also go to the dashboard
               if (!isPartnerConnected) {
-                final activeSep = await ApiService.getActiveSeparation().catchError((_) => null);
+                final activeSep = await ApiService.getActiveSeparation()
+                    .timeout(const Duration(seconds: 2))
+                    .catchError((_) => null);
                 if (activeSep != null && (activeSep['is_active'] == true || activeSep['isActive'] == true || activeSep['status'] == 'active')) {
-                  isPartnerConnected = true; // Force navigation to main dashboard
+                  isPartnerConnected = true;
                 }
               }
-                  
-              if (!isPartnerConnected && (heroData['partner_name'] != null || heroData['partnerName'] != null)) {
-                partnerName = heroData['partner_name'] ?? heroData['partnerName'] ?? partnerName;
-              }
             } catch (_) {
-              // Fallback: check partner connected from profile
               isPartnerConnected =
                   profile['isPartnerConnected'] == true ||
                   profile['is_partner_connected'] == true ||
-                  profile['partner_connected'] == true ||
-                  (profile['partner'] != null && profile['partner'] is Map);
-                  
-              if (!isPartnerConnected) {
-                try {
-                  final activeSep = await ApiService.getActiveSeparation().catchError((_) => null);
-                  if (activeSep != null && (activeSep['is_active'] == true || activeSep['isActive'] == true || activeSep['status'] == 'active')) {
-                    isPartnerConnected = true;
-                  }
-                } catch (_) {}
-              }
+                  profile['partner_connected'] == true;
             }
           }
-        } catch (e) {
-          // Network failed (likely Render server waking up)
-          // We keep isLoggedInAndOnboarded = true because we have a token
-          // We will route them to the dashboard/home and the components will show loaders
-          debugPrint("Offline or server waking up, but token exists. Proceeding optimistically.");
-          
-          // Try to get cached user and partner names and connection status
-          userName = await ApiService.getUserName();
-          partnerName = await ApiService.getPartnerName();
+        } catch (_) {
           isPartnerConnected = await ApiService.getIsPartnerConnected();
         }
       }
-    } catch (e) {
-      // SharedPreferences failure? Fall back to onboarding
+    } catch (_) {
       isLoggedInAndOnboarded = false;
     }
 
-    await splashTimer;
+    // Wait for BOTH the minimum splash timer and the config response
+    final results = await Future.wait([splashTimer, configFuture]);
+    final Map<String, dynamic>? configResponse = results[1] as Map<String, dynamic>?;
+
+    String flowKey = 'stats_based'; // default fallback
+    if (configResponse != null && configResponse.containsKey('flow_key')) {
+      flowKey = configResponse['flow_key'].toString();
+    }
 
     if (!mounted) return;
 
+    setState(() {
+      _assignedFlowKey = flowKey;
+    });
+
     if (isLoggedInAndOnboarded) {
       if (isPartnerConnected) {
-        // Partner already connected or active solo separation — go straight to the main app
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => MainDashboardScreen(
@@ -132,8 +140,8 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
             ),
           ),
         );
+        return;
       } else {
-        // Still waiting for partner
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => HomeScreen(
@@ -142,28 +150,29 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
             ),
           ),
         );
+        return;
       }
-    } else {
-      final prefs = await SharedPreferences.getInstance();
-      final hasSeen = prefs.getBool('has_seen_onboarding') ?? false;
-      
-      if (hasSeen) {
-        if (_pageController.hasClients) {
-          _pageController.jumpToPage(2);
-        }
-        setState(() {
-          _currentPage = 2;
-        });
-      } else {
-        await prefs.setBool('has_seen_onboarding', true);
-      }
-
-      // Hide splash and show onboarding/login
-      setState(() {
-        _splashOpacity = 0.0;
-        _splashScale = 1.05; // Expands outward smoothly as it fades
-      });
     }
+
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeen = prefs.getBool('has_seen_onboarding') ?? false;
+    
+    if (hasSeen) {
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(1);
+      }
+      setState(() {
+        _currentPage = 1;
+      });
+    } else {
+      await prefs.setBool('has_seen_onboarding', true);
+    }
+
+    // Hide splash and show onboarding/login
+    setState(() {
+      _splashOpacity = 0.0;
+      _splashScale = 1.05; // Expands outward smoothly as it fades
+    });
   }
 
   @override
@@ -206,38 +215,13 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
                     });
                   },
                   children: [
-                    Onboarding1Content(
-                      onNext: () {
-                        _pageController.animateToPage(
-                          1,
-                          duration: const Duration(milliseconds: 800),
-                          curve: Curves.easeInOutQuart,
-                        );
-                      },
-                      onSkip: () {
-                        _pageController.animateToPage(
-                          2,
-                          duration: const Duration(milliseconds: 800),
-                          curve: Curves.easeInOutQuart,
-                        );
-                      },
-                    ),
-                    Onboarding2Content(
-                      onNext: () {
-                        _pageController.animateToPage(
-                          2,
-                          duration: const Duration(milliseconds: 800),
-                          curve: Curves.easeInOutQuart,
-                        );
-                      },
-                      onSkip: () {
-                        _pageController.animateToPage(
-                          2,
-                          duration: const Duration(milliseconds: 800),
-                          curve: Curves.easeInOutQuart,
-                        );
-                      },
-                    ),
+                    _buildActiveOnboardingWidget(() {
+                      _pageController.animateToPage(
+                        1,
+                        duration: const Duration(milliseconds: 800),
+                        curve: Curves.easeInOutQuart,
+                      );
+                    }),
                     const LoginContent(),
                   ],
                 ),
@@ -300,5 +284,31 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildActiveOnboardingWidget(VoidCallback onFinish) {
+    switch (_assignedFlowKey) {
+      case 'story_based':
+        return Onboarding1Content(
+          onNext: onFinish,
+          onSkip: onFinish,
+        );
+      case 'tutorial':
+        return Onboarding3Screen(
+          onNext: onFinish,
+          onSkip: onFinish,
+        );
+      case 'emotional':
+        return Onboarding4Screen(
+          onNext: onFinish,
+          onSkip: onFinish,
+        );
+      case 'stats_based':
+      default:
+        return Onboarding2Content(
+          onNext: onFinish,
+          onSkip: onFinish,
+        );
+    }
   }
 }

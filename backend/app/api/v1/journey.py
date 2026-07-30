@@ -171,14 +171,10 @@ async def get_journey_score(
             "presenceProgress": 0.0,
         }
 
-    active_sep_query = db.query(Separation).filter(
+    active_sep = db.query(Separation).filter(
         (Separation.creator_id == current_user.id) | (Separation.partner_id == current_user.id),
         Separation.status == "active"
-    )
-    if active_rel:
-        active_sep_query = active_sep_query.filter(Separation.relationship_id == active_rel.id)
-        
-    active_sep = active_sep_query.order_by(Separation.created_at.desc()).first()
+    ).order_by(Separation.created_at.desc()).first()
 
     if not active_sep:
         return {
@@ -213,7 +209,7 @@ async def get_journey_score(
     if current_user.partner_id:
         partner = db.query(User).filter(User.id == current_user.partner_id).first()
         if partner:
-            partner_name = current_user.partner_name
+            partner_name = current_user.partner_name or partner.user_name
             old_partner_score = partner.relationship_score or 0
             partner_score = calculate_user_score(db, partner, active_rel, active_sep)
             partner.relationship_score = partner_score
@@ -347,7 +343,7 @@ async def get_journey_insights(
             "insights": None
         }
     partner = db.query(User).filter(User.id == partner_user_id).first()
-    partner_name = current_user.partner_name or "Partner"
+    partner_name = current_user.partner_name or (partner.user_name if (partner and partner.user_name) else "Partner")
 
     # Count shared completed reflection days for this specific separation
     shared_days_query = db.query(ReflectionSession.day_number).filter(
@@ -378,7 +374,7 @@ async def get_journey_insights(
         elif "month" in duration_label or "30" in duration_label:
             expected_days = 30
 
-    # Auto-unlock if both partners completed all required reflection days
+    # Auto-unlock early if both partners completed all required reflection days
     completed_all_reflections = (shared_days >= expected_days)
 
     # Check if locked or unlocked
@@ -387,14 +383,14 @@ async def get_journey_insights(
     if days_remaining < 0:
         days_remaining = 0
         
-    is_unlocked = completed_all_reflections
+    is_unlocked = (days_remaining <= 0) or (sep.status == "completed") or completed_all_reflections
 
     if not is_unlocked:
         # If locked, return the status so the vault remains visual & locked on frontend
         return {
             "isUnlocked": False,
             "daysRemaining": max(0, days_remaining),
-            "message": "Your insights vault unlocks once both partners have completed all reflections.",
+            "message": f"Your insights vault unlocks on the final day of separation ({days_remaining} days left).",
             "insights": None
         }
 

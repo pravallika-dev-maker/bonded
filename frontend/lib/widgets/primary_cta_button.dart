@@ -174,30 +174,33 @@ class _PrimaryCtaButtonState extends State<PrimaryCtaButton> with TickerProvider
                               strokeWidth: 2,
                             ),
                           )
-                        : Row(
-                            mainAxisSize: MainAxisSize.min,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              if (widget.icon != null) ...[
-                                Icon(
-                                  widget.icon,
-                                  size: 18,
-                                  color: widget.iconColor ?? defaultIconColor,
+                        : FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                if (widget.icon != null) ...[
+                                  Icon(
+                                    widget.icon,
+                                    size: 18,
+                                    color: widget.iconColor ?? defaultIconColor,
+                                  ),
+                                  const SizedBox(width: 14),
+                                ],
+                                Text(
+                                  widget.text,
+                                  style: TextStyle(
+                                    fontFamily: 'Georgia',
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w600,
+                                    fontStyle: FontStyle.italic,
+                                    letterSpacing: 0.3,
+                                    color: widget.textColor ?? defaultTextColor,
+                                  ),
                                 ),
-                                const SizedBox(width: 14),
                               ],
-                              Text(
-                                widget.text,
-                                style: TextStyle(
-                                  fontFamily: 'Georgia',
-                                  fontSize: 17,
-                                  fontWeight: FontWeight.w600,
-                                  fontStyle: FontStyle.italic,
-                                  letterSpacing: 0.3,
-                                  color: widget.textColor ?? defaultTextColor,
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                   ),
                   if (_isEnabled)

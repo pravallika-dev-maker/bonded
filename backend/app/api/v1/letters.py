@@ -10,7 +10,6 @@ from ...models.separation import Separation
 from ...schemas.letter import LetterCreate, LetterUpdate, LetterResponse, PartnerLetterScreenResponse
 from ...services.ai_service import evaluate_love_letter
 from ...services.notification_service import create_notification_and_push
-from ...api.v1.separations import check_and_expire_separation
 
 
 router = APIRouter(prefix="/letters", tags=["Letters"])
@@ -87,7 +86,11 @@ async def create_letter(
             detail="You must have an active partner connection to write letters."
         )
 
-    active_sep = check_and_expire_separation(db, current_user.id)
+    active_sep = db.query(Separation).filter(
+        (Separation.creator_id == current_user.id) | (Separation.partner_id == current_user.id),
+        Separation.relationship_id == active_rel.id,
+        Separation.status == "active"
+    ).order_by(Separation.created_at.desc()).first()
     if not active_sep:
         raise HTTPException(
             status_code=400,

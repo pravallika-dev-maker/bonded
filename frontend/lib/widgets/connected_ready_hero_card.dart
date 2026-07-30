@@ -9,6 +9,8 @@ class ConnectedReadyHeroCard extends StatefulWidget {
   final Map<String, dynamic>? latestPoke;
   final Future<void> Function(String gesture)? onSendPoke;
   final Future<void> Function(int pokeId)? onAcknowledgePoke;
+  final bool showSendAnimation;
+  final String sendAnimationGesture;
 
   const ConnectedReadyHeroCard({
     super.key,
@@ -16,6 +18,8 @@ class ConnectedReadyHeroCard extends StatefulWidget {
     this.latestPoke,
     this.onSendPoke,
     this.onAcknowledgePoke,
+    this.showSendAnimation = false,
+    this.sendAnimationGesture = 'Love',
   });
 
   @override
@@ -96,6 +100,14 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
         _forceOpenPokeMenu = false; // Reset force open if new poke is received
       });
     }
+    // Play send animation when the flag flips on
+    if (widget.showSendAnimation && !oldWidget.showSendAnimation) {
+      _receiveAnimCtrl.forward(from: 0.0);
+      setState(() => _playReceiveAnim = true);
+    }
+    if (!widget.showSendAnimation && oldWidget.showSendAnimation) {
+      setState(() => _playReceiveAnim = false);
+    }
   }
 
   @override
@@ -104,6 +116,7 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
     _driftCtrl.dispose();
     _connectionCtrl.dispose();
     _entranceCtrl.dispose();
+    _receiveAnimCtrl.dispose();
     super.dispose();
   }
 
@@ -265,6 +278,26 @@ class _ConnectedReadyHeroCardState extends State<ConnectedReadyHeroCard>
                         ),
                       ),
                     ),
+
+                    // ── POKE CUSTOM ANIMATION (send or receive) ──
+                    if (_playReceiveAnim)
+                      Positioned.fill(
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final animGesture = widget.showSendAnimation
+                                ? widget.sendAnimationGesture
+                                : (widget.latestPoke?['gesture'] ?? 'Love');
+                            return InteractionAnimator(
+                              gesture: animGesture,
+                              color: getGestureColor(animGesture),
+                              center: Offset(constraints.maxWidth / 2, constraints.maxHeight / 2),
+                              onComplete: () {
+                                if (mounted) setState(() => _playReceiveAnim = false);
+                              },
+                            );
+                          },
+                        ),
+                      ),
 
                     // ── Main content ──
                     Padding(

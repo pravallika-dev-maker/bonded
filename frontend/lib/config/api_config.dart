@@ -1,6 +1,10 @@
+import 'package:flutter/foundation.dart';
+
 class ApiConfig {
-  // Use real server for production
-  static const String baseUrl = 'http://3.110.252.52:8001/api/v1';
+  // Use local server for debug mode, real server for production
+  static const String baseUrl = kDebugMode
+      ? (kIsWeb ? 'http://localhost:8000/api/v1' : 'http://10.0.2.2:8000/api/v1')
+      : 'http://3.110.252.52:8001/api/v1';
 
   // Home Endpoints
   static const String homeHero = '$baseUrl/home/hero';
@@ -10,6 +14,9 @@ class ApiConfig {
   // Auth Endpoints
   static const String sendCode = '$baseUrl/auth/send-code';
   static const String verifyCode = '$baseUrl/auth/verify-code';
+
+  // Onboarding Endpoints
+  static const String onboardingConfig = '$baseUrl/onboarding/config';
 
   // Moods Endpoints
   static const String moods = '$baseUrl/moods/';

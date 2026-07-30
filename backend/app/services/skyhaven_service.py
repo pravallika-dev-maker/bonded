@@ -67,9 +67,8 @@ def place_object(db: Session, couple_id: int, user_id: int, data: PlaceObjectReq
     if not island:
         raise HTTPException(status_code=404, detail="Island not found")
         
-    # TEMPORARY: Bypass turn check for testing
-    # if island.current_turn_user_id != user_id:
-    #     raise HTTPException(status_code=400, detail="Not your turn")
+    if island.current_turn_user_id != user_id:
+        raise HTTPException(status_code=400, detail="Not your turn")
         
     asset = db.query(SkyHavenAsset).filter(SkyHavenAsset.id == data.asset_id).first()
     if not asset:
@@ -144,47 +143,3 @@ def react_object(db: Session, couple_id: int, user_id: int, object_id: str, data
     
     db.commit()
     return reaction
-
-def update_placed_object(db: Session, couple_id: int, user_id: int, object_id: str, position_x: float, position_y: float, rotation: float, scale: float):
-    obj = db.query(PlacedIslandObject).filter(PlacedIslandObject.id == object_id).first()
-    if not obj:
-        raise HTTPException(status_code=404, detail="Object not found")
-        
-    island = db.query(SkyHavenIsland).filter(SkyHavenIsland.id == obj.island_id).first()
-    if not island or island.couple_id != couple_id:
-        raise HTTPException(status_code=403, detail="Not your island")
-        
-    obj.position_x = position_x
-    obj.position_y = position_y
-    obj.rotation = rotation
-    obj.scale = scale
-    
-    island.island_version += 1
-    island.updated_at = datetime.now(timezone.utc)
-    
-    db.commit()
-    db.refresh(obj)
-    
-    # Pre-load reactions to match schema response expectations
-    obj.reactions = db.query(SkyHavenReaction).filter(SkyHavenReaction.object_id == obj.id).all()
-    return obj
-
-def delete_placed_object(db: Session, couple_id: int, user_id: int, object_id: str):
-    obj = db.query(PlacedIslandObject).filter(PlacedIslandObject.id == object_id).first()
-    if not obj:
-        raise HTTPException(status_code=404, detail="Object not found")
-        
-    island = db.query(SkyHavenIsland).filter(SkyHavenIsland.id == obj.island_id).first()
-    if not island or island.couple_id != couple_id:
-        raise HTTPException(status_code=403, detail="Not your island")
-        
-    # Delete associated reactions first to prevent integrity errors
-    db.query(SkyHavenReaction).filter(SkyHavenReaction.object_id == obj.id).delete()
-    
-    db.delete(obj)
-    
-    island.island_version += 1
-    island.updated_at = datetime.now(timezone.utc)
-    
-    db.commit()
-    return {"status": "success"}

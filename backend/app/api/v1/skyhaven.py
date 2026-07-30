@@ -75,31 +75,3 @@ def react_object(
     if not relationship:
         raise HTTPException(status_code=400, detail="User is not in a relationship")
     return skyhaven_service.react_object(db, relationship.id, current_user.id, object_id, data)
-
-
-@router.patch("/object/{object_id}", response_model=PlacedIslandObjectBase)
-def update_object(
-    object_id: str,
-    data: PlaceObjectRequest,
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_user),
-    relationship = Depends(get_active_relationship)
-):
-    if not relationship:
-        raise HTTPException(status_code=400, detail="User is not in a relationship")
-    return skyhaven_service.update_placed_object(
-        db, relationship.id, current_user.id, object_id,
-        data.position_x, data.position_y, data.rotation, data.scale
-    )
-
-
-@router.delete("/object/{object_id}")
-def delete_object(
-    object_id: str,
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_user),
-    relationship = Depends(get_active_relationship)
-):
-    if not relationship:
-        raise HTTPException(status_code=400, detail="User is not in a relationship")
-    return skyhaven_service.delete_placed_object(db, relationship.id, current_user.id, object_id)

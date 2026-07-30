@@ -26,6 +26,8 @@ async def get_my_profile(
         partner = db.query(User).filter(User.id == current_user.partner_id).first()
 
     partner_name = current_user.partner_name
+    if not partner_name and is_connected and partner:
+        partner_name = partner.user_name
 
     # Merge logic for missing fields
     if is_connected and partner:
@@ -174,7 +176,7 @@ async def delete_my_account(
         from ...models.relationship import Relationship
         db.query(Relationship).filter((Relationship.user1_id == uid) | (Relationship.user2_id == uid)).delete(synchronize_session=False)
 
-        # I. Delete Daily Content & Features
+        # I. Delete Daily Content
         try:
             from ...models.user_daily_affirmation import UserDailyAffirmation
             from ...models.user_daily_comfort import UserDailyComfort
@@ -184,29 +186,6 @@ async def delete_my_account(
             db.query(UserDailyInsight).filter(UserDailyInsight.user_id == uid).delete(synchronize_session=False)
         except ImportError as e:
             logger.warning(f"Skipped deleting some daily content due to import error: {e}")
-            pass
-            
-        # J. Delete Drift Bottles, Pokes, and Rewards
-        try:
-            from ...models.drift_bottle import UserReward, DriftBottleHistory
-            from ...models.poke import Poke
-            db.query(UserReward).filter(UserReward.user_id == uid).delete(synchronize_session=False)
-            db.query(DriftBottleHistory).filter(DriftBottleHistory.user_id == uid).delete(synchronize_session=False)
-            db.query(Poke).filter((Poke.sender_id == uid) | (Poke.recipient_id == uid)).delete(synchronize_session=False)
-        except ImportError as e:
-            logger.warning(f"Skipped deleting drift bottles/pokes: {e}")
-            pass
-            
-        # K. Delete SkyHaven Data
-        try:
-            from ...models.sky_haven import SkyHavenIsland, PlacedIslandObject, SkyHavenReaction, SkyHavenMilestone
-            # First find islands involving the user (via current_turn_user_id) or placed objects
-            # To be safe, just delete placed objects and reactions by this user
-            db.query(SkyHavenReaction).filter(SkyHavenReaction.reacted_by_user_id == uid).delete(synchronize_session=False)
-            db.query(PlacedIslandObject).filter(PlacedIslandObject.placed_by_user_id == uid).delete(synchronize_session=False)
-            db.query(SkyHavenIsland).filter(SkyHavenIsland.current_turn_user_id == uid).delete(synchronize_session=False)
-        except ImportError as e:
-            logger.warning(f"Skipped deleting sky haven data: {e}")
             pass
 
         db.commit()
@@ -229,12 +208,6 @@ async def register_fcm_token(
     current_user: User = Depends(get_current_user)
 ):
     try:
-        if data.fcmToken:
-            db.query(User).filter(
-                User.fcm_token == data.fcmToken,
-                User.id != current_user.id
-            ).update({"fcm_token": None})
-            
         current_user.fcm_token = data.fcmToken
         db.commit()
         logger.info(f"Registered FCM token for user {current_user.id}: {data.fcmToken[:15]}...")

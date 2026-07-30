@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Any
 
 class HomeHeroResponse(BaseModel):
     partner_connected: bool
@@ -14,10 +14,9 @@ class HomeHeroResponse(BaseModel):
     has_completed_separation: bool = False
     is_waiting_for_partner: bool = False
     has_acknowledged_completion: bool = False
-    latest_poke: Optional[dict] = None
+    latest_poke: Optional[Any] = None
     user_reflections_completed: bool = False
     partner_reflections_completed: bool = False
 
     class Config:
         from_attributes = True
-

@@ -8,8 +8,6 @@ from ..deps import get_current_user
 from ...models.user import User
 from ...models.relationship import Relationship
 from ...models.separation import Separation
-from ...models.reflection_session import ReflectionSession
-from ...api.v1.separations import check_and_expire_separation
 import random
 
 router = APIRouter(prefix="/home", tags=["Home"])
@@ -35,7 +33,7 @@ async def get_home_hero(
 ):
     try:
         # ── Update presence timestamp ──
-        now_utc = datetime.utcnow()
+        now_utc = datetime.now(timezone.utc)
         current_user.last_active_at = now_utc
         try:
             db.commit()
@@ -52,8 +50,11 @@ async def get_home_hero(
             (Relationship.user1_id == current_user.id) | (Relationship.user2_id == current_user.id)
         ).first() is not None
 
-        # Check for active separation (auto-expires overdue ones)
-        active_sep = check_and_expire_separation(db, current_user.id)
+        # Check for active separation
+        active_sep = db.query(Separation).filter(
+            (Separation.creator_id == current_user.id) | (Separation.partner_id == current_user.id),
+            Separation.status == "active"
+        ).order_by(Separation.created_at.desc()).first()
 
         partner_connected = active_rel is not None
         partner_name = current_user.partner_name
@@ -64,17 +65,19 @@ async def get_home_hero(
             partner_id = active_rel.user2_id if active_rel.user1_id == current_user.id else active_rel.user1_id
             if partner_id and partner_id != current_user.id:
                 partner = db.query(User).filter(User.id == partner_id).first()
+                if partner and not partner_name and partner.user_name:
+                    partner_name = partner.user_name
 
             # ── Detect shared presence (both active within 90 seconds) ──
-            PRESENCE_WINDOW = 90
+            PRESENCE_WINDOW = timedelta(seconds=90)
             if partner and partner.last_active_at:
                 partner_active_at = partner.last_active_at
-                # Make naive if aware, so we can subtract naive from naive
-                if partner_active_at.tzinfo is not None:
-                    partner_active_at = partner_active_at.replace(tzinfo=None)
+                # Make timezone-aware if naive
+                if partner_active_at.tzinfo is None:
+                    partner_active_at = partner_active_at.replace(tzinfo=timezone.utc)
                 
-                time_diff = (now_utc - partner_active_at).total_seconds()
-                shared_presence = 0 <= time_diff <= PRESENCE_WINDOW
+                time_diff = now_utc - partner_active_at
+                shared_presence = timedelta(seconds=0) <= time_diff <= PRESENCE_WINDOW
 
         # Check for completed separation
         completed_sep_query = db.query(Separation).filter(
@@ -87,9 +90,18 @@ async def get_home_hero(
         completed_sep = completed_sep_query.order_by(Separation.ended_at.desc()).first()
         has_completed_separation = completed_sep is not None
 
-        # Check for unacknowledged poke/gesture
+        # Check for active invite code (waiting for partner)
+        from ...models.invite_code import InviteCode
+        pending_invite = db.query(InviteCode).filter(
+            InviteCode.creator_id == current_user.id,
+            InviteCode.is_used == False,
+            InviteCode.expires_at > datetime.now(timezone.utc)
+        ).first()
+        is_waiting = (pending_invite is not None) and (not partner_connected)
+
+        # ── Check for unacknowledged poke/gesture (sent by partner to current user) ──
         from ...models.poke import Poke
-        
+
         unacknowledged_poke = None
         if partner:
             unacknowledged_poke = db.query(Poke).filter(
@@ -100,23 +112,14 @@ async def get_home_hero(
 
         latest_poke_data = None
         if unacknowledged_poke:
-            sender = db.query(User).filter(User.id == unacknowledged_poke.sender_id).first()
             sender_name = current_user.partner_name or "Your partner"
             latest_poke_data = {
                 "id": unacknowledged_poke.id,
+                "sender_id": unacknowledged_poke.sender_id,
                 "sender_name": sender_name,
                 "gesture": unacknowledged_poke.gesture,
                 "created_at": unacknowledged_poke.created_at.isoformat()
             }
-
-        # Check for active invite code (waiting for partner)
-        from ...models.invite_code import InviteCode
-        pending_invite = db.query(InviteCode).filter(
-            InviteCode.creator_id == current_user.id,
-            InviteCode.is_used == False,
-            InviteCode.expires_at > datetime.now(timezone.utc)
-        ).first()
-        is_waiting = (pending_invite is not None) and (not partner_connected)
 
         if not active_rel and not active_sep:
             return HomeHeroResponse(
@@ -229,6 +232,7 @@ async def get_home_hero(
             comfort_message = "It's okay to take a break. Take your time catching up, one step at a time."
 
         # Count completed reflections for this separation
+        from ...models.reflection_session import ReflectionSession
         user_completed_reflections = db.query(ReflectionSession).filter(
             ReflectionSession.user_id == current_user.id,
             ReflectionSession.separation_id == active_sep.id,

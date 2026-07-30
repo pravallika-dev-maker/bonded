@@ -50,6 +50,8 @@ dependencies:
   visibility_detector: ^0.4.0+2
   google_fonts: ^8.1.0
   font_awesome_flutter: ^11.0.0
+  video_player: ^2.11.1
+  chewie: ^1.14.1
 
 dev_dependencies:
   flutter_test:
@@ -81,6 +83,10 @@ flutter:
     - assets/sky_haven/
     - assets/models/
     - assets/web/
+    - assets/onboarding/flow1/
+    - assets/onboarding/flow2/
+    - assets/onboarding/flow3/
+    - assets/onboarding/flow4/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

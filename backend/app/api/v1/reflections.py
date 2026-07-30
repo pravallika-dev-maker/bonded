@@ -17,7 +17,6 @@ from ...schemas.reflection import (
     TodayStatusResponse,
 )
 from ...services.ai_service import analyze_answer
-from ...api.v1.separations import check_and_expire_separation
 
 router = APIRouter(prefix="/reflections", tags=["Reflections"])
 logger = logging.getLogger("bonded.reflections")
@@ -27,10 +26,13 @@ logger = logging.getLogger("bonded.reflections")
 
 def _get_active_separation(user: User, db: Session) -> Separation:
     """
-    Resolves the active separation for the user, auto-expiring it if overdue.
-    Raises 404 if no active separation exists.
+    Resolves the active separation by checking if the user is the creator or partner.
+    Supports both connected relationships and solo separations.
     """
-    sep = check_and_expire_separation(db, user.id)
+    sep = db.query(Separation).filter(
+        (Separation.creator_id == user.id) | (Separation.partner_id == user.id),
+        Separation.status == "active"
+    ).order_by(Separation.created_at.desc()).first()
 
     if not sep:
         raise HTTPException(
@@ -184,7 +186,7 @@ async def _trigger_reflection_notifications(user_id: int, sep_id: int, db: Sessi
                     recipient_id=partner.id,
                     notification_type="partner_reflection",
                     title="Journey Reflection",
-                    body=f"💭 {partner.partner_name or user.user_name or 'Your partner'} spent a moment reflecting on your relationship today.",
+                    body="💭 Someone spent a moment reflecting on your relationship today.",
                     fcm_token=partner.fcm_token
                 )
         
