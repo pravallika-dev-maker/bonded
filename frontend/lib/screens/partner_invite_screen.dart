@@ -107,18 +107,32 @@ class _PartnerInviteScreenState extends State<PartnerInviteScreen> with TickerPr
     await Future.delayed(const Duration(milliseconds: 1500));
     if (!mounted) return;
 
-    Navigator.of(context).pushReplacement(
-      PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 600),
-        pageBuilder: (_, __, ___) => JoinPartnerNameScreen(
-          userName: widget.userName,
-          fromDashboard: widget.fromDashboard,
-          isBondCreated: false,
+    if (widget.fromDashboard) {
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          transitionDuration: const Duration(milliseconds: 600),
+          pageBuilder: (_, __, ___) => JoinPartnerNameScreen(
+            userName: widget.userName,
+            fromDashboard: true,
+            isBondCreated: false,
+          ),
+          transitionsBuilder: (_, anim, __, child) =>
+              FadeTransition(opacity: anim, child: child),
         ),
-        transitionsBuilder: (_, anim, __, child) =>
-            FadeTransition(opacity: anim, child: child),
-      ),
-    );
+      );
+    } else {
+      Navigator.of(context).pushReplacement(
+        PageRouteBuilder(
+          transitionDuration: const Duration(milliseconds: 600),
+          pageBuilder: (_, __, ___) => PromiseScreen(
+            userName: widget.userName,
+            partnerName: widget.partnerName,
+          ),
+          transitionsBuilder: (_, anim, __, child) =>
+              FadeTransition(opacity: anim, child: child),
+        ),
+      );
+    }
   }
 
   @override

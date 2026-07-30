@@ -132,13 +132,13 @@ class _JoinWithCodeScreenState extends State<JoinWithCodeScreen>
             ),
           );
         } else {
-          // If from onboarding, go to JoinPartnerNameScreen
+          // If from onboarding, go to PromiseScreen
           Navigator.of(context).pushReplacement(
             PageRouteBuilder(
               transitionDuration: const Duration(milliseconds: 600),
-              pageBuilder: (_, __, ___) => JoinPartnerNameScreen(
+              pageBuilder: (_, __, ___) => PromiseScreen(
                 userName: widget.userName ?? 'You',
-                fromDashboard: false,
+                partnerName: pName,
               ),
               transitionsBuilder: (_, anim, __, child) =>
                   FadeTransition(opacity: anim, child: child),
