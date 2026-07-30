@@ -60,7 +60,8 @@ class _TutorialOnboardingState extends State<TutorialOnboarding> {
 
   void _startAutoScroll() {
     _autoScrollTimer?.cancel();
-    _autoScrollTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+    if (_currentPage >= _steps.length - 1) return; // Do not start timer if already on last slide
+    _autoScrollTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
       if (mounted) {
         if (_currentPage < _steps.length - 1) {
           _pageController.animateToPage(
@@ -69,12 +70,7 @@ class _TutorialOnboardingState extends State<TutorialOnboarding> {
             curve: Curves.easeInOut,
           );
         } else {
-          // Loop back to the first page
-          _pageController.animateToPage(
-            0,
-            duration: const Duration(milliseconds: 800),
-            curve: Curves.easeInOut,
-          );
+          timer.cancel();
         }
       }
     });
