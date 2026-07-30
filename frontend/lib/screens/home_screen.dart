@@ -4,8 +4,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/premium_sheen.dart';
 import '../widgets/primary_cta_button.dart';
+import '../widgets/tour_video_modal.dart';
 import '../services/api_service.dart';
 import 'main_dashboard_screen.dart';
 import 'join_partner_name_screen.dart';
@@ -110,6 +112,22 @@ class _HomeScreenState extends State<HomeScreen>
     });
 
     _entryController.forward();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndShowTour();
+    });
+  }
+
+  void _checkAndShowTour() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeen = prefs.getBool('has_seen_tour') ?? false;
+    if (!hasSeen && mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const TourVideoModal(),
+      );
+    }
   }
 
   @override

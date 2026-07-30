@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../widgets/premium_nav_bar.dart';
 import '../widgets/premium_sheen.dart';
+import '../widgets/tour_video_modal.dart';
 import 'separation_step1_intention_screen.dart';
 import 'history_screen.dart';
 import 'feel_screen.dart';
@@ -154,6 +155,22 @@ class _MainDashboardScreenState extends State<MainDashboardScreen> with WidgetsB
       }
       _fetchDashboardData();
     });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndShowTour();
+    });
+  }
+
+  void _checkAndShowTour() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeen = prefs.getBool('has_seen_tour') ?? false;
+    if (!hasSeen && mounted) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => const TourVideoModal(),
+      );
+    }
   }
 
   Future<void> _loadCachedDashboardData() async {
