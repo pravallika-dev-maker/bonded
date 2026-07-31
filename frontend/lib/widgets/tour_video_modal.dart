@@ -96,144 +96,147 @@ class _TourVideoModalState extends State<TourVideoModal> {
 
   @override
   Widget build(BuildContext context) {
-    return BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.only(
-          left: 20,
-          right: 20,
-          top: 16,
-          bottom: MediaQuery.of(context).padding.bottom + 20,
-        ),
-        decoration: BoxDecoration(
-          color: const Color(0xFF090204).withOpacity(0.95), // Match app's dark background
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(36)),
-          border: Border.all(
-            color: const Color(0xFF8A2E55).withOpacity(0.20), // Matches app CTA theme
-            width: 1.5,
+    return Material(
+      color: Colors.transparent,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          width: double.infinity,
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 16,
+            bottom: MediaQuery.of(context).padding.bottom + 20,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF8A2E55).withOpacity(0.08),
-              blurRadius: 40,
-              spreadRadius: 8,
+          decoration: BoxDecoration(
+            color: const Color(0xFF090204).withOpacity(0.95), // Match app's dark background
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(36)),
+            border: Border.all(
+              color: const Color(0xFF8A2E55).withOpacity(0.20), // Matches app CTA theme
+              width: 1.5,
             ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Drag Indicator bar
-            Center(
-              child: Container(
-                width: 44,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(2.5),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF8A2E55).withOpacity(0.08),
+                blurRadius: 40,
+                spreadRadius: 8,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Drag Indicator bar
+              Center(
+                child: Container(
+                  width: 44,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(2.5),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            // Immersive Video Area using Chewie Player
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: const Color(0xFF8A2E55).withOpacity(0.3), // Matches app CTA theme
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF8A2E55).withOpacity(0.10),
-                      blurRadius: 25,
-                      spreadRadius: 1,
+              // Immersive Video Area using Chewie Player
+              AspectRatio(
+                aspectRatio: 16 / 9,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: const Color(0xFF8A2E55).withOpacity(0.3), // Matches app CTA theme
+                      width: 1.5,
                     ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(22),
-                  child: _isInitialized && _chewieController != null
-                      ? Chewie(controller: _chewieController!)
-                      : const Center(
-                          child: CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8A2E55)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF8A2E55).withOpacity(0.10),
+                        blurRadius: 25,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(22),
+                    child: _isInitialized && _chewieController != null
+                        ? Chewie(controller: _chewieController!)
+                        : const Center(
+                            child: CircularProgressIndicator(
+                              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8A2E55)),
+                            ),
                           ),
-                        ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Title and Subtitle Column (No outer download button)
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: const [
-                // Video Title
-                Text(
-                  "Discover Bonding",
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontFamily: 'Quicksand',
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFFE8C6D3), // Elegant theme rose text
-                    letterSpacing: 0.5,
                   ),
                 ),
-                SizedBox(height: 8),
-                // Subtitle without the word "space"
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Text(
-                    "A quick video tour showcasing how to build closeness and stay connected.",
+              ),
+              const SizedBox(height: 24),
+
+              // Title and Subtitle Column (No outer download button)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: const [
+                  // Video Title
+                  Text(
+                    "Discover Bonding",
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontFamily: 'Quicksand',
-                      fontSize: 13,
-                      color: Color(0xFF8B6774), // Cozy theme dark rose
-                      height: 1.4,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFFE8C6D3), // Elegant theme rose text
+                      letterSpacing: 0.5,
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 28),
+                  SizedBox(height: 8),
+                  // Subtitle without the word "space"
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Text(
+                      "A quick video tour showcasing how to build closeness and stay connected.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'Quicksand',
+                        fontSize: 13,
+                        color: Color(0xFF8B6774), // Cozy theme dark rose
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 28),
 
-            // Got it, Let's go Button matching theme perfectly
-            ElevatedButton(
-              onPressed: () async {
-                await _markTourAsSeen();
-                if (context.mounted) {
-                  Navigator.pop(context);
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                foregroundColor: Colors.white,
-                backgroundColor: const Color(0xFF8A2E55), // Matches your app CTA color exactly
-                shadowColor: const Color(0xFF8A2E55).withOpacity(0.4),
-                elevation: 6,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(28), // Rounded button
+              // Got it, Let's go Button matching theme perfectly
+              ElevatedButton(
+                onPressed: () async {
+                  await _markTourAsSeen();
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  backgroundColor: const Color(0xFF8A2E55), // Matches your app CTA color exactly
+                  shadowColor: const Color(0xFF8A2E55).withOpacity(0.4),
+                  elevation: 6,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(28), // Rounded button
+                  ),
+                ),
+                child: const Text(
+                  "Got it, Let's go!",
+                  style: TextStyle(
+                    fontFamily: 'Quicksand',
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
-              child: const Text(
-                "Got it, Let's go!",
-                style: TextStyle(
-                  fontFamily: 'Quicksand',
-                  fontSize: 15,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

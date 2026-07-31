@@ -122,9 +122,13 @@ class _HomeScreenState extends State<HomeScreen>
     final prefs = await SharedPreferences.getInstance();
     final hasSeen = prefs.getBool('has_seen_tour') ?? false;
     if (!hasSeen && mounted) {
-      showDialog(
+      showModalBottomSheet(
         context: context,
-        barrierDismissible: false,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        barrierColor: Colors.black54,
+        isDismissible: false,
+        enableDrag: false,
         builder: (_) => const TourVideoModal(),
       );
     }
