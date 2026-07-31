@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
+import 'dart:async';
 import 'package:google_fonts/google_fonts.dart';
 
 class Onboarding3Screen extends StatefulWidget {
