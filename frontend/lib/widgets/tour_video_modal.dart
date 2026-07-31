@@ -42,9 +42,11 @@ class _TourVideoModalState extends State<TourVideoModal> {
                 OptionItem(
                   onTap: (context) async {
                     Navigator.pop(context); // Close the option panel sheet
-                    final Uri url = Uri.parse(widget.videoUrl);
-                    if (await canLaunchUrl(url)) {
+                    try {
+                      final Uri url = Uri.parse(widget.videoUrl);
                       await launchUrl(url, mode: LaunchMode.externalApplication);
+                    } catch (e) {
+                      debugPrint("Failed to launch video URL: $e");
                     }
                   },
                   iconData: Icons.download_rounded,
