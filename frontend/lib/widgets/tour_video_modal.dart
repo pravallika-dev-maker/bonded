@@ -27,6 +27,11 @@ class _TourVideoModalState extends State<TourVideoModal> {
     _videoController = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
       ..initialize().then((_) {
         if (mounted) {
+          _videoController!.addListener(() {
+            if (mounted) {
+              setState(() {});
+            }
+          });
           setState(() {
             _chewieController = ChewieController(
               videoPlayerController: _videoController!,
@@ -147,7 +152,43 @@ class _TourVideoModalState extends State<TourVideoModal> {
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(22),
                     child: _isInitialized && _chewieController != null
-                        ? Chewie(controller: _chewieController!)
+                        ? Stack(
+                            children: [
+                              Chewie(controller: _chewieController!),
+                              if (_videoController != null && !_videoController!.value.isPlaying)
+                                Positioned.fill(
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      _videoController!.play();
+                                    },
+                                    child: Container(
+                                      color: Colors.black.withOpacity(0.4),
+                                      child: Center(
+                                        child: Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF8A2E55).withOpacity(0.9),
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: const Color(0xFF8A2E55).withOpacity(0.5),
+                                                blurRadius: 15,
+                                                spreadRadius: 2,
+                                              ),
+                                            ],
+                                          ),
+                                          child: const Icon(
+                                            Icons.play_arrow_rounded,
+                                            size: 40,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          )
                         : const Center(
                             child: CircularProgressIndicator(
                               valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8A2E55)),
