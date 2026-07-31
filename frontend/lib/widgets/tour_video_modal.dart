@@ -1,7 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 
@@ -38,21 +37,6 @@ class _TourVideoModalState extends State<TourVideoModal> {
               showControlsOnInitialize: false, // Hides playback speed/rewind/fastforward indicators initially
               allowFullScreen: true,
               allowPlaybackSpeedChanging: true, // Playback speed controls
-              additionalOptions: (context) => [
-                OptionItem(
-                  onTap: (context) async {
-                    Navigator.pop(context); // Close the option panel sheet
-                    try {
-                      final Uri url = Uri.parse(widget.videoUrl);
-                      await launchUrl(url, mode: LaunchMode.externalApplication);
-                    } catch (e) {
-                      debugPrint("Failed to launch video URL: $e");
-                    }
-                  },
-                  iconData: Icons.download_rounded,
-                  title: 'Download Video',
-                ),
-              ],
               materialProgressColors: ChewieProgressColors(
                 playedColor: const Color(0xFF8A2E55),
                 handleColor: const Color(0xFFCA366C),
