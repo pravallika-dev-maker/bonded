@@ -25,7 +25,7 @@ class OnboardingFlowScreen extends StatefulWidget {
 class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
-  String _assignedFlowKey = 'stats_based'; // default fallback config key
+  String _assignedFlowKey = 'tutorial'; // Forced to flow 3 (tutorial)
 
   // ── Bulletproof Splash State ──
   bool _showSplash = true;
@@ -119,10 +119,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
     final results = await Future.wait([splashTimer, configFuture]);
     final Map<String, dynamic>? configResponse = results[1] as Map<String, dynamic>?;
 
-    String flowKey = 'stats_based'; // default fallback
-    if (configResponse != null && configResponse.containsKey('flow_key')) {
-      flowKey = configResponse['flow_key'].toString();
-    }
+    String flowKey = 'tutorial'; // Forced to flow 3 (tutorial)
 
     if (!mounted) return;
 
