@@ -3,10 +3,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'splash_screen.dart';
-import 'onboarding1_screen.dart';
-import 'onboarding2_screen.dart';
-import 'onboarding3_screen.dart';
-import 'onboarding4_screen.dart';
+import 'onboarding/story_onboarding.dart';
+import 'onboarding/stats_onboarding.dart';
 import 'onboarding/tutorial_onboarding.dart';
 import 'onboarding/emotional_onboarding.dart';
 import 'login_screen.dart';
@@ -26,6 +24,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
   String _assignedFlowKey = 'stats_based'; // default fallback config key
+  Map<String, dynamic>? _onboardingConfig;
 
   // ── Bulletproof Splash State ──
   bool _showSplash = true;
@@ -128,6 +127,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
 
     setState(() {
       _assignedFlowKey = flowKey;
+      _onboardingConfig = configResponse;
     });
 
     if (isLoggedInAndOnboarded) {
@@ -289,25 +289,25 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen> {
   Widget _buildActiveOnboardingWidget(VoidCallback onFinish) {
     switch (_assignedFlowKey) {
       case 'story_based':
-        return Onboarding1Content(
-          onNext: onFinish,
-          onSkip: onFinish,
+        return StoryOnboarding(
+          onFinish: onFinish,
+          config: _onboardingConfig,
         );
       case 'tutorial':
-        return Onboarding3Screen(
-          onNext: onFinish,
-          onSkip: onFinish,
+        return TutorialOnboarding(
+          onFinish: onFinish,
+          config: _onboardingConfig,
         );
       case 'emotional':
-        return Onboarding4Screen(
-          onNext: onFinish,
-          onSkip: onFinish,
+        return EmotionalOnboarding(
+          onFinish: onFinish,
+          config: _onboardingConfig,
         );
       case 'stats_based':
       default:
-        return Onboarding2Content(
-          onNext: onFinish,
-          onSkip: onFinish,
+        return StatsOnboarding(
+          onFinish: onFinish,
+          config: _onboardingConfig,
         );
     }
   }
