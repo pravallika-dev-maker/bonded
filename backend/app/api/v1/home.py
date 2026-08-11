@@ -56,18 +56,22 @@ async def get_home_hero(
             Separation.status == "active"
         ).order_by(Separation.created_at.desc()).first()
 
-        partner_connected = active_rel is not None
+        partner_connected = (active_rel is not None) or (current_user.partner_id is not None)
         partner_name = current_user.partner_name
         shared_presence = False
         partner = None
 
-        if active_rel:
+        # Resolve partner object
+        partner_id = current_user.partner_id
+        if not partner_id and active_rel:
             partner_id = active_rel.user2_id if active_rel.user1_id == current_user.id else active_rel.user1_id
-            if partner_id and partner_id != current_user.id:
-                partner = db.query(User).filter(User.id == partner_id).first()
-                if partner and not partner_name and partner.user_name:
-                    partner_name = partner.user_name
+        
+        if partner_id:
+            partner = db.query(User).filter(User.id == partner_id).first()
+            if partner and not partner_name and partner.user_name:
+                partner_name = partner.user_name
 
+        if partner:
             # ── Detect shared presence (both active within 90 seconds) ──
             PRESENCE_WINDOW = timedelta(seconds=90)
             if partner and partner.last_active_at:

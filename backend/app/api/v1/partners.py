@@ -280,3 +280,55 @@ async def disconnect_partner(current_user: User = Depends(get_current_user), db:
         db.rollback()
         logger.error(f"Database error in disconnect_partner: {e}")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="An internal error occurred. Please try again.")
+
+# ── Poke / Gestures Endpoints ──
+from ...models.poke import Poke
+from pydantic import BaseModel
+
+class PokeCreate(BaseModel):
+    gesture: String = ""
+
+@router.post("/poke")
+def send_poke(poke_data: dict, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if not current_user.partner_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="You do not have a partner connected to poke.")
+    
+    gesture = poke_data.get("gesture", "Love")
+    
+    new_poke = Poke(
+        sender_id=current_user.id,
+        recipient_id=current_user.partner_id,
+        gesture=gesture,
+        is_acknowledged=False
+    )
+    db.add(new_poke)
+    db.commit()
+    db.refresh(new_poke)
+    
+    # Send push notification to partner if FCM token exists
+    partner = db.query(User).filter(User.id == current_user.partner_id).first()
+    if partner and partner.fcm_token:
+        try:
+            create_notification_and_push(
+                db,
+                recipient_id=partner.id,
+                notification_type="poke_received",
+                title="New Poke Received!",
+                body=f"Your partner sent you a {gesture} 💕",
+                fcm_token=partner.fcm_token
+            )
+        except Exception as e:
+            logger.error(f"Failed to send poke notification: {e}")
+
+    return {"success": True, "poke_id": new_poke.id}
+
+@router.post("/poke/{poke_id}/acknowledge")
+def acknowledge_poke(poke_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    poke = db.query(Poke).filter(Poke.id == poke_id, Poke.recipient_id == current_user.id).first()
+    if not poke:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Poke interaction not found.")
+    
+    poke.is_acknowledged = True
+    db.commit()
+    return {"success": True}
+
