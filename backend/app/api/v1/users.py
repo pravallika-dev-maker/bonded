@@ -26,8 +26,6 @@ async def get_my_profile(
         partner = db.query(User).filter(User.id == current_user.partner_id).first()
 
     partner_name = current_user.partner_name
-    if not partner_name and is_connected and partner:
-        partner_name = partner.user_name
 
     # Merge logic for missing fields
     if is_connected and partner:

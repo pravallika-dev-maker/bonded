@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from ...database import get_db
 from ..deps import get_current_user, get_active_relationship
@@ -7,6 +7,9 @@ from ...models.separation import Separation
 from ...schemas.separation import SeparationCreate, SeparationResponse, ActiveSeparationResponse
 from ...services.notification_service import create_notification, create_notification_and_push, send_data_push
 from datetime import datetime, date, timedelta, timezone
+import logging
+
+logger = logging.getLogger("bonded.separations")
 
 router = APIRouter(prefix="/separations", tags=["Separations"])
 
@@ -20,10 +23,48 @@ MOOD_PHRASES = {
     7: "A week of choosing space"
 }
 
+
+# ── Background Tasks ──────────────────────────────────────────────────────────
+
+async def _notify_separation_started_in_background(creator_id: int, partner_id: int) -> None:
+    """
+    Background task: Notify partner of separation starting.
+    - Runs in the background to prevent FCM latency from delaying response.
+    - Uses own database session.
+    """
+    from ...database import SessionLocal
+    db = SessionLocal()
+    try:
+        creator = db.query(User).filter(User.id == creator_id).first()
+        partner = db.query(User).filter(User.id == partner_id).first()
+        if not creator or not partner:
+            logger.warning(f"[BG] notify_separation_started: creator {creator_id} or partner {partner_id} not found")
+            return
+
+        # Use what the RECIPIENT calls the creator (their stored partner_name)
+        # not the creator's registered user_name
+        display_name = partner.partner_name or creator.user_name or 'Your partner'
+        create_notification_and_push(
+            db,
+            recipient_id=partner_id,
+            notification_type="separation_started",
+            title="🌿 Space has begun",
+            body=f"{display_name} started a separation.",
+            fcm_token=partner.fcm_token
+        )
+    except Exception as e:
+        logger.error(f"[BG] notify_separation_started error: {e}")
+    finally:
+        db.close()
+
+
+# ── Endpoints ─────────────────────────────────────────────────────────────────
+
 @router.post("/", response_model=SeparationResponse)
 def create_separation(
-    request: SeparationCreate, 
-    current_user: User = Depends(get_current_user), 
+    request: SeparationCreate,
+    background_tasks: BackgroundTasks,
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     active_rel = Depends(get_active_relationship)
 ):
@@ -71,23 +112,15 @@ def create_separation(
     db.commit()
     db.refresh(new_sep)
     
-    # Notify partner
+    # Notify partner in background
     if current_user.partner_id:
-        partner = db.query(User).filter(User.id == current_user.partner_id).first()
-        create_notification_and_push(
-            db, 
-            recipient_id=current_user.partner_id, 
-            notification_type="separation_started", 
-            title="🌿 Space has begun", 
-            body=f"{current_user.user_name or 'Your partner'} started a separation.",
-            fcm_token=partner.fcm_token if partner else None
+        background_tasks.add_task(
+            _notify_separation_started_in_background,
+            current_user.id,
+            current_user.partner_id
         )
         
-    partner_name = None
-    if current_user.partner_id:
-        partner = db.query(User).filter(User.id == current_user.partner_id).first()
-        if partner:
-            partner_name = current_user.partner_name or partner.user_name
+    partner_name = current_user.partner_name
             
     # Convert to response — day 1 is the start date itself (1-based, same as reflections)
     new_sep.days_elapsed = (date.today() - new_sep.start_date).days + 1
@@ -96,7 +129,7 @@ def create_separation(
 
 @router.get("/active", response_model=ActiveSeparationResponse)
 def get_active_separation(
-    current_user: User = Depends(get_current_user), 
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     active_rel = Depends(get_active_relationship)
 ):
@@ -118,13 +151,8 @@ def get_active_separation(
     # 3. Compute mood_phrase from day number
     phrase = MOOD_PHRASES.get(days, "Continuing to grow")
     
-    # Resolve partner_name: try live partner record first, then onboarding fallback
-    partner_name = current_user.partner_name  # onboarding fallback
-    other_user_id = sep.partner_id if sep.creator_id == current_user.id else sep.creator_id
-    if other_user_id:
-        other_user = db.query(User).filter(User.id == other_user_id).first()
-        if other_user and other_user.user_name and not partner_name:
-            partner_name = other_user.user_name
+    # Resolve partner_name
+    partner_name = current_user.partner_name
             
     return ActiveSeparationResponse(
         is_active=True,

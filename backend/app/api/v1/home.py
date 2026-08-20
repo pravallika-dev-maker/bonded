@@ -68,8 +68,6 @@ async def get_home_hero(
         
         if partner_id:
             partner = db.query(User).filter(User.id == partner_id).first()
-            if partner and not partner_name and partner.user_name:
-                partner_name = partner.user_name
 
         if partner:
             # ── Detect shared presence (both active within 90 seconds) ──
@@ -94,14 +92,7 @@ async def get_home_hero(
         completed_sep = completed_sep_query.order_by(Separation.ended_at.desc()).first()
         has_completed_separation = completed_sep is not None
 
-        # Check for active invite code (waiting for partner)
-        from ...models.invite_code import InviteCode
-        pending_invite = db.query(InviteCode).filter(
-            InviteCode.creator_id == current_user.id,
-            InviteCode.is_used == False,
-            InviteCode.expires_at > datetime.now(timezone.utc)
-        ).first()
-        is_waiting = (pending_invite is not None) and (not partner_connected)
+        is_waiting = current_user.is_actively_waiting and (not partner_connected)
 
         # ── Check for unacknowledged poke/gesture (sent by partner to current user) ──
         from ...models.poke import Poke
